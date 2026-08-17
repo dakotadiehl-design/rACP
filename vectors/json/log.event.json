@@ -1,0 +1,21 @@
+{
+  "acp": "1.2",
+  "message_id": "0193f8d8-4c4e-7d8b-a2ab-000000000025",
+  "type": "log.event",
+  "source": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001"
+  },
+  "timestamp_utc": "2026-08-17T16:42:15.231Z",
+  "qos": "best_effort",
+  "flags": [],
+  "payload": {
+    "code": "boot",
+    "severity": "info",
+    "message": "up"
+  },
+  "destination": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002"
+  },
+  "session_id": "0193f8d8-4c4e-7d8b-a2ab-000000000013",
+  "sequence": 1
+}

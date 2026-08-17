@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/common/defs.schema.json",
+  "title": "ACP common definitions",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "RFC 4122 UUID, lowercase hyphenated hex. No preferred version."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "MAJOR.MINOR protocol or capability version"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["conductor", "prism", "lyric", "bridge", "tool", "simulator"]
+    },
+    "qos": {
+      "type": "string",
+      "enum": ["reliable", "latest", "best_effort"]
+    },
+    "flag": {
+      "type": "string",
+      "description": "Unknown optional flags are ignored on typed decode"
+    },
+    "command_status": {
+      "type": "string",
+      "enum": ["accepted", "rejected", "applied", "completed", "failed", "duplicate"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["unverified", "sent_assumed", "pending", "confirmed", "mismatch"]
+    },
+    "health_status": {
+      "type": "string",
+      "enum": ["ok", "degraded", "warning", "critical", "offline"]
+    },
+    "error_category": {
+      "type": "string",
+      "enum": ["protocol", "validation", "authorization", "not_found", "conflict", "unavailable", "timeout", "internal"]
+    },
+    "error_severity": {
+      "type": "string",
+      "enum": ["info", "warning", "error", "critical"]
+    },
+    "requirement": {
+      "type": "string",
+      "enum": ["required", "recommended", "optional"]
+    },
+    "conformance_state": {
+      "type": "string",
+      "enum": ["ready", "syncing", "missing", "stale", "hash_mismatch", "incompatible", "degraded", "failed"]
+    },
+    "assignment_reason": {
+      "type": "string",
+      "enum": ["explicit_assignment", "performer_preference", "show_default", "fallback"]
+    },
+    "chart_type": {
+      "type": "string",
+      "description": "Extensible. Well-known: nashville_number, chord_lyrics, lyrics_only, lead_sheet, sheet_music, custom"
+    },
+    "auth_mode": {
+      "type": "string",
+      "enum": ["trusted_lan", "tls", "mutual_tls"]
+    },
+    "encoding": {
+      "type": "string",
+      "enum": ["cbor", "json"]
+    },
+    "apply_mode": {
+      "type": "string",
+      "enum": ["validate_then_commit"]
+    },
+    "late_policy": {
+      "type": "string",
+      "enum": ["reject", "execute_immediately"]
+    },
+    "transfer_locator_mode": {
+      "type": "string",
+      "enum": ["chunked", "http"]
+    },
+    "nonneg_int": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "uint64": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709551615
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Duration in integer milliseconds"
+    },
+    "sha256_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+      "description": "RFC 3339 UTC with exactly millisecond precision and Z"
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["node_id"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/uuid" },
+        "component_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "$ref": "#/$defs/version" }
+      }
+    },
+    "node_identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["node_id", "instance_id", "role", "name"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/uuid" },
+        "instance_id": { "$ref": "#/$defs/uuid" },
+        "role": { "$ref": "#/$defs/role" },
+        "name": { "type": "string", "minLength": 1 },
+        "product_version": { "type": "string" }
+      }
+    },
+    "protocol_range": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "$ref": "#/$defs/version" },
+        "max": { "$ref": "#/$defs/version" }
+      }
+    },
+    "error_details": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "error_body": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code", "category", "severity", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "category": { "$ref": "#/$defs/error_category" },
+        "severity": { "$ref": "#/$defs/error_severity" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" },
+        "details": { "$ref": "#/$defs/error_details" }
+      }
+    },
+    "asset_ref": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset_id", "asset_type", "revision", "sha256"],
+      "properties": {
+        "asset_id": { "$ref": "#/$defs/uuid" },
+        "asset_type": { "type": "string", "minLength": 1 },
+        "revision": { "$ref": "#/$defs/uint64" },
+        "sha256": { "$ref": "#/$defs/sha256_hex" },
+        "media_type": { "type": "string" },
+        "size_bytes": { "$ref": "#/$defs/uint64" },
+        "producer": { "type": "string" }
+      }
+    },
+    "show_identity": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "manifest_sha256"],
+      "properties": {
+        "show_id": { "$ref": "#/$defs/uuid" },
+        "show_name": { "type": "string" },
+        "revision": { "$ref": "#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "#/$defs/sha256_hex" },
+        "policy": { "type": "string" }
+      }
+    },
+    "state_resource": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["resource", "revision", "owner", "value"],
+      "properties": {
+        "resource": { "type": "string", "minLength": 1 },
+        "revision": { "$ref": "#/$defs/uint64" },
+        "owner": { "$ref": "#/$defs/endpoint" },
+        "value": { "type": "object", "additionalProperties": true },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "authority_node_id": { "$ref": "#/$defs/uuid" },
+        "authority_epoch": { "$ref": "#/$defs/uint64" }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/config/set.schema.json",
+  "title": "config.set payload — write side; secrets allowed as values",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["transaction_id", "expected_revision", "changes", "apply"],
+  "properties": {
+    "transaction_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "expected_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["path", "value"],
+        "properties": {
+          "path": { "type": "string" },
+          "value": true
+        }
+      }
+    },
+    "apply": { "$ref": "../common/defs.schema.json#/$defs/apply_mode" },
+    "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+  }
+}

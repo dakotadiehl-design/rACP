@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/health/messages.schema.json",
+  "title": "ACP health payloads",
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/health_status" },
+        "code": { "type": "string" },
+        "summary": { "type": "string" }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["uptime_ms", "status"],
+      "properties": {
+        "uptime_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/health_status" },
+        "summary": { "type": "string" },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "cpu_pct": { "type": "number" },
+            "memory_pct": { "type": "number" },
+            "temperature_c": { "type": "number" }
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" }
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code", "severity", "message", "first_seen", "last_seen", "count"],
+      "properties": {
+        "code": { "type": "string" },
+        "severity": { "$ref": "../common/defs.schema.json#/$defs/error_severity" },
+        "message": { "type": "string" },
+        "first_seen": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "last_seen": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "count": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "remediation": { "type": "string" }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "../common/defs.schema.json#/$defs/health_status" },
+        "summary": { "type": "string" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/component" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/warning" }
+        }
+      }
+    }
+  }
+}

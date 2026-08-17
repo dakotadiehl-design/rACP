@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/telemetry/messages.schema.json",
+  "title": "ACP telemetry payloads",
+  "$defs": {
+    "metric": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name", "value"],
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "number" },
+        "unit": { "type": "string" }
+      }
+    },
+    "batch": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["metrics"],
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/metric" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "$comment": "Provisional ACP v1.2 protocol constants. Collision-check before the first tagged release. After a tagged release these become deployment commitments.",
+  "protocol": {
+    "name": "Aurora Communications Protocol",
+    "family": "aurora",
+    "baseline": "1.2",
+    "min_supported": "1.0",
+    "max_supported": "1.2"
+  },
+  "discovery": {
+    "provisional": true,
+    "multicast_group": "239.255.40.1",
+    "udp_port": 27420,
+    "magic": "ACP0",
+    "magic_bytes": [65, 67, 80, 48],
+    "datagram_version": 1,
+    "encoding_cbor": 0,
+    "encoding_json": 1,
+    "max_datagram_bytes": 1200,
+    "advertisement_interval_ms": 2000,
+    "advertisement_jitter_ms": 500,
+    "query_response_jitter_ms": 200,
+    "send_encoding": "cbor"
+  },
+  "session": {
+    "provisional": true,
+    "default_ws_port": 27421,
+    "ws_path": "/acp",
+    "preferred_encoding": "cbor",
+    "fallback_encoding": "json",
+    "default_auth_mode": "trusted_lan",
+    "reconnect_initial_ms": 100,
+    "reconnect_max_ms": 5000
+  },
+  "heartbeat": {
+    "full_profile_interval_ms": 1000,
+    "lightweight_interval_ms": 5000,
+    "offline_missed_intervals": 3,
+    "recover_consecutive_goods": 2
+  },
+  "limits": {
+    "full": {
+      "max_message_bytes": 1048576,
+      "max_nesting_depth": 16,
+      "max_collection_length": 4096,
+      "max_decoded_bytes": 4194304,
+      "outbound_reliable_queue": 256,
+      "outbound_latest_keys": 128,
+      "outbound_best_effort_queue": 64,
+      "max_correlation_waiters": 128,
+      "max_subscriptions": 64,
+      "max_idempotency_records": 1024,
+      "max_concurrent_transfers": 4,
+      "max_chunk_bytes": 16384,
+      "max_transfer_bytes": 262144
+    },
+    "lightweight": {
+      "max_message_bytes": 8192,
+      "max_nesting_depth": 8,
+      "max_collection_length": 256,
+      "max_decoded_bytes": 32768,
+      "outbound_reliable_queue": 32,
+      "outbound_latest_keys": 16,
+      "outbound_best_effort_queue": 8,
+      "max_correlation_waiters": 16,
+      "max_subscriptions": 8,
+      "max_idempotency_records": 64,
+      "max_concurrent_transfers": 1,
+      "max_chunk_bytes": 1024,
+      "max_transfer_bytes": 32768
+    }
+  },
+  "idempotency": {
+    "retain_after_session_ms": 60000
+  },
+  "blackout": {
+    "clear_on_disconnect_default": false
+  }
+}

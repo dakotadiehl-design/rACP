@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "acp-model",
+    "acp-codec",
+    "acp-session",
+]
+
+[workspace.package]
+version = "1.2.0"
+edition = "2021"
+license = "LicenseRef-Proprietary"
+repository = "https://github.com/aurora/acp"
+rust-version = "1.75"
+
+[workspace.lints.rust]
+unexpected_cfgs = "warn"

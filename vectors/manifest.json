@@ -1,0 +1,161 @@
+{
+  "version": "1.2",
+  "vectors": [
+    {
+      "id": "session.hello",
+      "json": "json/session.hello.json",
+      "cbor": "cbor/session.hello.cbor",
+      "sha256": "f8ee0bb07b98ff22e16d2b665be29e2d9b9e6ec1d254dccc44f60b237a3dc711"
+    },
+    {
+      "id": "session.hello_ack",
+      "json": "json/session.hello_ack.json",
+      "cbor": "cbor/session.hello_ack.cbor",
+      "sha256": "238e1bec4937904c0c1ff5845d9ddf9f73aa0629c09fa11a24d984ccbc1a91c7"
+    },
+    {
+      "id": "command.ack",
+      "json": "json/command.ack.json",
+      "cbor": "cbor/command.ack.cbor",
+      "sha256": "07fec5ca97bda9a5cead683bb9fd3a55fb108d400de4b5247e257ef936b7a72a"
+    },
+    {
+      "id": "health.heartbeat",
+      "json": "json/health.heartbeat.json",
+      "cbor": "cbor/health.heartbeat.cbor",
+      "sha256": "d81f2a73736240f616a69463feac425f7d103ee7e9c3d646e7370e00edc57739"
+    },
+    {
+      "id": "state.delta",
+      "json": "json/state.delta.json",
+      "cbor": "cbor/state.delta.cbor",
+      "sha256": "1f658768fffffc43f710d9b694a8954bab939a6b90aaf87d4f9e0e6f4dd970ba"
+    },
+    {
+      "id": "bridge.blackout",
+      "json": "json/bridge.blackout.json",
+      "cbor": "cbor/bridge.blackout.cbor",
+      "sha256": "f766e050728abc785e071a509d38f0ed3b4b7aff5b4da6e7d6f4e40a8b64a6ba"
+    },
+    {
+      "id": "error.report",
+      "json": "json/error.report.json",
+      "cbor": "cbor/error.report.cbor",
+      "sha256": "ee9e9df001bd39bbf0a356d8547bd8d01c569d5aaed3781e9293d6dfd7c1a3f4"
+    },
+    {
+      "id": "show.prepare",
+      "json": "json/show.prepare.json",
+      "cbor": "cbor/show.prepare.cbor",
+      "sha256": "fd68c7272cb5d8cd3c5eaa1ebb1ba647b620eb875872acf72d57149c8c8bd1e2"
+    },
+    {
+      "id": "discovery.advertisement",
+      "json": "json/discovery.advertisement.json",
+      "cbor": "cbor/discovery.advertisement.cbor",
+      "sha256": "eda407be53b92cae387fce694654621f80e492c1a0a9425b68c3827de07e7dfb"
+    },
+    {
+      "id": "command.execute",
+      "json": "json/command.execute.json",
+      "cbor": "cbor/command.execute.cbor",
+      "sha256": "da97ef3d443e5fb8790a86b3903ad30517ff317c39e58673002e4445d0035620"
+    },
+    {
+      "id": "state.request",
+      "json": "json/state.request.json",
+      "cbor": "cbor/state.request.cbor",
+      "sha256": "a50a744d760060f738ed497133653b952e38d342f421db0f78d71faa5e57084c"
+    },
+    {
+      "id": "capability.list",
+      "json": "json/capability.list.json",
+      "cbor": "cbor/capability.list.cbor",
+      "sha256": "9f09aede459c3d3d81c49526121a6dc5356a3f0144688b3cba97a3a626dffc30"
+    },
+    {
+      "id": "config.get",
+      "json": "json/config.get.json",
+      "cbor": "cbor/config.get.cbor",
+      "sha256": "2d3ab2b5e7502ec117002decf27661c4da3b2ebc988b40cc746c05038a92faa2"
+    },
+    {
+      "id": "log.event",
+      "json": "json/log.event.json",
+      "cbor": "cbor/log.event.cbor",
+      "sha256": "e9abaead9d9043e5d9e8ed1028950b298f60cf929a662512c86a1d2552631460"
+    },
+    {
+      "id": "telemetry.metric",
+      "json": "json/telemetry.metric.json",
+      "cbor": "cbor/telemetry.metric.cbor",
+      "sha256": "72c5a574dad7f047e1154fd23d881a8ac5ab4c541ac794b9c2c6a429a7827e4f"
+    },
+    {
+      "id": "cue.go",
+      "json": "json/cue.go.json",
+      "cbor": "cbor/cue.go.cbor",
+      "sha256": "bce52e0b90e3803aa17d94f47ef3fdc9b2f8e41b1297b2f359ff3e2901847512"
+    },
+    {
+      "id": "song.select",
+      "json": "json/song.select.json",
+      "cbor": "cbor/song.select.cbor",
+      "sha256": "262b502e50f9f9950e2244bff4428493b37e08786f5fecf8d730001c6d869ca6"
+    },
+    {
+      "id": "section.enter",
+      "json": "json/section.enter.json",
+      "cbor": "cbor/section.enter.cbor",
+      "sha256": "a0e73c5e619c16ff9d0eda70398caa65da6ccefd633c2491144b95af75d29e32"
+    },
+    {
+      "id": "transport.play",
+      "json": "json/transport.play.json",
+      "cbor": "cbor/transport.play.cbor",
+      "sha256": "a091972434238f48d59057a6207d5079d8ba291b01327a00f7a554b3db63d420"
+    },
+    {
+      "id": "resource.offer",
+      "json": "json/resource.offer.json",
+      "cbor": "cbor/resource.offer.cbor",
+      "sha256": "207360087f08847aaae8a896083529086887a8f96faf7974ac21e6366b334f60"
+    },
+    {
+      "id": "lyric.client_ready",
+      "json": "json/lyric.client_ready.json",
+      "cbor": "cbor/lyric.client_ready.cbor",
+      "sha256": "4da923ccdfb34263f94c427ef07fba788c577336e9c431fd51393241fa6aa20a"
+    },
+    {
+      "id": "participant.identity",
+      "json": "json/participant.identity.json",
+      "cbor": "cbor/participant.identity.cbor",
+      "sha256": "8d2888e824a3054955170e75d266ba201235879ad12a1dde8fd09c1bc01594d8"
+    },
+    {
+      "id": "chart.metadata",
+      "json": "json/chart.metadata.json",
+      "cbor": "cbor/chart.metadata.cbor",
+      "sha256": "2e0fd55693a3d325df49e6c53972f6853a02de1a3553428396f8c462200369ae"
+    },
+    {
+      "id": "asset.status",
+      "json": "json/asset.status.json",
+      "cbor": "cbor/asset.status.cbor",
+      "sha256": "49670e15bc14cc582158930dfb72b71311eeac1cd7db079912c4e8d44944ebee"
+    },
+    {
+      "id": "manifest.get",
+      "json": "json/manifest.get.json",
+      "cbor": "cbor/manifest.get.cbor",
+      "sha256": "1b7c1036d660ef20e5bfee4de5c3f7d737b2f8da4241539c7d4f8c50bc7d9b53"
+    },
+    {
+      "id": "show.arm",
+      "json": "json/show.arm.json",
+      "cbor": "cbor/show.arm.cbor",
+      "sha256": "1d17f517caa39d61189ceed9bbdd376bef8f1f49de542e6fb10472cbbcd4a033"
+    }
+  ]
+}

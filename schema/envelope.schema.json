@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/envelope.schema.json",
+  "title": "ACP common envelope",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "acp",
+    "message_id",
+    "type",
+    "source",
+    "timestamp_utc",
+    "qos",
+    "flags",
+    "payload"
+  ],
+  "properties": {
+    "acp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Message schema version used to encode this envelope. Must be <= negotiated session version."
+    },
+    "message_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$",
+      "description": "Lowercase dotted message type"
+    },
+    "source": { "$ref": "common/defs.schema.json#/$defs/endpoint" },
+    "destination": { "$ref": "common/defs.schema.json#/$defs/endpoint" },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Required after HELLO completes"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Assigned after QoS, only for transmitted messages. Required after HELLO."
+    },
+    "timestamp_utc": { "$ref": "common/defs.schema.json#/$defs/timestamp_utc" },
+    "correlation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "causation_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "qos": { "$ref": "common/defs.schema.json#/$defs/qos" },
+    "flags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Empty array allowed. Unknown optional flags ignored."
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

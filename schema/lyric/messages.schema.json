@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/lyric/messages.schema.json",
+  "title": "ACP Lyric payloads",
+  "$defs": {
+    "assignment_manifest": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["participant_id", "show_id", "assets"],
+      "properties": {
+        "participant_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "show_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/asset_ref" }
+        }
+      }
+    },
+    "assignment_status": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["participant_id", "show_id", "status"],
+      "properties": {
+        "participant_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "show_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "assigned_count": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "verified_count": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" },
+        "problems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "song_id": { "type": "string" },
+              "asset_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+              "required_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+              "state": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" }
+            }
+          }
+        }
+      }
+    },
+    "client_ready": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["node_id", "device_id", "supported_chart_types"],
+      "properties": {
+        "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "device_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "participant_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "supported_chart_types": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/chart_type" }
+        }
+      }
+    },
+    "ready": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["participant_id", "ready"],
+      "properties": {
+        "participant_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "ready": { "type": "boolean" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" }
+      }
+    }
+  }
+}

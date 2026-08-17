@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/log/messages.schema.json",
+  "title": "ACP log payloads",
+  "$defs": {
+    "event": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "severity": { "$ref": "../common/defs.schema.json#/$defs/error_severity" },
+        "message": { "type": "string" },
+        "fields": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install and test
+        run: |
+          python3 -m pip install -e './python[dev]'
+          python3 -m ruff check --config python/pyproject.toml python scripts
+          (cd python && python3 -m mypy src/acp)
+          (cd python && python3 -m pytest tests --cov=acp --cov-fail-under=70)
+      - name: Registry and vectors
+        run: |
+          python3 scripts/check_registry.py
+          python3 scripts/freeze_vectors.py
+      - name: Localhost WebSocket HELLO
+        run: python3 tests/interop/test_ws_hello.py
+      - name: Worktree stays clean
+        run: |
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+      - name: Wheel install outside the tree
+        run: |
+          python3 -m pip install build
+          python3 -m build --wheel --outdir dist python
+          python3 -m pip install --force-reinstall dist/*.whl
+          mkdir -p /tmp/acp-wheel-test && cd /tmp/acp-wheel-test
+          python3 - <<'PY'
+          from acp.constants import load, limits
+          from acp.registry import lookup
+          from acp.discovery import MAGIC
+          assert load()["protocol"]["baseline"] == "1.2"
+          assert limits()["max_message_bytes"] > 0
+          assert lookup("session.hello")["legal_before_handshake"]
+          assert MAGIC == b"ACP0"
+          print("wheel import ok")
+          PY
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Test
+        run: cargo test --manifest-path rust/Cargo.toml
+      - name: Clippy
+        run: cargo clippy --manifest-path rust/Cargo.toml -- -D warnings
+      - name: rustfmt
+        working-directory: rust
+        run: cargo fmt -- --check
+
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No generated artifacts in the worktree
+        run: |
+          test ! -d rust/target
+          test ! -d tmp
+          test -z "$(git ls-files -z -- '**/__pycache__/**' '**/*.pyc' '**/*.egg-info/**' | tr -d '\0')"
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test
+        run: swift test --package-path swift

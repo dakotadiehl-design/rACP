@@ -1,0 +1,17 @@
+[package]
+name = "acp-session"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ACP session engine (Tokio full profile)"
+rust-version.workspace = true
+
+[dependencies]
+acp-model = { path = "../acp-model" }
+acp-codec = { path = "../acp-codec" }
+tokio = { version = "1", features = ["io-util", "macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+[lints]
+workspace = true

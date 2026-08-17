@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/song/messages.schema.json",
+  "title": "ACP song payloads",
+  "$defs": {
+    "select": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["song_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "song_id": { "type": "string" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "start": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["song_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "song_id": { "type": "string" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["song_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "song_id": { "type": "string" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["song_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "song_id": { "type": "string" },
+        "section_id": { "type": "string" },
+        "elapsed_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+        "bar": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "beat": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "tempo_bpm": { "type": "number" }
+      }
+    }
+  }
+}

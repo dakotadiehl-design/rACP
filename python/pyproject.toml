@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aurora-acp"
+version = "1.2.0"
+description = "Aurora Communications Protocol — Python reference SDK"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "LicenseRef-Proprietary" }
+authors = [{ name = "Aurora" }]
+dependencies = [
+    "jsonschema>=4.23",
+    "referencing>=0.35",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "hypothesis>=6.100",
+]
+
+[project.scripts]
+acp = "acp.__main__:main"
+acp-inspect = "acp.__main__:main"
+acp-sim = "acp.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/aurora/acp"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+acp = ["data/*.json", "data/schema/**/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["UP042"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+packages = ["acp"]
+explicit_package_bases = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["acp"]
+omit = ["*/tests/*", "*/acp/__main__.py", "*/acp/ws.py"]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true

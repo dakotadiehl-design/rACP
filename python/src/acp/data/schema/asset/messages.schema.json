@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/asset/messages.schema.json",
+  "title": "ACP asset / manifest payloads",
+  "$defs": {
+    "manifest_get": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" }
+      }
+    },
+    "manifest_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "assets"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+        "assets": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "../common/defs.schema.json#/$defs/asset_ref" },
+              {
+                "type": "object",
+                "properties": {
+                  "requirement": { "$ref": "../common/defs.schema.json#/$defs/requirement" }
+                }
+              }
+            ]
+          }
+        },
+        "participant_assignments": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        }
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["assets"],
+      "properties": {
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/asset_ref" }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset_id", "state"],
+      "properties": {
+        "asset_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "state": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" },
+        "sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" }
+      }
+    },
+    "required": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset", "requirement"],
+      "properties": {
+        "asset": { "$ref": "../common/defs.schema.json#/$defs/asset_ref" },
+        "requirement": { "$ref": "../common/defs.schema.json#/$defs/requirement" }
+      }
+    },
+    "sync": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset"],
+      "properties": {
+        "asset": { "$ref": "../common/defs.schema.json#/$defs/asset_ref" }
+      }
+    },
+    "sync_result": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["asset_id", "status"],
+      "properties": {
+        "asset_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" },
+        "error": { "$ref": "../common/defs.schema.json#/$defs/error_body" }
+      }
+    }
+  }
+}

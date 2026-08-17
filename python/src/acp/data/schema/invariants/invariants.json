@@ -1,0 +1,36 @@
+{
+  "invariants": [
+    {
+      "id": "confidence_not_from_transmit",
+      "description": "Transport or MIDI transmit success must not produce confidence=confirmed"
+    },
+    {
+      "id": "non_owner_cannot_publish",
+      "description": "A non-owner must not publish authoritative state for an owned resource"
+    },
+    {
+      "id": "config_get_redacts_secrets",
+      "description": "config.get / config.result must not contain secret field values"
+    },
+    {
+      "id": "blackout_persist_on_reconnect",
+      "description": "Reconnect does not clear blackout unless clear_on_disconnect is true"
+    },
+    {
+      "id": "lyric_no_infer_chart_from_song",
+      "description": "A Lyric client must not infer chart_id from song_id"
+    },
+    {
+      "id": "ack_correlation_binding",
+      "description": "command.ack.correlation_id equals request correlation_id or request message_id"
+    },
+    {
+      "id": "sequence_after_qos",
+      "description": "Sequence numbers are assigned only to transmitted messages after QoS"
+    },
+    {
+      "id": "v12_gated_by_session_and_capability",
+      "description": "1.2-only types require session>=1.2 and the listed capability"
+    }
+  ]
+}

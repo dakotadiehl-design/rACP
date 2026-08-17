@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/state/messages.schema.json",
+  "title": "ACP state payloads",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["resources"],
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/state_resource" }
+        }
+      }
+    },
+    "delta": {
+      "allOf": [
+        { "$ref": "../common/defs.schema.json#/$defs/state_resource" }
+      ]
+    }
+  }
+}

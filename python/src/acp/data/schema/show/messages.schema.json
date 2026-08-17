@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/show/messages.schema.json",
+  "title": "ACP show payloads",
+  "$defs": {
+    "load": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "ready": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "ready"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "ready": { "type": "boolean" },
+        "degraded": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "song_id": { "type": "string" },
+        "section_id": { "type": "string" },
+        "bar": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "beat": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "elapsed_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" }
+      }
+    },
+    "prepare": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show"],
+      "properties": {
+        "show": { "$ref": "../common/defs.schema.json#/$defs/show_identity" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "conformance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "status"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/conformance_state" },
+        "problems": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "manifest_sha256"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "manifest_sha256"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+        "force": { "type": "boolean" },
+        "deviations": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "armed": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id", "revision", "manifest_sha256", "armed"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "manifest_sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+        "armed": { "type": "boolean" },
+        "deviations": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+      }
+    },
+    "disarm": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["show_id"],
+      "properties": {
+        "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

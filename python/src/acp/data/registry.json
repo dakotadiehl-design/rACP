@@ -1,0 +1,2406 @@
+{
+  "version": "1.2",
+  "messages": [
+    {
+      "type": "session.hello",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "session.hello_ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": true,
+      "security_class": "handshake",
+      "schema": "session/messages.schema.json#/$defs/hello"
+    },
+    {
+      "type": "session.hello_ack",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": true,
+      "security_class": "handshake",
+      "schema": "session/messages.schema.json#/$defs/hello_ack"
+    },
+    {
+      "type": "session.goodbye",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "best_effort",
+      "qos_allowed": [
+        "best_effort",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "handshake",
+      "schema": "session/messages.schema.json#/$defs/goodbye"
+    },
+    {
+      "type": "discovery.query",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "advertisement",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "broadcast"
+      ],
+      "qos_default": "best_effort",
+      "qos_allowed": [
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": true,
+      "security_class": "discovery",
+      "schema": "discovery/messages.schema.json#/$defs/query"
+    },
+    {
+      "type": "discovery.advertisement",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "advertisement",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "broadcast"
+      ],
+      "qos_default": "best_effort",
+      "qos_allowed": [
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": true,
+      "security_class": "discovery",
+      "schema": "discovery/messages.schema.json#/$defs/advertisement"
+    },
+    {
+      "type": "command.execute",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "component"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "command/messages.schema.json#/$defs/execute"
+    },
+    {
+      "type": "command.ack",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "command/messages.schema.json#/$defs/ack"
+    },
+    {
+      "type": "state.request",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "optional",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "state.snapshot",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "state/messages.schema.json#/$defs/request"
+    },
+    {
+      "type": "state.snapshot",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "state/messages.schema.json#/$defs/snapshot"
+    },
+    {
+      "type": "state.delta",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "state/messages.schema.json#/$defs/delta"
+    },
+    {
+      "type": "health.heartbeat",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "health.heartbeat",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "health",
+      "schema": "health/messages.schema.json#/$defs/heartbeat"
+    },
+    {
+      "type": "health.warning",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "health.heartbeat",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "health",
+      "schema": "health/messages.schema.json#/$defs/warning"
+    },
+    {
+      "type": "health.snapshot",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "health.heartbeat",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "health",
+      "schema": "health/messages.schema.json#/$defs/snapshot"
+    },
+    {
+      "type": "capability.list",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "handshake",
+      "schema": "capability/messages.schema.json#/$defs/list"
+    },
+    {
+      "type": "capability.changed",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "handshake",
+      "schema": "capability/messages.schema.json#/$defs/changed"
+    },
+    {
+      "type": "error.report",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": true,
+      "security_class": "control",
+      "schema": "error/messages.schema.json#/$defs/report"
+    },
+    {
+      "type": "config.schema",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.config",
+      "direction": "response",
+      "valid_senders": [
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "config",
+      "schema": "config/schema.schema.json"
+    },
+    {
+      "type": "config.get",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.config",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "config.result",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "config",
+      "schema": "config/get.schema.json"
+    },
+    {
+      "type": "config.set",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.config",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "config.result",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "config",
+      "schema": "config/set.schema.json"
+    },
+    {
+      "type": "config.result",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.config",
+      "direction": "response",
+      "valid_senders": [
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "config",
+      "schema": "config/result.schema.json"
+    },
+    {
+      "type": "log.event",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "best_effort",
+      "qos_allowed": [
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "telemetry",
+      "schema": "log/messages.schema.json#/$defs/event"
+    },
+    {
+      "type": "telemetry.metric",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "telemetry",
+      "schema": "telemetry/messages.schema.json#/$defs/metric"
+    },
+    {
+      "type": "telemetry.batch",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "best_effort",
+      "qos_allowed": [
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "telemetry",
+      "schema": "telemetry/messages.schema.json#/$defs/batch"
+    },
+    {
+      "type": "show.load",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor",
+        "prism"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "show/messages.schema.json#/$defs/load"
+    },
+    {
+      "type": "show.ready",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "show/messages.schema.json#/$defs/ready"
+    },
+    {
+      "type": "show.position",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "show/messages.schema.json#/$defs/position"
+    },
+    {
+      "type": "show.prepare",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "show.conformance",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "show/messages.schema.json#/$defs/prepare"
+    },
+    {
+      "type": "show.conformance",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "response",
+      "valid_senders": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "show/messages.schema.json#/$defs/conformance"
+    },
+    {
+      "type": "show.verify",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "show/messages.schema.json#/$defs/verify"
+    },
+    {
+      "type": "show.arm",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "show.armed",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "show/messages.schema.json#/$defs/arm"
+    },
+    {
+      "type": "show.armed",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "show/messages.schema.json#/$defs/armed"
+    },
+    {
+      "type": "show.disarm",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "show/messages.schema.json#/$defs/disarm"
+    },
+    {
+      "type": "song.select",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "song/messages.schema.json#/$defs/select"
+    },
+    {
+      "type": "song.start",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "song/messages.schema.json#/$defs/start"
+    },
+    {
+      "type": "song.stop",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "song/messages.schema.json#/$defs/stop"
+    },
+    {
+      "type": "song.position",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "song/messages.schema.json#/$defs/position"
+    },
+    {
+      "type": "section.enter",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "section/messages.schema.json#/$defs/enter"
+    },
+    {
+      "type": "section.exit",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "section/messages.schema.json#/$defs/exit"
+    },
+    {
+      "type": "section.position",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "section/messages.schema.json#/$defs/position"
+    },
+    {
+      "type": "cue.go",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "prism"
+      ],
+      "required_capability": "prism.cue_control",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "component"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "cue/messages.schema.json#/$defs/go"
+    },
+    {
+      "type": "cue.fire",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "prism"
+      ],
+      "required_capability": "prism.cue_control",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "component"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "cue/messages.schema.json#/$defs/fire"
+    },
+    {
+      "type": "cue.stop",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "prism"
+      ],
+      "required_capability": "prism.cue_control",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "component"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "cue/messages.schema.json#/$defs/stop"
+    },
+    {
+      "type": "transport.play",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "transport/messages.schema.json#/$defs/play"
+    },
+    {
+      "type": "transport.pause",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "transport/messages.schema.json#/$defs/pause"
+    },
+    {
+      "type": "transport.stop",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "transport/messages.schema.json#/$defs/stop"
+    },
+    {
+      "type": "transport.seek",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "transport/messages.schema.json#/$defs/seek"
+    },
+    {
+      "type": "bridge.status",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.status",
+      "direction": "event",
+      "valid_senders": [
+        "bridge"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "bridge/messages.schema.json#/$defs/status"
+    },
+    {
+      "type": "bridge.blackout",
+      "min_protocol": "1.0",
+      "max_protocol": null,
+      "profiles": [
+        "bridge"
+      ],
+      "required_capability": "bridge.blackout",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "bridge/messages.schema.json#/$defs/blackout"
+    },
+    {
+      "type": "manifest.get",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "manifest.report",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "asset/messages.schema.json#/$defs/manifest_get"
+    },
+    {
+      "type": "manifest.report",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "response",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "asset/messages.schema.json#/$defs/manifest_report"
+    },
+    {
+      "type": "asset.inventory",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "event",
+      "valid_senders": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "asset/messages.schema.json#/$defs/inventory"
+    },
+    {
+      "type": "asset.status",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "event",
+      "valid_senders": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "asset/messages.schema.json#/$defs/status"
+    },
+    {
+      "type": "asset.required",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "asset/messages.schema.json#/$defs/required"
+    },
+    {
+      "type": "asset.sync",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "conductor"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "asset.sync_result",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "asset/messages.schema.json#/$defs/sync"
+    },
+    {
+      "type": "asset.sync_result",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "required_capability": "asset.conformance",
+      "direction": "response",
+      "valid_senders": [
+        "prism",
+        "lyric",
+        "bridge"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "asset/messages.schema.json#/$defs/sync_result"
+    },
+    {
+      "type": "resource.offer",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "resource.accept",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/offer"
+    },
+    {
+      "type": "resource.accept",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/accept"
+    },
+    {
+      "type": "resource.reject",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/reject"
+    },
+    {
+      "type": "resource.chunk",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/chunk"
+    },
+    {
+      "type": "resource.complete",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "resource.transfer_result",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/complete"
+    },
+    {
+      "type": "resource.transfer_result",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/transfer_result"
+    },
+    {
+      "type": "resource.activate",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "resource.activation_result",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/activate"
+    },
+    {
+      "type": "resource.activation_result",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/activation_result"
+    },
+    {
+      "type": "resource.cancel",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": "resource.transfer",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "transfer",
+      "schema": "resource/messages.schema.json#/$defs/cancel"
+    },
+    {
+      "type": "participant.identity",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "lyric"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "participant/messages.schema.json#/$defs/identity"
+    },
+    {
+      "type": "participant.preference",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "participant/messages.schema.json#/$defs/preference"
+    },
+    {
+      "type": "participant.assignment",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "request",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "participant/messages.schema.json#/$defs/assignment"
+    },
+    {
+      "type": "chart.catalog",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "chart/messages.schema.json#/$defs/catalog"
+    },
+    {
+      "type": "chart.metadata",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "lyric"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "chart/messages.schema.json#/$defs/metadata"
+    },
+    {
+      "type": "chart.assignment",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "request",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "chart/messages.schema.json#/$defs/assignment"
+    },
+    {
+      "type": "chart.assignment_set",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "request",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "chart/messages.schema.json#/$defs/assignment_set"
+    },
+    {
+      "type": "lyric.assignment_manifest",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric",
+        "conductor"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "conductor"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "lyric/messages.schema.json#/$defs/assignment_manifest"
+    },
+    {
+      "type": "lyric.assignment_status",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "lyric"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "lyric/messages.schema.json#/$defs/assignment_status"
+    },
+    {
+      "type": "lyric.client_ready",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "lyric"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "lyric/messages.schema.json#/$defs/client_ready"
+    },
+    {
+      "type": "lyric.ready",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "lyric"
+      ],
+      "required_capability": "lyric.assignment",
+      "direction": "event",
+      "valid_senders": [
+        "lyric"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "lyric/messages.schema.json#/$defs/ready"
+    }
+  ]
+}

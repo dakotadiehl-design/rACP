@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/resource/messages.schema.json",
+  "title": "ACP resource-transfer payloads",
+  "$defs": {
+    "locator": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "$ref": "../common/defs.schema.json#/$defs/transfer_locator_mode" },
+        "url": { "type": "string" }
+      }
+    },
+    "offer": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id", "asset", "locator"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "asset": { "$ref": "../common/defs.schema.json#/$defs/asset_ref" },
+        "purpose": { "type": "string" },
+        "locator": { "$ref": "#/$defs/locator" },
+        "max_chunk_bytes": { "$ref": "../common/defs.schema.json#/$defs/uint64" }
+      }
+    },
+    "accept": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "max_chunk_bytes": { "$ref": "../common/defs.schema.json#/$defs/uint64" }
+      }
+    },
+    "reject": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id", "code"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "chunk": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id", "offset", "length", "data"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "offset": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "length": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "data": {
+          "type": "string",
+          "description": "JSON encoding: base64. CBOR encoding: byte string."
+        }
+      }
+    },
+    "complete": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "transfer_result": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id", "status"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "status": { "type": "string", "enum": ["verified", "failed"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "activate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "activation_result": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id", "status"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "status": { "type": "string", "enum": ["applied", "failed"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["transfer_id"],
+      "properties": {
+        "transfer_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
