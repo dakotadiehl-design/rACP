@@ -107,3 +107,32 @@ Required fix:
 ## Release recommendation
 
 The previous wire-format blocker is resolved, and the Python Remote implementation remains a credible reference. Do not yet describe Rust/Swift as production-complete live ACP or Aurora Remote implementations. Fix both P1 items before shipping the Swift session API, and complete P2-1/P2-2 before claiming full cross-language session or Remote interoperability.
+
+---
+
+## Phase 0A freeze addendum (2026-08-19)
+
+Tag **`AuroraACP 1.0.0`** at `56c429b6002e6fd2008c5414e5d4032a15ccf5b0` (commit of the freeze; annotated tag object is distinct). Wire protocol remains **ACP 1.2**.
+
+The tenth-review P1/P2 list above describes the pre-freeze tree. Rechecked against `Sources/AuroraACP/` and the 0A verification suite:
+
+| Finding | 1.0.0 status | Evidence |
+|---|---|---|
+| P1-1 Swift negotiation fail-open | **Resolved** | `ACPNegotiate.selectVersion` / `selectEncoding` throw; `applyHelloAckValidated` requires ACK fields; `testRejectsDisjointProtocolAndEncoding`, `testApplyHelloAckRequiresFields` |
+| P1-2 unbounded handshake I/O | **Resolved** | `recvBounded`; `testHandshakeTimeoutIsBounded`; `testFramedAcceptAndHandshakeTimeoutsAreBounded` |
+| P2-1 HELLO-only interop | **Resolved** | `test_framed_cross.py --suite session\|remote\|negative`; `--sdk rust-swift --suite session` |
+| P2-2 payload schema at Swift/Rust boundary | **Open (Phase 0B)** | Swift `admit` uses registry role/capability/QoS/protocol rules. Per-message payload schema validation is still Python-complete and not fully applied on Swift/Rust decode-before-inbox. |
+| P2-3 CI SDK skip | **Resolved** | `--sdk rust\|swift\|rust-swift` is required; CI jobs pass `--sdk` and split hello vs session/remote/negative |
+
+Re-run counts at freeze (not the tenth-review counts):
+
+- Python: **131 passed**, 81.93% coverage; Ruff passed; mypy passed for 23 source files
+- Rust: **22 tests passed**; Clippy `-D warnings` passed; rustfmt passed
+- Swift: **22 tests passed**
+- Registry/vectors: **91 / 91**
+- Python WebSocket HELLO + Remote: passed
+- Python↔Swift and Python↔Rust framed hello/session/remote/negative: passed
+- Rust↔Swift framed session: passed
+- External dummy package `import AuroraACP`: passed
+
+Remaining work after this tag is **Phase 0B feature development**, not another package conversion: snapshot/delta epoch envelopes, `command.status_*`, command ledger, preconditions, availability vs capability, provenance, priority/coalescing, generic Swift WebSocket, portable discovery + Bonjour mapping, P2-2 schema admission, and a production Swift Remote authority (do not promote `ACPRemoteAuthority`).
