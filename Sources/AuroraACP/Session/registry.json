@@ -248,6 +248,77 @@
       "schema": "command/messages.schema.json#/$defs/ack"
     },
     {
+      "type": "command.status_request",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "min_capability_version": null,
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "command.status_report",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "command/messages.schema.json#/$defs/status_request"
+    },
+    {
+      "type": "command.status_report",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "core"
+      ],
+      "required_capability": null,
+      "min_capability_version": null,
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "command/messages.schema.json#/$defs/status_report"
+    },
+    {
       "type": "state.request",
       "min_protocol": "1.0",
       "max_protocol": null,

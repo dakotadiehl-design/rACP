@@ -8,6 +8,14 @@ Remote expresses operator intent. Conductor/Prism own state and execution. Remot
 
 Negotiate `aurora.remote.prism.v1` in `session.hello.profiles` (Conductor: reserved `aurora.remote.conductor.v1`). The registry family name remains `remote`.
 
+## Discovery mapping
+
+Discovery is informational and never authenticates or authorizes. Apple Bonjour service `_acp._tcp` advertises the same ACP endpoint identity as UDP multicast discovery: node id, instance id, WebSocket URL (default `ws://host:27421/acp`), encodings, profiles, and capability digest. TXT records must not include PINs, tokens, or permission grants. Clients still complete HELLO, session authentication, and server-side authorization after connecting.
+
+## State and command recovery
+
+Prism/Remote-ready authorities publish `state.snapshot` with `authority_epoch` + `revision` and `state.delta` with `authority_epoch` + `base_revision` + `revision` + `changes`. Epoch or base-revision mismatch requires a fresh snapshot. Lost acknowledgements are recovered with `command.status_request` / `command.status_report`. Typed `preconditions` fail closed as `precondition_failed` without executing the action.
+
 ## Capabilities
 
 See `schema/constants.json` `remote.capabilities` and `remote.feature_capabilities`. Feature IDs (`look.global`, `song.loading`, `output.blackout`, …) are individually discoverable. Message registry rows still use `remote.*` capabilities.

@@ -18,6 +18,8 @@
       "additionalProperties": true,
       "required": ["resources"],
       "properties": {
+        "authority_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
         "resources": {
           "type": "array",
           "items": { "$ref": "../common/defs.schema.json#/$defs/state_resource" }
@@ -25,8 +27,22 @@
       }
     },
     "delta": {
-      "allOf": [
-        { "$ref": "../common/defs.schema.json#/$defs/state_resource" }
+      "oneOf": [
+        { "$ref": "../common/defs.schema.json#/$defs/state_resource" },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["authority_epoch", "base_revision", "revision", "changes"],
+          "properties": {
+            "authority_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+            "base_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+            "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+            "changes": {
+              "type": "array",
+              "items": { "$ref": "../common/defs.schema.json#/$defs/state_resource" }
+            }
+          }
+        }
       ]
     }
   }

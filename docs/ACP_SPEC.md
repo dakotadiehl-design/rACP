@@ -6,7 +6,7 @@ ACP is the Aurora-family control plane. It is not Art-Net, sACN, DMX, MIDI, or O
 
 - Canonical encoding: CBOR under [WIRE_ENCODING.md](WIRE_ENCODING.md). JSON is required for humans and debug.
 - Reliable transport: WebSocket, one envelope per message.
-- Discovery: framed UDP multicast. Never authentication. Never safety-critical.
+- Discovery: framed UDP multicast, with an Apple Bonjour mapping (`_acp._tcp`) of the same endpoint identity. Never authentication. Never safety-critical.
 - Commands distinguish delivery, acceptance, application, and observed confidence.
 - One owner per state kind. State is reconstructable via snapshots.
 - Unknown optional fields are ignored on typed decode.

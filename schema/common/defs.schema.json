@@ -139,7 +139,96 @@
     },
     "command_status": {
       "type": "string",
-      "enum": ["accepted", "rejected", "applied", "completed", "failed", "duplicate"]
+      "enum": [
+        "accepted",
+        "rejected",
+        "applied",
+        "completed",
+        "failed",
+        "duplicate",
+        "precondition_failed",
+        "unknown"
+      ]
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "local_ui",
+        "remote",
+        "conductor",
+        "midi",
+        "music_engine",
+        "automation",
+        "bridge",
+        "system"
+      ]
+    },
+    "traffic_class": {
+      "type": "string",
+      "enum": ["safety", "interactive", "state", "background", "telemetry"]
+    },
+    "delivery_policy": {
+      "type": "string",
+      "enum": ["in_order", "latest_value_wins", "never_coalesce"]
+    },
+    "availability_reason": {
+      "type": "string",
+      "enum": [
+        "no_show_loaded",
+        "not_armed",
+        "output_offline",
+        "permission_denied",
+        "wrong_mode",
+        "sync_required",
+        "interlock_active",
+        "resource_unavailable"
+      ]
+    },
+    "precondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "field"],
+      "properties": {
+        "op": { "type": "string", "enum": ["equals", "at_least"] },
+        "field": {
+          "type": "string",
+          "enum": [
+            "authority_epoch",
+            "revision",
+            "show_id",
+            "current_cue_id",
+            "resource_field"
+          ]
+        },
+        "value": true,
+        "resource": { "type": "string", "minLength": 1 },
+        "resource_field": { "type": "string", "minLength": 1 }
+      }
+    },
+    "command_provenance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["command_id", "source_type"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/uuid" },
+        "instance_id": { "$ref": "#/$defs/uuid" },
+        "session_id": { "$ref": "#/$defs/uuid" },
+        "principal_id": { "type": "string", "minLength": 1 },
+        "command_id": { "$ref": "#/$defs/uuid" },
+        "source_type": { "$ref": "#/$defs/source_type" },
+        "display_name": { "type": "string" }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["action", "available"],
+      "properties": {
+        "action": { "type": "string", "minLength": 1 },
+        "available": { "type": "boolean" },
+        "reason": { "$ref": "#/$defs/availability_reason" },
+        "detail": { "type": "string" }
+      }
     },
     "confidence": {
       "type": "string",

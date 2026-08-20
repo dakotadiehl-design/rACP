@@ -399,12 +399,21 @@
         "ack": {
           "additionalProperties": true,
           "properties": {
+            "command_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
             "error": {
               "$ref": "../common/defs.schema.json#/$defs/error_body"
             },
             "result": {
               "additionalProperties": true,
               "type": "object"
+            },
+            "resulting_epoch": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "resulting_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
             },
             "status": {
               "$ref": "../common/defs.schema.json#/$defs/command_status"
@@ -422,6 +431,13 @@
               "additionalProperties": true,
               "type": "object"
             },
+            "coalescing_key": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "delivery": {
+              "$ref": "../common/defs.schema.json#/$defs/delivery_policy"
+            },
             "execute_at_utc": {
               "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
             },
@@ -435,13 +451,104 @@
               "minLength": 1,
               "type": "string"
             },
+            "preconditions": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/precondition"
+              },
+              "type": "array"
+            },
+            "provenance": {
+              "$ref": "../common/defs.schema.json#/$defs/command_provenance"
+            },
             "tolerance_ms": {
               "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "traffic_class": {
+              "$ref": "../common/defs.schema.json#/$defs/traffic_class"
             }
           },
           "required": [
             "name"
           ],
+          "type": "object"
+        },
+        "status_report": {
+          "additionalProperties": true,
+          "properties": {
+            "command_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "disposition": {
+              "$ref": "../common/defs.schema.json#/$defs/command_status"
+            },
+            "expires_at": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "origin_instance_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "origin_node_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "origin_principal": {
+              "type": "string"
+            },
+            "origin_session_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "received_at": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "result": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "resulting_epoch": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "resulting_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        "status_request": {
+          "additionalProperties": true,
+          "anyOf": [
+            {
+              "required": [
+                "command_id"
+              ]
+            },
+            {
+              "required": [
+                "idempotency_key"
+              ]
+            }
+          ],
+          "properties": {
+            "command_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "origin_instance_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "origin_node_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
           "type": "object"
         }
       },
@@ -508,6 +615,42 @@
           ],
           "type": "string"
         },
+        "availability": {
+          "additionalProperties": true,
+          "properties": {
+            "action": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "available": {
+              "type": "boolean"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "reason": {
+              "$ref": "#/$defs/availability_reason"
+            }
+          },
+          "required": [
+            "action",
+            "available"
+          ],
+          "type": "object"
+        },
+        "availability_reason": {
+          "enum": [
+            "no_show_loaded",
+            "not_armed",
+            "output_offline",
+            "permission_denied",
+            "wrong_mode",
+            "sync_required",
+            "interlock_active",
+            "resource_unavailable"
+          ],
+          "type": "string"
+        },
         "capability": {
           "additionalProperties": true,
           "properties": {
@@ -529,6 +672,38 @@
           "description": "Extensible. Well-known: nashville_number, chord_lyrics, lyrics_only, lead_sheet, sheet_music, custom",
           "type": "string"
         },
+        "command_provenance": {
+          "additionalProperties": true,
+          "properties": {
+            "command_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "display_name": {
+              "type": "string"
+            },
+            "instance_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "node_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "principal_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "session_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "source_type": {
+              "$ref": "#/$defs/source_type"
+            }
+          },
+          "required": [
+            "command_id",
+            "source_type"
+          ],
+          "type": "object"
+        },
         "command_status": {
           "enum": [
             "accepted",
@@ -536,7 +711,9 @@
             "applied",
             "completed",
             "failed",
-            "duplicate"
+            "duplicate",
+            "precondition_failed",
+            "unknown"
           ],
           "type": "string"
         },
@@ -560,6 +737,14 @@
             "incompatible",
             "degraded",
             "failed"
+          ],
+          "type": "string"
+        },
+        "delivery_policy": {
+          "enum": [
+            "in_order",
+            "latest_value_wins",
+            "never_coalesce"
           ],
           "type": "string"
         },
@@ -701,6 +886,42 @@
         "nonneg_int": {
           "minimum": 0,
           "type": "integer"
+        },
+        "precondition": {
+          "additionalProperties": false,
+          "properties": {
+            "field": {
+              "enum": [
+                "authority_epoch",
+                "revision",
+                "show_id",
+                "current_cue_id",
+                "resource_field"
+              ],
+              "type": "string"
+            },
+            "op": {
+              "enum": [
+                "equals",
+                "at_least"
+              ],
+              "type": "string"
+            },
+            "resource": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "resource_field": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "value": true
+          },
+          "required": [
+            "op",
+            "field"
+          ],
+          "type": "object"
         },
         "protocol_range": {
           "additionalProperties": true,
@@ -961,6 +1182,19 @@
           ],
           "type": "object"
         },
+        "source_type": {
+          "enum": [
+            "local_ui",
+            "remote",
+            "conductor",
+            "midi",
+            "music_engine",
+            "automation",
+            "bridge",
+            "system"
+          ],
+          "type": "string"
+        },
         "state_resource": {
           "additionalProperties": true,
           "properties": {
@@ -999,6 +1233,16 @@
         "timestamp_utc": {
           "description": "RFC 3339 UTC with exactly millisecond precision and Z",
           "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "type": "string"
+        },
+        "traffic_class": {
+          "enum": [
+            "safety",
+            "interactive",
+            "state",
+            "background",
+            "telemetry"
+          ],
           "type": "string"
         },
         "transfer_locator_mode": {
@@ -2021,6 +2265,10 @@
         "accessibility_label": {
           "type": "string"
         },
+        "availability_binding": {
+          "minLength": 1,
+          "type": "string"
+        },
         "binding": {
           "additionalProperties": false,
           "properties": {
@@ -2045,6 +2293,14 @@
             "action"
           ],
           "type": "object"
+        },
+        "category": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "coalescing_key": {
+          "minLength": 1,
+          "type": "string"
         },
         "concurrency": {
           "$ref": "../common/defs.schema.json#/$defs/remote_concurrency"
@@ -2082,6 +2338,9 @@
         "control_type": {
           "$ref": "../common/defs.schema.json#/$defs/remote_control_type"
         },
+        "delivery": {
+          "$ref": "../common/defs.schema.json#/$defs/delivery_policy"
+        },
         "enabled": {
           "type": "boolean"
         },
@@ -2116,6 +2375,9 @@
               "$ref": "../common/defs.schema.json#/$defs/remote_permission"
             }
           ]
+        },
+        "presentation_hint": {
+          "type": "string"
         },
         "qos": {
           "$ref": "../common/defs.schema.json#/$defs/qos"
@@ -2152,6 +2414,9 @@
         },
         "style": {
           "$ref": "../common/defs.schema.json#/$defs/remote_style"
+        },
+        "traffic_class": {
+          "$ref": "../common/defs.schema.json#/$defs/traffic_class"
         },
         "units": {
           "type": "string"
@@ -3351,9 +3616,36 @@
     "state/messages.schema.json": {
       "$defs": {
         "delta": {
-          "allOf": [
+          "oneOf": [
             {
               "$ref": "../common/defs.schema.json#/$defs/state_resource"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "authority_epoch": {
+                  "$ref": "../common/defs.schema.json#/$defs/uint64"
+                },
+                "base_revision": {
+                  "$ref": "../common/defs.schema.json#/$defs/uint64"
+                },
+                "changes": {
+                  "items": {
+                    "$ref": "../common/defs.schema.json#/$defs/state_resource"
+                  },
+                  "type": "array"
+                },
+                "revision": {
+                  "$ref": "../common/defs.schema.json#/$defs/uint64"
+                }
+              },
+              "required": [
+                "authority_epoch",
+                "base_revision",
+                "revision",
+                "changes"
+              ],
+              "type": "object"
             }
           ]
         },
@@ -3372,11 +3664,17 @@
         "snapshot": {
           "additionalProperties": true,
           "properties": {
+            "authority_epoch": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
             "resources": {
               "items": {
                 "$ref": "../common/defs.schema.json#/$defs/state_resource"
               },
               "type": "array"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
             }
           },
           "required": [
@@ -3496,6 +3794,8 @@
     "chart.metadata": "chart/messages.schema.json#/$defs/metadata",
     "command.ack": "command/messages.schema.json#/$defs/ack",
     "command.execute": "command/messages.schema.json#/$defs/execute",
+    "command.status_report": "command/messages.schema.json#/$defs/status_report",
+    "command.status_request": "command/messages.schema.json#/$defs/status_request",
     "config.get": "config/get.schema.json",
     "config.result": "config/result.schema.json",
     "config.schema": "config/schema.schema.json",

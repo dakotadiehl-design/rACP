@@ -42,6 +42,8 @@ Stable lowercase dotted codes. `error.report` and `command.ack.error` use this c
 | `remote.command.rate_limited` | unavailable | true | Provider refused the command due to rate |
 | `remote.control.unconfirmed_release` | internal | true | Router did not confirm physical inactivity; hold remains unsafe |
 | `reliable_queue_overflow` | unavailable | true | Reliable outbound queue full; message not sent |
+| `command.precondition_failed` | conflict | false | Typed command precondition did not match authoritative state |
+| `command.unknown` | not_found | false | Command-status query found no retained disposition |
 
 ## Remote stable outcomes
 

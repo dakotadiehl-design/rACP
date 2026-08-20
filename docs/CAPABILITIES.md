@@ -38,6 +38,7 @@ Capability IDs are stable lowercase dotted strings. Versions evolve independentl
 | `control.momentary` | 1.2 | Feature flag for leased momentary holds |
 | `output.blackout` | 1.2 | Output blackout set |
 | `output.grand_master` | 1.2 | Grand-master set |
+| `command.status` | 1.2 | `command.status_request` / `command.status_report` recovery |
 | `state.live` | 1.2 | Live show state namespaces |
 | `system.health` | 1.2 | Health/warnings subscription |
 

@@ -269,7 +269,7 @@
       "id": "state.snapshot",
       "json": "json/state.snapshot.json",
       "cbor": "cbor/state.snapshot.cbor",
-      "sha256": "13ebc5bef8e1116ffab12dd70dcedfb127c781f41a2946e615a69a81f828256a"
+      "sha256": "5d409286c41e02f401b730b210da27ef9e350d31faa8c129ec854389266784ff"
     },
     {
       "id": "health.warning",
@@ -546,6 +546,18 @@
       "json": "json/lyric.ready.json",
       "cbor": "cbor/lyric.ready.cbor",
       "sha256": "1bbbdeb0c7253a503b5efe835d2610dbf7b196329ab5c24c3f8f959ad50001fd"
+    },
+    {
+      "id": "command.status_request",
+      "json": "json/command.status_request.json",
+      "cbor": "cbor/command.status_request.cbor",
+      "sha256": "3828454f1c32b98748ceda6e2d817f4e715e69ce34ab34da2787982eacdf719c"
+    },
+    {
+      "id": "command.status_report",
+      "json": "json/command.status_report.json",
+      "cbor": "cbor/command.status_report.cbor",
+      "sha256": "9603619730192f1e477185d255166f58ba3182ac6acd8fa0f18c0fa7ea0ccd7c"
     }
   ]
 }

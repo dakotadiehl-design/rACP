@@ -4,6 +4,16 @@ Package version (`AuroraACP` semver) is not the ACP wire-protocol version. Wire 
 
 ## Unreleased
 
+## 1.1.0-dev.1 — 2026-08-19
+
+ACP Prism/Remote readiness on wire protocol **1.2** (not a protocol bump).
+
+- `command.status_request` / `command.status_report` plus a bounded command ledger keyed by origin node + command identity.
+- Snapshot payloads may carry `authority_epoch` + `revision`; deltas accept a revisioned envelope (`authority_epoch`, `base_revision`, `revision`, `changes`) while remaining compatible with the legacy single-resource delta.
+- Typed command `preconditions`, provenance, traffic class, coalescing key, and delivery policy.
+- Availability reason codes and semantic surface fields (`category`, `availability_binding`, `presentation_hint`).
+- Generic Swift WebSocket listener/connection and portable discovery + Bonjour TXT mapping (`_acp._tcp`). Discovery still never authenticates.
+
 ## 1.0.0 — 2026-08-19
 
 Swift package conversion and frozen protocol baseline. This is **not** a wire-protocol bump; sessions still negotiate `acp: "1.2"`.

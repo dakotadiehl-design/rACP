@@ -36,6 +36,8 @@ class CommandStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     DUPLICATE = "duplicate"
+    PRECONDITION_FAILED = "precondition_failed"
+    UNKNOWN = "unknown"
 
     def terminal(self) -> bool:
         return self is not CommandStatus.ACCEPTED

@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-private final class ResumeBox: @unchecked Sendable {
+final class ResumeBox: @unchecked Sendable {
     private var done = false
     private let lock = NSLock()
     func resume(_ body: () -> Void) {

@@ -96,6 +96,8 @@ def payloads() -> dict[str, dict]:
         "session.goodbye": {"reason": "shutdown"},
         "discovery.query": {"role_filter": ["bridge"]},
         "state.snapshot": {
+            "authority_epoch": 1,
+            "revision": 1,
             "resources": [{
                 "resource": "cue.current",
                 "revision": 1,
@@ -103,6 +105,19 @@ def payloads() -> dict[str, dict]:
                 "value": {"cue_id": "cue_1"},
                 "confidence": "confirmed",
             }],
+        },
+        "command.status_request": {"command_id": KEY},
+        "command.status_report": {
+            "command_id": KEY,
+            "idempotency_key": KEY,
+            "origin_node_id": SRC,
+            "origin_instance_id": SRC,
+            "origin_session_id": SID,
+            "operation": "performance.go",
+            "received_at": TS,
+            "disposition": "applied",
+            "resulting_epoch": 1,
+            "resulting_revision": 2,
         },
         "health.warning": {
             "code": "hot",

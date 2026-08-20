@@ -13,7 +13,15 @@
         "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
         "execute_at_utc": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
         "tolerance_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
-        "late_policy": { "$ref": "../common/defs.schema.json#/$defs/late_policy" }
+        "late_policy": { "$ref": "../common/defs.schema.json#/$defs/late_policy" },
+        "preconditions": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/precondition" }
+        },
+        "provenance": { "$ref": "../common/defs.schema.json#/$defs/command_provenance" },
+        "traffic_class": { "$ref": "../common/defs.schema.json#/$defs/traffic_class" },
+        "coalescing_key": { "type": "string", "minLength": 1 },
+        "delivery": { "$ref": "../common/defs.schema.json#/$defs/delivery_policy" }
       }
     },
     "ack": {
@@ -23,7 +31,44 @@
       "properties": {
         "status": { "$ref": "../common/defs.schema.json#/$defs/command_status" },
         "error": { "$ref": "../common/defs.schema.json#/$defs/error_body" },
-        "result": { "type": "object", "additionalProperties": true }
+        "result": { "type": "object", "additionalProperties": true },
+        "command_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "resulting_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "resulting_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" }
+      }
+    },
+    "status_request": {
+      "type": "object",
+      "additionalProperties": true,
+      "anyOf": [
+        { "required": ["command_id"] },
+        { "required": ["idempotency_key"] }
+      ],
+      "properties": {
+        "command_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "origin_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "origin_instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" }
+      }
+    },
+    "status_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["disposition"],
+      "properties": {
+        "command_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "origin_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "origin_instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "origin_principal": { "type": "string" },
+        "origin_session_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "operation": { "type": "string" },
+        "received_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "disposition": { "$ref": "../common/defs.schema.json#/$defs/command_status" },
+        "result": { "type": "object", "additionalProperties": true },
+        "resulting_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "resulting_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" }
       }
     }
   }

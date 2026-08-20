@@ -9,6 +9,8 @@
   "qos": "reliable",
   "flags": [],
   "payload": {
+    "authority_epoch": 1,
+    "revision": 1,
     "resources": [
       {
         "resource": "cue.current",
