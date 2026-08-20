@@ -4,6 +4,16 @@ Package version (`AuroraACP` semver) is not the ACP wire-protocol version. Wire 
 
 ## Unreleased
 
+## 1.1.0-dev.2 — 2026-08-19
+
+Production Swift Remote Profile authority (`ACPRemoteProductionAuthority`):
+
+- Server-derived roles from `ACPRemotePolicyProviding`; client-claimed roles are ignored.
+- Authenticated principal is the transport node ID.
+- Invoke dedup survives session replacement.
+- Momentary BEGIN/END, disconnect release, timer expiry, and failed physical release (`release_pending` + `physical_active`).
+- Injected `ACPRemoteActionRouting` adapters. The existing `ACPRemoteAuthority` simulator is unchanged and unused by Prism.
+
 ## 1.1.0-dev.1 — 2026-08-19
 
 ACP Prism/Remote readiness on wire protocol **1.2** (not a protocol bump).
