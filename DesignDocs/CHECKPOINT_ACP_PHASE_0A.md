@@ -4,7 +4,7 @@
 **Status:** Review-satisfied  
 **Repo:** `AuroraCommunicationsProtocol`  
 **ACP tag:** `1.0.0`  
-**ACP commit:** `1463f8d76a1c9abb496e05fe9bf079eb4f8dfb16` (package conversion `56c429b6002e6fd2008c5414e5d4032a15ccf5b0`)  
+**ACP commit:** `426f40185b6b7510448c5e4229a7fb09b47f4cc3` (package conversion `56c429b6002e6fd2008c5414e5d4032a15ccf5b0`)  
 **Prism commit:** unchanged (this phase does not modify Prism)
 
 ## Phase objective

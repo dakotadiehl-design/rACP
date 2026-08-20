@@ -112,7 +112,7 @@ The previous wire-format blocker is resolved, and the Python Remote implementati
 
 ## Phase 0A freeze addendum (2026-08-19)
 
-Tag **`AuroraACP 1.0.0`** at `56c429b6002e6fd2008c5414e5d4032a15ccf5b0` (commit of the freeze; annotated tag object is distinct). Wire protocol remains **ACP 1.2**.
+Tag **`AuroraACP 1.0.0`** at `426f40185b6b7510448c5e4229a7fb09b47f4cc3` (package conversion `56c429b6002e6fd2008c5414e5d4032a15ccf5b0`). Wire protocol remains **ACP 1.2**.
 
 The tenth-review P1/P2 list above describes the pre-freeze tree. Rechecked against `Sources/AuroraACP/` and the 0A verification suite:
 
