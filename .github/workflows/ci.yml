@@ -25,6 +25,8 @@ jobs:
           python3 scripts/freeze_vectors.py
       - name: Localhost WebSocket HELLO
         run: python3 tests/interop/test_ws_hello.py
+      - name: Localhost WebSocket Remote
+        run: python3 tests/interop/test_ws_remote.py
       - name: Worktree stays clean
         run: |
           git status --porcelain
@@ -56,10 +58,40 @@ jobs:
       - name: Test
         run: cargo test --manifest-path rust/Cargo.toml
       - name: Clippy
-        run: cargo clippy --manifest-path rust/Cargo.toml -- -D warnings
+        run: cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
       - name: rustfmt
         working-directory: rust
         run: cargo fmt -- --check
+
+  framed-python-rust-hello:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Python/Rust framed HELLO
+        run: |
+          python3 -m pip install -e './python[dev]'
+          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
+          python3 tests/interop/test_framed_cross.py --sdk rust --suite hello
+
+  framed-python-rust-session:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Python/Rust framed session, Remote, and negatives
+        run: |
+          python3 -m pip install -e './python[dev]'
+          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
+          python3 tests/interop/test_framed_cross.py --sdk rust --suite session
+          python3 tests/interop/test_framed_cross.py --sdk rust --suite remote
+          python3 tests/interop/test_framed_cross.py --sdk rust --suite negative
 
   hygiene:
     runs-on: ubuntu-latest
@@ -78,4 +110,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Test
-        run: swift test --package-path swift
+        run: swift test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Python/Swift framed HELLO
+        run: |
+          python3 -m pip install -e './python[dev]'
+          swift build --product acp-framed-hello
+          python3 tests/interop/test_framed_cross.py --sdk swift --suite hello
+      - name: Python/Swift framed session and Remote
+        run: |
+          python3 tests/interop/test_framed_cross.py --sdk swift --suite session
+          python3 tests/interop/test_framed_cross.py --sdk swift --suite remote
+          python3 tests/interop/test_framed_cross.py --sdk swift --suite negative
+      - name: Rust/Swift framed session
+        run: |
+          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
+          python3 tests/interop/test_framed_cross.py --sdk rust-swift --suite session

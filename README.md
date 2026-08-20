@@ -20,15 +20,16 @@ Baseline: **ACP v1.2**. Spec: `Aurora_Communications_Protocol_Handoff_Spec_v1.2.
 ## Layout
 
 ```
-schema/     JSON Schema, constants, message registry, semantic invariants
-vectors/    Frozen golden JSON/CBOR (never silently rewritten)
-docs/       Normative markdown (wire profile, state machines, catalogs)
-swift/      SwiftPM package (Prism / Conductor / Apple Lyric)
-python/     Reference models, codec, CLI, simulators
-rust/       Bridge-oriented crates (acp-model has no Tokio)
-tools/      acp-inspect, acp-sim, Wireshark dissector
-tests/      Live cross-language interop
-scripts/    Registry checks, vector freeze, dissector install
+Package.swift   SwiftPM manifest (product AuroraACP)
+Sources/        AuroraACP library + acp-framed-hello interop fixture
+schema/         JSON Schema, constants, message registry, semantic invariants
+vectors/        Frozen golden JSON/CBOR (never silently rewritten)
+docs/           Normative markdown (wire profile, state machines, catalogs)
+python/         Reference models, codec, CLI, simulators
+rust/           Bridge-oriented crates (acp-model has no Tokio)
+tools/          acp-inspect, acp-sim, Wireshark dissector
+tests/          Swift package tests + live cross-language interop
+scripts/        Registry checks, vector freeze, dissector install
 ```
 
 ## Build
@@ -46,13 +47,86 @@ python3 -m ruff check --config python/pyproject.toml python scripts
 cargo test --manifest-path rust/Cargo.toml
 
 # Swift
-swift test --package-path swift
+swift test
 
-# Schema / registry (once PR1 lands)
+# Schema / registry
 python3 scripts/check_registry.py
 ```
 
 CI may fetch toolchains and crates on a fresh runner. That is not a protocol Internet dependency.
+
+## Using AuroraACP
+
+`AuroraACP` is the canonical Swift package for ACP. Prism, Remote, Conductor, and Lyric consume it as a dependency. They must not copy ACP protocol `.swift` files.
+
+**Platforms:** macOS 13+, iOS 16+, Swift 5.9+.
+
+**Import:**
+
+```swift
+import AuroraACP
+```
+
+### Local package (active development)
+
+In Xcode: File → Add Package Dependencies → Add Local → select this repository root (the folder that contains `Package.swift`). Add the `AuroraACP` library product to the application target.
+
+From another Swift package:
+
+```swift
+.package(path: "../AuroraCommunicationsProtocol")
+```
+
+then depend on `.product(name: "AuroraACP", package: "AuroraCommunicationsProtocol")`.
+
+### Remote Git package (stable integration)
+
+Add the ACP git repository URL and pin a semantic version tag. Do not pin release branches to a moving `main`.
+
+```swift
+.package(url: "https://example.com/AuroraCommunicationsProtocol.git", from: "1.0.0")
+```
+
+Replace the URL with the canonical ACP remote when tagging.
+
+### Minimal usage
+
+```swift
+import AuroraACP
+
+let (clientTransport, serverTransport) = await acpLinkedTransports()
+let client = ACPSession(
+    transport: clientTransport,
+    local: ACPIdentity(role: "conductor", name: "example"),
+    isServer: false
+)
+let server = ACPSession(
+    transport: serverTransport,
+    local: ACPIdentity(role: "bridge", name: "example"),
+    isServer: true
+)
+async let serverAck = server.handshake()
+_ = try await client.handshake()
+_ = try await serverAck
+await client.goodbye()
+await server.goodbye()
+```
+
+### Build and test this package
+
+```bash
+swift build
+swift test
+```
+
+### Versioning
+
+Package version and wire-protocol version are different numbers:
+
+- **AuroraACP 1.0.0** — Swift package release (semver). PATCH = compatible bug fix; MINOR = backward-compatible API addition; MAJOR = breaking public API or protocol compatibility change.
+- **ACP 1.2** — version spoken on the network (`acp` field, HELLO negotiation). That remains authoritative for wire compatibility.
+
+Tagged package baseline: **`1.0.0`**. That tag is a library/package freeze, not a wire-protocol bump.
 
 ## Adding a message
 
@@ -62,20 +136,27 @@ See [`docs/ADDING_A_MESSAGE.md`](docs/ADDING_A_MESSAGE.md). Short version: schem
 
 | Layer | Python | Rust | Swift |
 |---|---|---|---|
-| Models | yes | `acp-model` | `ACPModel` |
+| Models | yes | `acp-model` | `AuroraACP` |
 | JSON + ACP-CDE-1.2 | reference encoder | bit-identical golden vectors | bit-identical golden vectors |
 | Session | inbound authz, QoS scheduler, acks | Tokio engine (handshake, admit, sequence) | actor engine (handshake, admit, sequence) |
 | Discovery framing | encode/decode + size limit | — | — |
 | Bridge / config / blackout | yes | — | — |
 | Resource transfer | chunk + SHA-256 + activate | — | — |
 | Lyric assignment | resolver | — | — |
-| CLI | `python3 -m acp inspect\|sim` | — | — |
+| Remote Profile | session-hosted production authority | non-production simulator | non-production simulator |
+| Live session transport | WebSocket + framed TCP | framed TCP + loopback | framed TCP + loopback |
+| CLI | `python3 -m acp inspect\|sim\|remote` | — | — |
 
-- Schema + 75-type `schema/registry.json` + semantic invariants
-- Frozen golden vectors in `vectors/` (one per message family plus core types)
+- Schema + 91-type `schema/registry.json` + semantic invariants
+- Frozen golden vectors in `vectors/` (one JSON/CBOR pair per registry message)
 - Shared malformed CBOR corpus in `vectors/malformed/`
-- Localhost Python WebSocket HELLO: `python3 tests/interop/test_ws_hello.py` (cross-language live interop is follow-on)
+- Localhost Python WebSocket HELLO: `python3 tests/interop/test_ws_hello.py`
+- Localhost Python WebSocket Remote hello/sync/commands: `python3 tests/interop/test_ws_remote.py`
+- Cross-language framed TCP: `python3 tests/interop/test_framed_cross.py --sdk rust|swift|rust-swift --suite hello|session|remote|negative`
+- Coverage matrix: **codec** (all 91 golden vectors plus the invalid-message corpus), **session** (loopback plus framed TCP HELLO, heartbeat, correlated `state.request`/`state.snapshot`, goodbye), **Remote profile** (Python production host; Rust/Swift simulators exchange chunk/activate/invoke over an established session). Rust↔Swift framed session is covered by `--sdk rust-swift`.
 - Wireshark Lua dissector: `tools/wireshark/`
+
+Remote Profile (v1.2 profile, recommended future revision 1.3): see `docs/REMOTE.md` and `Aurora_ACP_Remote_Profile_Implementation_Spec.md`.
 
 Product adapters (Prism `ControlActionRouter`, Conductor UI, Lyric presentation, Bridge firmware I/O) are **not** in this repo.
 
@@ -87,8 +168,9 @@ python3 scripts/freeze_vectors.py          # verify pinned CBOR
 python3 -m ruff check --config python/pyproject.toml python scripts
 (cd python && python3 -m mypy src/acp)
 (cd python && python3 -m pytest tests --cov=acp --cov-fail-under=70)
-python3 tests/interop/test_ws_hello.py     # Python loopback, not cross-language
+python3 tests/interop/test_ws_hello.py     # Python loopback handshake
+python3 tests/interop/test_ws_remote.py    # Python loopback Remote hello/sync/commands
 cargo test --manifest-path rust/Cargo.toml
 (cd rust && cargo fmt -- --check && cargo clippy -- -D warnings)
-swift test --package-path swift
+swift test
 ```

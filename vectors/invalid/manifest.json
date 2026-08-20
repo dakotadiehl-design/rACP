@@ -1,0 +1,124 @@
+{
+  "vectors": [
+    {
+      "id": "session.hello-missing-node",
+      "json": "invalid/session.hello-missing-node.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "discovery.query-bad-role",
+      "json": "invalid/discovery.query-bad-role.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "state.request-bad-resources",
+      "json": "invalid/state.request-bad-resources.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "health.heartbeat-bad-status",
+      "json": "invalid/health.heartbeat-bad-status.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "capability.list-not-array",
+      "json": "invalid/capability.list-not-array.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "command.execute-missing-name",
+      "json": "invalid/command.execute-missing-name.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "config.get-bad-path",
+      "json": "invalid/config.get-bad-path.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "error.report-missing-code",
+      "json": "invalid/error.report-missing-code.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "resource.chunk-missing-data",
+      "json": "invalid/resource.chunk-missing-data.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "remote.control.invoke-missing-control",
+      "json": "invalid/remote.control.invoke-missing-control.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "show.load-missing-show-id",
+      "json": "invalid/show.load-missing-show-id.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "song.select-missing-song",
+      "json": "invalid/song.select-missing-song.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "section.enter-missing-section",
+      "json": "invalid/section.enter-missing-section.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "cue.go-bad-key",
+      "json": "invalid/cue.go-bad-key.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "transport.play-bad-key",
+      "json": "invalid/transport.play-bad-key.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "telemetry.metric-missing-name",
+      "json": "invalid/telemetry.metric-missing-name.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "asset.status-missing-asset",
+      "json": "invalid/asset.status-missing-asset.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "chart.catalog-not-array",
+      "json": "invalid/chart.catalog-not-array.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "lyric.ready-missing-participant",
+      "json": "invalid/lyric.ready-missing-participant.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "participant.identity-missing-id",
+      "json": "invalid/participant.identity-missing-id.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "log.event-missing-message",
+      "json": "invalid/log.event-missing-message.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "bridge.blackout-missing-state",
+      "json": "invalid/bridge.blackout-missing-state.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "manifest.get-missing-show",
+      "json": "invalid/manifest.get-missing-show.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "unknown-type",
+      "json": "invalid/unknown-type.json",
+      "error": "unsupported_message"
+    }
+  ]
+}

@@ -5,6 +5,16 @@ from importlib.metadata import PackageNotFoundError, version
 from .codec import decode_cbor, decode_json, encode_cbor, encode_json
 from .envelope import Envelope, make_envelope
 from .negotiate import select_version
+from .remote import (
+    ActionContext,
+    ActionResult,
+    Enrollment,
+    MemoryActionRouter,
+    RemoteAuthority,
+    RemoteClient,
+    RemoteHost,
+    RemoteIdentity,
+)
 from .types import Capability, Endpoint, NodeIdentity, QoS, Role
 
 try:
@@ -26,4 +36,12 @@ __all__ = [
     "NodeIdentity",
     "QoS",
     "Role",
+    "ActionContext",
+    "ActionResult",
+    "Enrollment",
+    "MemoryActionRouter",
+    "RemoteAuthority",
+    "RemoteClient",
+    "RemoteHost",
+    "RemoteIdentity",
 ]

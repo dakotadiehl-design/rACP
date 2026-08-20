@@ -10,6 +10,7 @@ pub enum Role {
     Bridge,
     Tool,
     Simulator,
+    Remote,
 }
 
 impl Role {
@@ -21,6 +22,7 @@ impl Role {
             Role::Bridge => "bridge",
             Role::Tool => "tool",
             Role::Simulator => "simulator",
+            Role::Remote => "remote",
         }
     }
 
@@ -32,6 +34,7 @@ impl Role {
             "bridge" => Some(Self::Bridge),
             "tool" => Some(Self::Tool),
             "simulator" => Some(Self::Simulator),
+            "remote" => Some(Self::Remote),
             _ => None,
         }
     }

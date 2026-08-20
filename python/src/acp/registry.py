@@ -25,6 +25,7 @@ def allowed_to_send(
     sender_role: str,
     negotiated_capabilities: set[str],
     handshake_complete: bool,
+    negotiated_versions: dict[str, str] | None = None,
 ) -> str | None:
     return _check(
         message_type,
@@ -33,6 +34,7 @@ def allowed_to_send(
         negotiated_capabilities=negotiated_capabilities,
         handshake_complete=handshake_complete,
         qos=None,
+        negotiated_versions=negotiated_versions,
     )
 
 
@@ -45,6 +47,7 @@ def allowed_to_receive(
     handshake_complete: bool,
     qos: str | None = None,
     envelope_version: str | None = None,
+    negotiated_versions: dict[str, str] | None = None,
 ) -> str | None:
     return _check(
         message_type,
@@ -55,6 +58,7 @@ def allowed_to_receive(
         qos=qos,
         unknown_is_error=True,
         envelope_version=envelope_version,
+        negotiated_versions=negotiated_versions,
     )
 
 
@@ -68,6 +72,7 @@ def _check(
     qos: str | None,
     unknown_is_error: bool = False,
     envelope_version: str | None = None,
+    negotiated_versions: dict[str, str] | None = None,
 ) -> str | None:
     row = lookup(message_type)
     if row is None:
@@ -80,6 +85,17 @@ def _check(
     cap = row.get("required_capability")
     if cap and cap not in negotiated_capabilities:
         return "capability_not_permitted"
+    min_cap = row.get("min_capability_version")
+    if cap and min_cap:
+        versions = negotiated_versions or {}
+        have = versions.get(cap)
+        if have is None:
+            return "capability_not_permitted"
+        try:
+            if not version_at_least(str(have), str(min_cap)):
+                return "capability_not_permitted"
+        except ValueError:
+            return "capability_not_permitted"
     if sender_role not in row["valid_senders"]:
         return "capability_not_permitted"
     if qos is not None and qos not in row.get("qos_allowed", [qos]):

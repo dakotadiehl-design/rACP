@@ -42,12 +42,24 @@ def _prep_for_cbor(value: Any) -> Any:
 
 
 def _restore_chunk_bytes(payload: dict[str, Any], message_type: str) -> dict[str, Any]:
-    if message_type == "resource.chunk" and isinstance(payload.get("data"), str):
+    if message_type != "resource.chunk":
+        return payload
+    data = payload.get("data")
+    if isinstance(data, str):
         try:
-            payload = dict(payload)
-            payload["data"] = base64.b64decode(payload["data"])
+            decoded = base64.b64decode(data, validate=True)
         except Exception as exc:  # noqa: BLE001
             raise CodecError("invalid resource.chunk data") from exc
+        payload = dict(payload)
+        payload["data"] = decoded
+        data = decoded
+    if isinstance(data, (bytes, bytearray)) and payload.get("length") is not None:
+        try:
+            declared = int(payload["length"])
+        except (TypeError, ValueError) as exc:
+            raise CodecError("invalid resource.chunk length") from exc
+        if declared != len(data):
+            raise CodecError("resource.chunk length does not match decoded bytes")
     return payload
 
 
@@ -59,10 +71,20 @@ def _check_size(raw: bytes | str) -> None:
 
 def _envelope_from_object(data: dict[str, Any]) -> Envelope:
     _reject_nonfinite(data)
+    payload = data.get("payload")
+    if (
+        str(data.get("type", "")) == "resource.chunk"
+        and isinstance(payload, dict)
+        and isinstance(payload.get("data"), (bytes, bytearray))
+    ):
+        payload = dict(payload)
+        payload["data"] = base64.b64encode(bytes(payload["data"])).decode("ascii")
+        data = dict(data)
+        data["payload"] = payload
     try:
         validate_message(data)
     except ValidationError as exc:
-        raise CodecError(str(exc)) from exc
+        raise CodecError(f"{exc.code}: {exc}") from exc
     if isinstance(data.get("payload"), dict):
         message_type = str(data.get("type", ""))
         payload = filter_payload(message_type, dict(data["payload"]))
@@ -76,9 +98,17 @@ def _envelope_from_object(data: dict[str, Any]) -> Envelope:
 
 
 def encode_json(envelope: Envelope) -> bytes:
-    _reject_nonfinite(envelope.to_dict())
+    data = envelope.to_dict()
+    _reject_nonfinite(data)
+    payload = data.get("payload")
+    if envelope.type == "resource.chunk" and isinstance(payload, dict):
+        chunk = dict(payload)
+        raw = chunk.get("data")
+        if isinstance(raw, (bytes, bytearray)):
+            chunk["data"] = base64.b64encode(bytes(raw)).decode("ascii")
+        data["payload"] = chunk
     return json.dumps(
-        envelope.to_dict(),
+        data,
         separators=(",", ":"),
         ensure_ascii=False,
         allow_nan=False,

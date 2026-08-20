@@ -1,6 +1,7 @@
 //! JSON + ACP-CDE-1.2 envelope codec.
 
 mod cbor;
+mod schema;
 
 use acp_model::{Endpoint, Envelope, Json, Qos};
 use std::collections::BTreeSet;
@@ -19,6 +20,110 @@ impl std::error::Error for CodecError {}
 
 fn cerr(msg: impl Into<String>) -> CodecError {
     CodecError(msg.into())
+}
+
+const B64: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+fn b64_encode(data: &[u8]) -> String {
+    let mut out = String::new();
+    let mut i = 0;
+    while i < data.len() {
+        let b0 = data[i];
+        let b1 = if i + 1 < data.len() { data[i + 1] } else { 0 };
+        let b2 = if i + 2 < data.len() { data[i + 2] } else { 0 };
+        let n = ((b0 as u32) << 16) | ((b1 as u32) << 8) | (b2 as u32);
+        out.push(B64[((n >> 18) & 63) as usize] as char);
+        out.push(B64[((n >> 12) & 63) as usize] as char);
+        if i + 1 < data.len() {
+            out.push(B64[((n >> 6) & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if i + 2 < data.len() {
+            out.push(B64[(n & 63) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        i += 3;
+    }
+    out
+}
+
+fn b64_decode(text: &str) -> Result<Vec<u8>, CodecError> {
+    let raw = text.as_bytes();
+    if raw.len() % 4 != 0 {
+        return Err(cerr("invalid resource.chunk base64"));
+    }
+    let mut table = [0xffu8; 256];
+    for (i, b) in B64.iter().enumerate() {
+        table[*b as usize] = i as u8;
+    }
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < raw.len() {
+        let mut vals = [0u8; 4];
+        let mut pads = 0;
+        for (j, slot) in vals.iter_mut().enumerate() {
+            let c = raw[i + j];
+            if c == b'=' {
+                pads += 1;
+                *slot = 0;
+                continue;
+            }
+            if pads > 0 || table[c as usize] == 0xff {
+                return Err(cerr("invalid resource.chunk base64"));
+            }
+            *slot = table[c as usize];
+        }
+        if pads > 2 {
+            return Err(cerr("invalid resource.chunk base64"));
+        }
+        out.push((vals[0] << 2) | (vals[1] >> 4));
+        if pads < 2 {
+            out.push((vals[1] << 4) | (vals[2] >> 2));
+        }
+        if pads < 1 {
+            out.push((vals[2] << 6) | vals[3]);
+        }
+        i += 4;
+    }
+    Ok(out)
+}
+
+fn json_uint(value: &Json) -> Option<u64> {
+    match value {
+        Json::UInt(u) => Some(*u),
+        Json::Int(i) if *i >= 0 => Some(*i as u64),
+        _ => None,
+    }
+}
+
+fn normalize_chunk_payload(message_type: &str, payload: Json) -> Result<Json, CodecError> {
+    if message_type != "resource.chunk" {
+        return Ok(payload);
+    }
+    let Json::Object(mut pairs) = payload else {
+        return Ok(payload);
+    };
+    let Some(idx) = pairs.iter().position(|(k, _)| k == "data") else {
+        return Ok(Json::Object(pairs));
+    };
+    let decoded = match &pairs[idx].1 {
+        Json::String(s) => b64_decode(s)?,
+        Json::Bytes(b) => b.clone(),
+        _ => return Err(cerr("resource.chunk data must be base64 or bytes")),
+    };
+    if let Some(declared) = pairs
+        .iter()
+        .find(|(k, _)| k == "length")
+        .and_then(|(_, v)| json_uint(v))
+    {
+        if declared != decoded.len() as u64 {
+            return Err(cerr("resource.chunk length does not match decoded bytes"));
+        }
+    }
+    pairs[idx].1 = Json::Bytes(decoded);
+    Ok(Json::Object(pairs))
 }
 
 pub fn json_from_serde(v: &serde_json::Value) -> Json {
@@ -52,7 +157,7 @@ pub fn serde_from_json(v: &Json) -> serde_json::Value {
         Json::UInt(u) => serde_json::json!(u),
         Json::Float(f) => serde_json::json!(f),
         Json::String(s) => serde_json::Value::String(s.clone()),
-        Json::Bytes(b) => serde_json::Value::String(b.iter().map(|x| format!("{x:02x}")).collect()),
+        Json::Bytes(b) => serde_json::Value::String(b64_encode(b)),
         Json::Array(a) => serde_json::Value::Array(a.iter().map(serde_from_json).collect()),
         Json::Object(o) => {
             let mut map = serde_json::Map::new();
@@ -176,7 +281,10 @@ pub fn envelope_from_json(value: &Json) -> Result<Envelope, CodecError> {
         },
         qos,
         flags,
-        payload: get("payload").cloned().unwrap_or(Json::Object(vec![])),
+        payload: normalize_chunk_payload(
+            &req_str("type")?,
+            get("payload").cloned().unwrap_or(Json::Object(vec![])),
+        )?,
     })
 }
 
@@ -187,7 +295,9 @@ pub fn encode_json(env: &Envelope) -> Result<Vec<u8>, CodecError> {
 
 pub fn decode_json(raw: &[u8]) -> Result<Envelope, CodecError> {
     let v: serde_json::Value = serde_json::from_slice(raw).map_err(|e| cerr(e.to_string()))?;
-    envelope_from_json(&json_from_serde(&v))
+    let env = envelope_from_json(&json_from_serde(&v))?;
+    schema::validate_envelope(&env)?;
+    Ok(env)
 }
 
 pub fn encode_cbor(env: &Envelope) -> Result<Vec<u8>, CodecError> {
@@ -250,7 +360,9 @@ enum Prepared {
 
 pub fn decode_cbor(raw: &[u8]) -> Result<Envelope, CodecError> {
     let v = decode_cbor_value(raw).map_err(|e| cerr(e.0))?;
-    envelope_from_json(&v)
+    let env = envelope_from_json(&v)?;
+    schema::validate_envelope(&env)?;
+    Ok(env)
 }
 
 #[cfg(test)]
@@ -276,14 +388,73 @@ mod tests {
             let json_path = root.join("vectors").join(item["json"].as_str().unwrap());
             let cbor_path = root.join("vectors").join(item["cbor"].as_str().unwrap());
             let raw_json = fs::read(&json_path).unwrap();
-            let env = decode_json(&raw_json).expect(item["id"].as_str().unwrap());
+            let id = item["id"].as_str().unwrap();
+            let env = decode_json(&raw_json).unwrap_or_else(|err| panic!("{id}: {err}"));
             let encoded = encode_cbor(&env).unwrap();
             let pinned = fs::read(&cbor_path).unwrap();
             assert_eq!(encoded, pinned, "cbor mismatch {}", item["id"]);
             let again = decode_cbor(&pinned).unwrap();
-            assert_eq!(again.acp, env.acp);
-            assert_eq!(again.message_type, env.message_type);
-            assert_eq!(again.message_id, env.message_id);
+            assert_eq!(
+                serde_from_json(&envelope_to_json(&again)),
+                serde_from_json(&envelope_to_json(&env)),
+                "decoded envelope mismatch {id}"
+            );
+            let reencoded = encode_json(&again).unwrap();
+            let via_json = decode_json(&reencoded).unwrap();
+            assert_eq!(
+                serde_from_json(&envelope_to_json(&via_json)),
+                serde_from_json(&envelope_to_json(&env)),
+                "json re-encode mismatch {id}"
+            );
+        }
+    }
+
+    #[test]
+    fn chunk_bytes_roundtrip_and_reject_bad_base64() {
+        let raw_json = br#"{
+          "acp":"1.2",
+          "message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000040",
+          "type":"resource.chunk",
+          "source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-000000000001"},
+          "timestamp_utc":"2026-08-17T16:42:15.231Z",
+          "qos":"reliable",
+          "flags":[],
+          "payload":{"transfer_id":"0193f8d8-4c4e-7d8b-a2ab-000000000070","offset":0,"length":4,"data":"AAH/4A=="}
+        }"#;
+        let env = decode_json(raw_json).unwrap();
+        match env.payload.get("data") {
+            Some(Json::Bytes(b)) => assert_eq!(b, &vec![0x00, 0x01, 0xff, 0xe0]),
+            other => panic!("expected bytes {other:?}"),
+        }
+        let cbor = encode_cbor(&env).unwrap();
+        assert!(cbor.contains(&0x44));
+        let again = decode_cbor(&cbor).unwrap();
+        assert_eq!(again.payload.get("data"), env.payload.get("data"));
+        let json = encode_json(&again).unwrap();
+        let text = String::from_utf8(json).unwrap();
+        assert!(text.contains("AAH/4A=="), "{text}");
+        let bad = String::from_utf8_lossy(raw_json).replace("AAH/4A==", "!!!!");
+        assert!(decode_json(bad.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn invalid_corpus_rejected() {
+        let dir = repo_root().join("vectors/invalid");
+        let manifest: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(dir.join("manifest.json")).unwrap()).unwrap();
+        for item in manifest["vectors"].as_array().unwrap() {
+            let path = repo_root()
+                .join("vectors")
+                .join(item["json"].as_str().unwrap());
+            let raw = fs::read(&path).unwrap();
+            let err = decode_json(&raw).expect_err(item["id"].as_str().unwrap());
+            let expected = item["error"].as_str().unwrap();
+            assert!(
+                err.0.starts_with(expected) || err.0.contains(expected),
+                "{}: {}",
+                item["id"],
+                err.0
+            );
         }
     }
 

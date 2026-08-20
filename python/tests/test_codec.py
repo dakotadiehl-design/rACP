@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
+
 from acp.cbor_cde import CborError, decode, encode
 from acp.codec import CodecError, decode_cbor, decode_json, encode_cbor, encode_json
 from acp.envelope import Envelope
@@ -81,6 +82,37 @@ def test_reject_non_preferred_int() -> None:
 def test_json_rejects_nan() -> None:
     with pytest.raises(CodecError):
         decode_json('{"acp":"1.2","message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000002","type":"health.heartbeat","source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-000000000001"},"timestamp_utc":"2026-08-17T16:42:15.231Z","qos":"latest","flags":[],"payload":{"uptime_ms":1,"status":"ok","metrics":{"cpu_pct":NaN}}}')
+
+
+def test_chunk_bytes_json_cbor_and_bad_base64() -> None:
+    raw = bytes([0x00, 0x01, 0xFF, 0xE0])
+    env = Envelope(
+        acp="1.2",
+        message_id="0193f8d8-4c4e-7d8b-a2ab-000000000040",
+        type="resource.chunk",
+        source=SRC,
+        timestamp_utc=TS,
+        qos=QoS.RELIABLE,
+        payload={
+            "transfer_id": "0193f8d8-4c4e-7d8b-a2ab-000000000070",
+            "offset": 0,
+            "length": 4,
+            "data": raw,
+        },
+        flags=frozenset(),
+        session_id="0193f8d8-4c4e-7d8b-a2ab-000000000013",
+        sequence=1,
+    )
+    encoded_json = encode_json(env)
+    assert b"AAH/4A==" in encoded_json
+    again = decode_json(encoded_json)
+    assert again.payload["data"] == raw
+    cbor = encode_cbor(env)
+    assert b"\x44" in cbor
+    from_cbor = decode_cbor(cbor)
+    assert from_cbor.payload["data"] == raw
+    with pytest.raises(CodecError):
+        decode_json(encoded_json.replace(b"AAH/4A==", b"!!!!"))
 
 
 def test_malformed_uuid() -> None:

@@ -11,6 +11,7 @@ pub struct RegistryRow {
     pub qos_allowed: Vec<String>,
     pub legal_before_handshake: bool,
     pub response_type: Option<String>,
+    pub min_capability_version: Option<String>,
 }
 
 fn table() -> &'static HashMap<String, RegistryRow> {
@@ -47,6 +48,9 @@ fn table() -> &'static HashMap<String, RegistryRow> {
                         .as_bool()
                         .unwrap_or(false),
                     response_type: msg["response_type"].as_str().map(str::to_string),
+                    min_capability_version: msg["min_capability_version"]
+                        .as_str()
+                        .map(str::to_string),
                 },
             );
         }
@@ -65,6 +69,7 @@ pub fn allowed(
     handshake_complete: bool,
     qos: Option<&str>,
     envelope_version: Option<&str>,
+    negotiated_versions: Option<&HashMap<String, String>>,
 ) -> Option<&'static str> {
     let Some(row) = lookup(message_type) else {
         return if handshake_complete {
@@ -86,6 +91,15 @@ pub fn allowed(
         if !negotiated.iter().any(|c| c == cap) {
             return Some("capability_not_permitted");
         }
+        if let Some(min_cap) = &row.min_capability_version {
+            let have = negotiated_versions.and_then(|versions| versions.get(cap));
+            let Some(have) = have else {
+                return Some("capability_not_permitted");
+            };
+            if !crate::negotiate::version_at_least(have, min_cap) {
+                return Some("capability_not_permitted");
+            }
+        }
     }
     if !row.valid_senders.iter().any(|s| s == sender_role) {
         return Some("capability_not_permitted");
@@ -96,4 +110,77 @@ pub fn allowed(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn min_capability_version_requires_explicit_version() {
+        let mut versions = HashMap::new();
+        assert_eq!(
+            allowed(
+                "remote.control.invoke",
+                "remote",
+                &["remote.control.invoke".into()],
+                true,
+                Some("reliable"),
+                Some("1.2"),
+                None,
+            ),
+            Some("capability_not_permitted")
+        );
+        assert_eq!(
+            allowed(
+                "remote.control.invoke",
+                "remote",
+                &["remote.control.invoke".into()],
+                true,
+                Some("reliable"),
+                Some("1.2"),
+                Some(&versions),
+            ),
+            Some("capability_not_permitted")
+        );
+        versions.insert("remote.control.invoke".into(), "not-a-version".into());
+        assert_eq!(
+            allowed(
+                "remote.control.invoke",
+                "remote",
+                &["remote.control.invoke".into()],
+                true,
+                Some("reliable"),
+                Some("1.2"),
+                Some(&versions),
+            ),
+            Some("capability_not_permitted")
+        );
+        versions.insert("remote.control.invoke".into(), "0.9".into());
+        assert_eq!(
+            allowed(
+                "remote.control.invoke",
+                "remote",
+                &["remote.control.invoke".into()],
+                true,
+                Some("reliable"),
+                Some("1.2"),
+                Some(&versions),
+            ),
+            Some("capability_not_permitted")
+        );
+        versions.insert("remote.control.invoke".into(), "1.0".into());
+        assert_eq!(
+            allowed(
+                "remote.control.invoke",
+                "remote",
+                &["remote.control.invoke".into()],
+                true,
+                Some("reliable"),
+                Some("1.2"),
+                Some(&versions),
+            ),
+            None
+        );
+    }
 }

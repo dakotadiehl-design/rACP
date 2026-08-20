@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_layout.schema.json",
+  "title": "ACP Remote layout asset",
+  "type": "object",
+  "additionalProperties": false,
+  "anyOf": [
+    { "required": ["layout_id"] },
+    { "required": ["surface_id"] }
+  ],
+  "required": ["revision", "show_id", "name", "pages", "controls"],
+  "properties": {
+    "surface_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "layout_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "show_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "name": { "type": "string", "minLength": 1 },
+    "sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+    "schema_version": { "$ref": "../common/defs.schema.json#/$defs/version" },
+    "min_client_schema": { "$ref": "../common/defs.schema.json#/$defs/version" },
+    "max_client_schema": { "$ref": "../common/defs.schema.json#/$defs/version" },
+    "compatible_profile": { "$ref": "../common/defs.schema.json#/$defs/remote_profile_id" },
+    "asset_type": { "$ref": "../common/defs.schema.json#/$defs/remote_asset_type" },
+    "pages": {
+      "type": "array",
+      "items": { "$ref": "remote_page.schema.json" }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "remote_control_definition.schema.json" }
+    },
+    "extensions": { "type": "object" }
+  }
+}

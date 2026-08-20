@@ -60,6 +60,14 @@ pub fn select_encoding(client: &[String], server: &[String]) -> Result<String, N
     Err(NegotiateError("no common encoding".into()))
 }
 
+pub fn intersect_profiles(local: &[String], peer: &[String]) -> Vec<String> {
+    local
+        .iter()
+        .filter(|name| peer.iter().any(|p| p == *name))
+        .cloned()
+        .collect()
+}
+
 pub fn intersect_capabilities(local: &[Capability], peer: &[Capability]) -> Vec<Capability> {
     let mut out = Vec::new();
     for cap in local {

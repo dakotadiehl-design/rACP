@@ -287,6 +287,7 @@ class TransferAgent:
         return make_envelope(
             type=typ,
             source=self.source,
+            destination=cause.source,
             qos=QoS.RELIABLE,
             payload={k: v for k, v in payload.items() if v is not None},
             correlation_id=cause.correlation_id or cause.message_id,

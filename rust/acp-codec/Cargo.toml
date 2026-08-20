@@ -9,6 +9,7 @@ rust-version.workspace = true
 [dependencies]
 acp-model = { path = "../acp-model" }
 serde_json = "1"
+regex = "1"
 
 [lints]
 workspace = true

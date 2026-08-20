@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_control_invocation.schema.json",
+  "title": "ACP Remote control invocation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["control_id", "invocation_id", "interaction"],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "interaction": { "enum": ["momentary_end", "momentary_cancel"] } },
+        "required": ["interaction"]
+      },
+      "then": { "required": ["lease_id"] }
+    }
+  ],
+  "properties": {
+    "control_id": { "type": "string", "minLength": 1 },
+    "invocation_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "interaction": { "$ref": "../common/defs.schema.json#/$defs/remote_interaction" },
+    "value": true,
+    "client_timestamp_utc": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+    "show_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "show_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "layout_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "layout_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "lease_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "delivery": { "$ref": "../common/defs.schema.json#/$defs/remote_delivery" },
+    "issued_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+    "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+    "max_age_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "transition_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+        "transition_mode": { "$ref": "../common/defs.schema.json#/$defs/remote_transition_mode" },
+        "transition_preset": { "type": "string" }
+      }
+    },
+    "extensions": { "type": "object" }
+  }
+}

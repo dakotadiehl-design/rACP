@@ -58,9 +58,12 @@ class Advertisement:
     endpoint_url: str
     capabilities_digest: str
     security_mode: str = "trusted_lan"
+    product: str | None = None
+    product_role: str | None = None
+    remote_profiles: list[str] | None = None
 
     def payload(self) -> dict:
-        return {
+        data = {
             "type": "discovery.advertisement",
             "node": self.node.to_dict(),
             "protocol": self.protocol.to_dict(),
@@ -68,6 +71,13 @@ class Advertisement:
             "capabilities_digest": self.capabilities_digest,
             "security_mode": self.security_mode,
         }
+        if self.product:
+            data["product"] = self.product
+        if self.product_role:
+            data["product_role"] = self.product_role
+        if self.remote_profiles:
+            data["remote_profiles"] = list(self.remote_profiles)
+        return data
 
 
 class DiscoveryNode:

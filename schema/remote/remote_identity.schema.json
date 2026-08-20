@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_identity.schema.json",
+  "title": "ACP Remote identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["node_id", "instance_id", "device_id", "remote_id", "device_name", "platform", "app_version"],
+  "properties": {
+    "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "device_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "remote_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "participant_id": {
+      "anyOf": [
+        { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "device_name": { "type": "string", "minLength": 1 },
+    "platform": { "$ref": "../common/defs.schema.json#/$defs/remote_platform" },
+    "app_version": { "type": "string", "minLength": 1 },
+    "extensions": { "type": "object" }
+  }
+}

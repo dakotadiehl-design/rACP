@@ -15,7 +15,119 @@
     },
     "role": {
       "type": "string",
-      "enum": ["conductor", "prism", "lyric", "bridge", "tool", "simulator"]
+      "enum": ["conductor", "prism", "lyric", "bridge", "tool", "simulator", "remote"]
+    },
+    "remote_role": {
+      "type": "string",
+      "enum": ["remote.viewer", "remote.operator", "remote.busker", "remote.show_navigation", "remote.admin"]
+    },
+    "remote_permission": {
+      "type": "string",
+      "enum": [
+        "observe",
+        "song.select",
+        "song.load",
+        "cue.execute",
+        "look.execute",
+        "busk.execute",
+        "output.grand_master",
+        "output.blackout",
+        "remote.surface.use"
+      ]
+    },
+    "remote_profile_id": {
+      "type": "string",
+      "enum": ["aurora.remote.prism.v1", "aurora.remote.conductor.v1", "remote"]
+    },
+    "remote_delivery": {
+      "type": "string",
+      "enum": ["stateful", "impulse", "live_ephemeral"]
+    },
+    "remote_transition_mode": {
+      "type": "string",
+      "enum": ["cut", "fade"]
+    },
+    "remote_show_mode": {
+      "type": "string",
+      "enum": ["programmed", "free_play"]
+    },
+    "remote_interaction": {
+      "type": "string",
+      "enum": ["activate", "set", "adjust", "momentary_begin", "momentary_end", "momentary_cancel"]
+    },
+    "remote_control_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Known types are enumerated in constants; unknown types are skipped by compatible clients."
+    },
+    "remote_control_type_known": {
+      "type": "string",
+      "enum": [
+        "button",
+        "momentary",
+        "momentary_button",
+        "toggle",
+        "slider",
+        "fader",
+        "encoder",
+        "rotary",
+        "selector",
+        "segmented_selector",
+        "xy",
+        "xy_pad",
+        "transport",
+        "navigation",
+        "status",
+        "meter",
+        "color",
+        "color_control",
+        "preset_tile",
+        "label",
+        "value_display",
+        "status_indicator",
+        "group",
+        "spacer"
+      ]
+    },
+    "remote_failsafe": {
+      "type": "string",
+      "enum": ["release_on_disconnect", "release_on_timeout", "hold_last_state", "authority_defined"]
+    },
+    "remote_concurrency": {
+      "type": "string",
+      "enum": ["shared", "exclusive", "single_owner", "authority_defined"]
+    },
+    "remote_readiness": {
+      "type": "string",
+      "enum": ["connecting", "negotiating", "syncing_assets", "syncing_state", "ready", "ready_with_warnings", "degraded", "blocked", "disconnected"]
+    },
+    "remote_feedback": {
+      "type": "string",
+      "enum": ["none", "ack_only", "state", "meter", "progress"]
+    },
+    "remote_safety_class": {
+      "type": "string",
+      "enum": ["normal", "caution", "dangerous"]
+    },
+    "remote_platform": {
+      "type": "string",
+      "enum": ["ios", "ipados", "macos", "android", "web", "hardware", "simulator"]
+    },
+    "remote_asset_type": {
+      "type": "string",
+      "enum": [
+        "remote.layout",
+        "aurora.remote.surface",
+        "remote.control_set",
+        "remote.busking_page",
+        "remote.navigation_profile",
+        "remote.presentation_profile",
+        "remote.permission_profile"
+      ]
+    },
+    "remote_style": {
+      "type": "string",
+      "enum": ["normal", "primary", "secondary", "warning", "danger", "success", "performance"]
     },
     "qos": {
       "type": "string",

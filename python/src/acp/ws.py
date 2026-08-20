@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from .constants import limits as profile_limits
 from .session import Transport
+from .types import UUID_RE
 
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 MAX_HEADER_BYTES = 8192
@@ -169,19 +170,11 @@ def _tls_identity(ssl_object: ssl.SSLObject | None) -> str | None:
             if not isinstance(item, (list, tuple)) or len(item) != 2:
                 continue
             type_, value = item
-            if type_ == "URI" and isinstance(value, str) and value.startswith("acp://"):
-                return value.split("acp://", 1)[1]
-    subject = cert.get("subject") or ()
-    if isinstance(subject, (list, tuple)):
-        for rdn in subject:
-            if not isinstance(rdn, (list, tuple)):
+            if type_ != "URI" or not isinstance(value, str) or not value.startswith("acp://"):
                 continue
-            for pair in rdn:
-                if not isinstance(pair, (list, tuple)) or len(pair) != 2:
-                    continue
-                key, value = pair
-                if key == "commonName" and isinstance(value, str):
-                    return value
+            node = value.split("acp://", 1)[1].rstrip("/").split("/")[-1].lower()
+            if UUID_RE.match(node):
+                return node
     return None
 
 
@@ -218,24 +211,31 @@ async def connect_ws(
     )
     writer.write(req.encode("ascii"))
     await writer.drain()
-    header = await _read_headers(reader)
-    lines = header.decode("iso-8859-1").split("\r\n")
-    status = lines[0]
-    parts = status.split()
-    if len(parts) < 2 or parts[0] != "HTTP/1.1" or parts[1] != "101":
+    try:
+        header = await _read_headers(reader)
+        lines = header.decode("iso-8859-1").split("\r\n")
+        status = lines[0]
+        parts = status.split()
+        if len(parts) < 2 or parts[0] != "HTTP/1.1" or parts[1] != "101":
+            raise ConnectionError(f"websocket handshake failed: {status!r}")
+        headers = {}
+        for line in lines[1:]:
+            if ":" in line:
+                name, value = line.split(":", 1)
+                headers[name.strip().lower()] = value.strip()
+        if headers.get("upgrade", "").lower() != "websocket":
+            raise ConnectionError("missing Upgrade: websocket")
+        if not _header_has_token(headers.get("connection", ""), "upgrade"):
+            raise ConnectionError("missing Connection: Upgrade")
+        if headers.get("sec-websocket-accept") != _accept_key(key):
+            raise ConnectionError("invalid Sec-WebSocket-Accept")
+    except Exception:
         writer.close()
-        raise ConnectionError(f"websocket handshake failed: {status!r}")
-    headers = {}
-    for line in lines[1:]:
-        if ":" in line:
-            name, value = line.split(":", 1)
-            headers[name.strip().lower()] = value.strip()
-    if headers.get("upgrade", "").lower() != "websocket":
-        raise ConnectionError("missing Upgrade: websocket")
-    if not _header_has_token(headers.get("connection", ""), "upgrade"):
-        raise ConnectionError("missing Connection: Upgrade")
-    if headers.get("sec-websocket-accept") != _accept_key(key):
-        raise ConnectionError("invalid Sec-WebSocket-Accept")
+        try:
+            await writer.wait_closed()
+        except Exception:  # noqa: BLE001
+            pass
+        raise
     identity = _tls_identity(writer.get_extra_info("ssl_object"))
     return WsTransport(reader, writer, client=True, peer_identity=identity)
 

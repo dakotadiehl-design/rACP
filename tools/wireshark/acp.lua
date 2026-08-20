@@ -30,13 +30,29 @@ local f_asset_status = ProtoField.string("acp.asset.status", "Asset status")
 local f_participant = ProtoField.string("acp.participant.id", "Participant ID")
 local f_xfer = ProtoField.string("acp.resource.transfer_id", "Transfer ID")
 local f_blackout = ProtoField.bool("acp.bridge.blackout", "Bridge blackout")
+local f_remote_id = ProtoField.string("acp.remote.id", "Remote ID")
+local f_remote_device = ProtoField.string("acp.remote.device_id", "Remote device ID")
+local f_remote_part = ProtoField.string("acp.remote.participant_id", "Remote participant ID")
+local f_remote_layout = ProtoField.string("acp.remote.layout.id", "Remote layout ID")
+local f_remote_layout_rev = ProtoField.uint64("acp.remote.layout.revision", "Remote layout revision")
+local f_remote_control = ProtoField.string("acp.remote.control.id", "Remote control ID")
+local f_remote_ctype = ProtoField.string("acp.remote.control.type", "Remote control type")
+local f_remote_ix = ProtoField.string("acp.remote.control.interaction", "Remote interaction")
+local f_remote_inv = ProtoField.string("acp.remote.control.invocation_id", "Remote invocation ID")
+local f_remote_value = ProtoField.string("acp.remote.control.value", "Remote control value")
+local f_remote_perm = ProtoField.string("acp.remote.permission", "Remote permission")
+local f_remote_ready = ProtoField.string("acp.remote.readiness", "Remote readiness")
+local f_remote_lease = ProtoField.string("acp.remote.momentary.lease_id", "Momentary lease ID")
+local f_remote_exp = ProtoField.uint64("acp.remote.momentary.expires_ms", "Momentary expires ms")
 
 acp.fields = {
   f_magic, f_dver, f_enc, f_version, f_type, f_message_id, f_correlation_id,
   f_causation_id, f_session_id, f_sequence, f_qos, f_src_node, f_src_comp,
   f_dst_node, f_cmd_status, f_state_res, f_state_rev, f_state_conf, f_health,
   f_error, f_show_id, f_show_rev, f_asset_id, f_asset_status, f_participant,
-  f_xfer, f_blackout
+  f_xfer, f_blackout, f_remote_id, f_remote_device, f_remote_part, f_remote_layout,
+  f_remote_layout_rev, f_remote_control, f_remote_ctype, f_remote_ix, f_remote_inv,
+  f_remote_value, f_remote_perm, f_remote_ready, f_remote_lease, f_remote_exp
 }
 
 local udp_port = DissectorTable.get("udp.port")
@@ -77,6 +93,29 @@ local function add_json_fields(tree, buf, json)
     if p.participant_id then tree:add(f_participant, p.participant_id) end
     if p.asset_id then tree:add(f_asset_id, p.asset_id) end
     if p.state then tree:add(f_asset_status, p.state) end
+    if type(p.remote) == "table" then
+      if p.remote.remote_id then tree:add(f_remote_id, p.remote.remote_id) end
+      if p.remote.device_id then tree:add(f_remote_device, p.remote.device_id) end
+      if p.remote.participant_id then tree:add(f_remote_part, p.remote.participant_id) end
+    end
+    if p.remote_id then tree:add(f_remote_id, p.remote_id) end
+    if p.control_id then tree:add(f_remote_control, p.control_id) end
+    if p.control_type then tree:add(f_remote_ctype, p.control_type) end
+    if p.interaction then tree:add(f_remote_ix, p.interaction) end
+    if p.invocation_id then tree:add(f_remote_inv, p.invocation_id) end
+    if p.value ~= nil then tree:add(f_remote_value, tostring(p.value)) end
+    if p.permission then tree:add(f_remote_perm, p.permission) end
+    if p.state and json.type and string.find(json.type, "readiness", 1, true) then
+      tree:add(f_remote_ready, p.state)
+    end
+    if p.lease_id then tree:add(f_remote_lease, p.lease_id) end
+    if p.expires_ms then tree:add(f_remote_exp, p.expires_ms) end
+    if p.layout_id then tree:add(f_remote_layout, p.layout_id) end
+    if p.layout_revision then tree:add(f_remote_layout_rev, p.layout_revision) end
+    if type(p.layout) == "table" then
+      if p.layout.layout_id then tree:add(f_remote_layout, p.layout.layout_id) end
+      if p.layout.revision then tree:add(f_remote_layout_rev, p.layout.revision) end
+    end
   end
 end
 

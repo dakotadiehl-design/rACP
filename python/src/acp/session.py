@@ -17,6 +17,7 @@ from .idempotency import IdempotencyCache
 from .negotiate import (
     VersionError,
     intersect_capabilities,
+    intersect_profiles,
     select_encoding,
     select_version,
     validate_heartbeat,
@@ -115,6 +116,7 @@ class Session:
     peer_offered: list[Capability] = field(default_factory=list, init=False)
     negotiated_capabilities: set[str] = field(default_factory=set, init=False)
     negotiated_capability_versions: dict[str, str] = field(default_factory=dict, init=False)
+    negotiated_profiles: set[str] = field(default_factory=set, init=False)
     heartbeat_interval_ms: int = field(default=1000, init=False)
     max_message_bytes: int = field(default=1_048_576, init=False)
     _shutting_down: bool = field(default=False, init=False)
@@ -241,6 +243,10 @@ class Session:
             encoding = select_encoding(list(payload.get("encodings") or []), self.encodings)
             peer_caps = self._caps_from_payload(payload.get("capabilities"))
             negotiated = intersect_capabilities(capabilities, peer_caps)
+            negotiated_profiles = intersect_profiles(
+                list(self.profiles),
+                [str(p) for p in (payload.get("profiles") or [])],
+            )
             auth_mode = (payload.get("auth") or {}).get("mode", "trusted_lan")
             self._require_auth_mode(str(auth_mode))
             peer = NodeIdentity.from_dict(payload["node"])
@@ -280,6 +286,7 @@ class Session:
         self.local_offered = list(capabilities)
         self.negotiated_capability_versions = {c.id: c.version for c in negotiated}
         self.negotiated_capabilities = set(self.negotiated_capability_versions)
+        self.negotiated_profiles = set(negotiated_profiles)
         self.session_id = new_uuid()
         self.session_version = selected
         self.encoding = encoding
@@ -299,6 +306,7 @@ class Session:
                 "heartbeat_interval_ms": self.heartbeat_interval_ms,
                 "node": self.local.to_dict(),
                 "peer_capabilities": [c.to_dict() for c in negotiated],
+                "profiles": negotiated_profiles,
                 "limits": {"max_message_bytes": self.limits["max_message_bytes"]},
             },
         )
@@ -330,6 +338,11 @@ class Session:
         peer_caps = self._caps_from_payload(payload.get("peer_capabilities"))
         self.peer_offered = peer_caps
         self._refresh_negotiated()
+        ack_profiles = payload.get("profiles")
+        if isinstance(ack_profiles, list):
+            self.negotiated_profiles = set(intersect_profiles(list(self.profiles), [str(p) for p in ack_profiles]))
+        else:
+            self.negotiated_profiles = set(self.profiles)
         if "node" not in payload:
             self.state = SessionState.FAILED
             raise SessionError("authentication", "hello_ack missing node identity")
@@ -368,6 +381,7 @@ class Session:
             sender_role=self.local.role.value,
             negotiated_capabilities=self.negotiated_capabilities,
             handshake_complete=True,
+            negotiated_versions=self.negotiated_capability_versions,
         )
         if err:
             raise SessionError(err, f"not allowed to send {envelope.type}")
@@ -642,6 +656,7 @@ class Session:
             negotiated_capabilities=self.negotiated_capabilities,
             handshake_complete=True,
             qos=env.qos.value,
+            negotiated_versions=self.negotiated_capability_versions,
         )
 
     async def _check_sequence(self, env: Envelope) -> bool:

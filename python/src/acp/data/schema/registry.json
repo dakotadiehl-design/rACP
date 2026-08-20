@@ -9,6 +9,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -16,7 +17,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -43,6 +45,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -50,7 +53,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -77,6 +81,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -84,7 +89,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -112,11 +118,13 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "advertisement",
       "valid_senders": [
         "conductor",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "broadcast"
@@ -143,6 +151,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "advertisement",
       "valid_senders": [
         "conductor",
@@ -150,7 +159,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "broadcast"
@@ -177,6 +187,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -209,6 +220,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -243,6 +255,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -250,7 +263,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -277,6 +291,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -311,6 +326,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -345,6 +361,7 @@
         "core"
       ],
       "required_capability": "health.heartbeat",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -352,7 +369,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "session"
@@ -379,6 +397,7 @@
         "core"
       ],
       "required_capability": "health.heartbeat",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -411,6 +430,7 @@
         "core"
       ],
       "required_capability": "health.heartbeat",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -443,6 +463,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -450,7 +471,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -477,6 +499,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -509,6 +532,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -516,7 +540,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node",
@@ -544,6 +569,7 @@
         "bridge"
       ],
       "required_capability": "bridge.config",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "bridge"
@@ -573,6 +599,7 @@
         "bridge"
       ],
       "required_capability": "bridge.config",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -604,6 +631,7 @@
         "bridge"
       ],
       "required_capability": "bridge.config",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -635,6 +663,7 @@
         "bridge"
       ],
       "required_capability": "bridge.config",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "bridge"
@@ -664,6 +693,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -696,6 +726,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -729,6 +760,7 @@
         "core"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -762,6 +794,7 @@
         "prism"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -795,6 +828,7 @@
         "bridge"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "prism",
@@ -826,6 +860,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -855,6 +890,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -890,6 +926,7 @@
         "bridge"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "prism",
@@ -921,6 +958,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -952,6 +990,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -987,6 +1026,7 @@
         "bridge"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -1019,6 +1059,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1051,6 +1092,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1083,6 +1125,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1115,6 +1158,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1147,6 +1191,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -1176,6 +1221,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1208,6 +1254,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -1237,6 +1284,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -1266,6 +1314,7 @@
         "prism"
       ],
       "required_capability": "prism.cue_control",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1298,6 +1347,7 @@
         "prism"
       ],
       "required_capability": "prism.cue_control",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1330,6 +1380,7 @@
         "prism"
       ],
       "required_capability": "prism.cue_control",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1362,6 +1413,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1394,6 +1446,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1426,6 +1479,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1458,6 +1512,7 @@
         "conductor"
       ],
       "required_capability": null,
+      "min_capability_version": null,
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1490,6 +1545,7 @@
         "bridge"
       ],
       "required_capability": "bridge.status",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "bridge"
@@ -1520,6 +1576,7 @@
         "bridge"
       ],
       "required_capability": "bridge.blackout",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1551,6 +1608,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1558,7 +1616,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1585,6 +1644,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor"
@@ -1616,6 +1676,7 @@
         "bridge"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "prism",
@@ -1649,6 +1710,7 @@
         "bridge"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "prism",
@@ -1681,6 +1743,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -1710,6 +1773,7 @@
         "conductor"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1743,6 +1807,7 @@
         "bridge"
       ],
       "required_capability": "asset.conformance",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "prism",
@@ -1774,6 +1839,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1781,7 +1847,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1808,6 +1875,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -1815,7 +1883,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1842,6 +1911,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -1849,7 +1919,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1876,6 +1947,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -1883,7 +1955,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1910,6 +1983,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -1917,7 +1991,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1944,6 +2019,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -1951,7 +2027,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -1978,6 +2055,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -1985,7 +2063,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -2012,6 +2091,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "response",
       "valid_senders": [
         "conductor",
@@ -2019,7 +2099,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -2046,6 +2127,7 @@
         "core"
       ],
       "required_capability": "resource.transfer",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor",
@@ -2053,7 +2135,8 @@
         "lyric",
         "bridge",
         "tool",
-        "simulator"
+        "simulator",
+        "remote"
       ],
       "valid_destinations": [
         "node"
@@ -2081,6 +2164,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -2113,6 +2197,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -2143,6 +2228,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor"
@@ -2173,6 +2259,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -2203,6 +2290,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor",
@@ -2234,6 +2322,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor"
@@ -2264,6 +2353,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "request",
       "valid_senders": [
         "conductor"
@@ -2294,6 +2384,7 @@
         "conductor"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "conductor"
@@ -2323,6 +2414,7 @@
         "lyric"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "lyric"
@@ -2352,6 +2444,7 @@
         "lyric"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "lyric"
@@ -2381,6 +2474,7 @@
         "lyric"
       ],
       "required_capability": "lyric.assignment",
+      "min_capability_version": "1.0",
       "direction": "event",
       "valid_senders": [
         "lyric"
@@ -2401,6 +2495,525 @@
       "legal_before_handshake": false,
       "security_class": "state",
       "schema": "lyric/messages.schema.json#/$defs/ready"
+    },
+    {
+      "type": "remote.hello",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.profile",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "remote.hello_ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "handshake",
+      "schema": "remote/messages.schema.json#/$defs/hello"
+    },
+    {
+      "type": "remote.hello_ack",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.profile",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "handshake",
+      "schema": "remote/messages.schema.json#/$defs/hello_ack"
+    },
+    {
+      "type": "remote.layout.request",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.layout",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "optional",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "remote.layout.report",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/messages.schema.json#/$defs/layout_request"
+    },
+    {
+      "type": "remote.layout.report",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.layout",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/messages.schema.json#/$defs/layout_report"
+    },
+    {
+      "type": "remote.control.invoke",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.control.invoke",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable",
+        "latest"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "remote/remote_control_invocation.schema.json"
+    },
+    {
+      "type": "remote.control.state",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.control.state",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/remote_control_state.schema.json"
+    },
+    {
+      "type": "remote.control.snapshot",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.control.state",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/messages.schema.json#/$defs/control_snapshot"
+    },
+    {
+      "type": "remote.permissions",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.profile",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/remote_permission_set.schema.json"
+    },
+    {
+      "type": "remote.permissions.changed",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.profile",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/remote_permission_set.schema.json"
+    },
+    {
+      "type": "remote.readiness",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.readiness",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "optional",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "remote.readiness.changed",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/remote_readiness.schema.json"
+    },
+    {
+      "type": "remote.readiness.changed",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.readiness",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/remote_readiness.schema.json"
+    },
+    {
+      "type": "remote.navigation.request",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.navigation.song",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "remote/messages.schema.json#/$defs/navigation_request"
+    },
+    {
+      "type": "remote.navigation.state",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.navigation.song",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "state",
+      "schema": "remote/messages.schema.json#/$defs/navigation_state"
+    },
+    {
+      "type": "remote.presentation.state",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.presentation",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest",
+        "best_effort"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "telemetry",
+      "schema": "remote/remote_presentation.schema.json"
+    },
+    {
+      "type": "remote.momentary.refresh",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.control.momentary",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "remote",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "optional",
+      "idempotent": true,
+      "idempotency_key": "payload.idempotency_key",
+      "response_type": "command.ack",
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "remote/messages.schema.json#/$defs/momentary_refresh"
+    },
+    {
+      "type": "remote.error",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "remote"
+      ],
+      "required_capability": "remote.profile",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "simulator",
+        "remote",
+        "tool"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "copy_or_message_id",
+      "causation": "set_on_derived_state",
+      "legal_before_handshake": false,
+      "security_class": "control",
+      "schema": "remote/messages.schema.json#/$defs/error"
     }
   ]
 }

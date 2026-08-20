@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_readiness.schema.json",
+  "title": "ACP Remote readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["state"],
+  "properties": {
+    "state": { "$ref": "../common/defs.schema.json#/$defs/remote_readiness" },
+    "remote_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "session_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+    "layout_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "layout_hash": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+    "sha256": { "$ref": "../common/defs.schema.json#/$defs/sha256_hex" },
+    "snapshot_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "permissions_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "reason": { "type": "string" },
+    "extensions": { "type": "object" }
+  }
+}

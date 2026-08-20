@@ -61,28 +61,34 @@ def main() -> int:
                     errors.append(f"{msg['type']}: schema pointer {pointer} not found")
                     break
                 node = node[part]
-    # Every family messages.schema.json should be referenced at least once
+    referenced_files = {m["schema"].split("#", 1)[0] for m in messages}
+    referenced_files.update(_schema_ref_closure(referenced_files))
     for family_file in SCHEMA.rglob("*.schema.json"):
         rel = family_file.relative_to(SCHEMA).as_posix()
         if rel in {"envelope.schema.json", "common/defs.schema.json"}:
             continue
-        referenced = any(m["schema"].split("#", 1)[0] == rel for m in messages)
-        if not referenced:
+        if rel not in referenced_files:
             errors.append(f"schema file not referenced by registry: {rel}")
     by_type = {m["type"]: m for m in messages}
     manifest = ROOT / "vectors" / "manifest.json"
+    covered: set[str] = set()
     if manifest.is_file():
         for item in json.loads(manifest.read_text())["vectors"]:
-            vec_type = item["id"]
+            vec_type = item.get("type") or item["id"]
+            covered.add(vec_type)
             if vec_type not in by_type:
-                errors.append(f"vector {vec_type} has no registry row")
+                errors.append(f"vector {item['id']} has no registry row")
                 continue
             payload = json.loads((ROOT / "vectors" / item["json"]).read_text())
             if payload.get("type") != vec_type:
-                errors.append(f"vector {vec_type} type mismatch")
+                errors.append(f"vector {item['id']} type mismatch")
             if payload.get("qos") not in by_type[vec_type]["qos_allowed"]:
-                errors.append(f"vector {vec_type} qos not allowed")
+                errors.append(f"vector {item['id']} qos not allowed")
+    for typ in by_type:
+        if typ not in covered:
+            errors.append(f"missing vector for {typ}")
     errors.extend(_packaged_data_drift())
+    errors.extend(_schema_pack_drift())
     try:
         errors.extend(_compile_and_validate_vectors(messages))
     except Exception as exc:  # noqa: BLE001
@@ -94,6 +100,44 @@ def main() -> int:
         return 1
     print(f"registry ok: {len(messages)} messages")
     return 0
+
+
+def _schema_ref_closure(roots: set[str]) -> set[str]:
+    found: set[str] = set()
+    pending = list(roots)
+    while pending:
+        rel = pending.pop()
+        path = SCHEMA / rel
+        if not path.is_file():
+            continue
+        text = path.read_text()
+        doc = json.loads(text)
+        for ref in _walk_refs(doc):
+            target = ref.split("#", 1)[0]
+            if not target:
+                continue
+            if target.startswith("../"):
+                target = str((path.parent / target).resolve().relative_to(SCHEMA.resolve()))
+            elif "/" not in target and not target.startswith("http"):
+                target = f"{path.parent.relative_to(SCHEMA).as_posix()}/{target}"
+            if target.endswith(".json") and target not in found and target not in roots:
+                found.add(target)
+                pending.append(target)
+    return found
+
+
+def _walk_refs(node: object) -> list[str]:
+    refs: list[str] = []
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str):
+            refs.append(ref)
+        for value in node.values():
+            refs.extend(_walk_refs(value))
+    elif isinstance(node, list):
+        for item in node:
+            refs.extend(_walk_refs(item))
+    return refs
 
 
 def _compile_and_validate_vectors(messages: list[dict]) -> list[str]:
@@ -128,7 +172,15 @@ def _compile_and_validate_vectors(messages: list[dict]) -> list[str]:
         if cbor_path.is_file():
             try:
                 again = decode_cbor(cbor_path.read_bytes())
-                validate_message(again.to_dict())
+                decoded = again.to_dict()
+                payload = decoded.get("payload")
+                data = payload.get("data") if isinstance(payload, dict) else None
+                if again.type == "resource.chunk" and isinstance(data, (bytes, bytearray)):
+                    import base64
+                    payload = dict(payload)
+                    payload["data"] = base64.b64encode(bytes(data)).decode("ascii")
+                    decoded["payload"] = payload
+                validate_message(decoded)
             except Exception as exc:  # noqa: BLE001
                 errors.append(f"vector {item['id']} decoded CBOR failed schema: {exc}")
     invalid = ROOT / "schema" / "invariants" / "invalid_envelope.json"
@@ -147,6 +199,7 @@ def _packaged_data_drift() -> list[str]:
     pairs = [
         (SCHEMA / "constants.json", packaged / "constants.json", "packaged constants.json"),
         (REGISTRY, packaged / "registry.json", "packaged registry.json"),
+        (REGISTRY, ROOT / "Sources" / "AuroraACP" / "Session" / "registry.json", "Swift registry.json"),
     ]
     for src, dst, label in pairs:
         if not dst.is_file():
@@ -163,6 +216,26 @@ def _packaged_data_drift() -> list[str]:
             errors.append(f"packaged schema missing {rel.as_posix()}")
         elif other.read_bytes() != path.read_bytes():
             errors.append(f"packaged schema drift: {rel.as_posix()}")
+    return errors
+
+
+def _schema_pack_drift() -> list[str]:
+    docs: dict[str, object] = {}
+    for path in sorted(SCHEMA.rglob("*.schema.json")):
+        rel = path.relative_to(SCHEMA).as_posix()
+        docs[rel] = json.loads(path.read_text())
+    messages = {row["type"]: row["schema"] for row in json.loads(REGISTRY.read_text())["messages"]}
+    expected = json.dumps({"docs": docs, "messages": messages}, indent=2, sort_keys=True) + "\n"
+    errors: list[str] = []
+    for dest in (
+        SCHEMA / "schema_pack.json",
+        ROOT / "python" / "src" / "acp" / "data" / "schema" / "schema_pack.json",
+        ROOT / "Sources" / "AuroraACP" / "Codec" / "schema_pack.json",
+    ):
+        if not dest.is_file():
+            errors.append(f"schema pack missing {dest}")
+        elif dest.read_text() != expected:
+            errors.append(f"schema pack out of date: {dest} (run scripts/pack_schemas.py)")
     return errors
 
 

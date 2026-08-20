@@ -1,0 +1,3576 @@
+{
+  "docs": {
+    "asset/messages.schema.json": {
+      "$defs": {
+        "inventory": {
+          "additionalProperties": true,
+          "properties": {
+            "assets": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "assets"
+          ],
+          "type": "object"
+        },
+        "manifest_get": {
+          "additionalProperties": true,
+          "properties": {
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision"
+          ],
+          "type": "object"
+        },
+        "manifest_report": {
+          "additionalProperties": true,
+          "properties": {
+            "assets": {
+              "items": {
+                "allOf": [
+                  {
+                    "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+                  },
+                  {
+                    "properties": {
+                      "requirement": {
+                        "$ref": "../common/defs.schema.json#/$defs/requirement"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "manifest_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "participant_assignments": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "assets"
+          ],
+          "type": "object"
+        },
+        "required": {
+          "additionalProperties": true,
+          "properties": {
+            "asset": {
+              "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+            },
+            "requirement": {
+              "$ref": "../common/defs.schema.json#/$defs/requirement"
+            }
+          },
+          "required": [
+            "asset",
+            "requirement"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "additionalProperties": true,
+          "properties": {
+            "asset_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "state": {
+              "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+            }
+          },
+          "required": [
+            "asset_id",
+            "state"
+          ],
+          "type": "object"
+        },
+        "sync": {
+          "additionalProperties": true,
+          "properties": {
+            "asset": {
+              "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+            }
+          },
+          "required": [
+            "asset"
+          ],
+          "type": "object"
+        },
+        "sync_result": {
+          "additionalProperties": true,
+          "properties": {
+            "asset_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "error": {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+            }
+          },
+          "required": [
+            "asset_id",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/asset/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP asset / manifest payloads"
+    },
+    "bridge/messages.schema.json": {
+      "$defs": {
+        "blackout": {
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "scope": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "enabled"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "additionalProperties": true,
+          "properties": {
+            "last_error": {
+              "type": "string"
+            },
+            "output_mode": {
+              "type": "string"
+            },
+            "universes": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "last_error": {
+                    "type": "string"
+                  },
+                  "port": {
+                    "type": "string"
+                  },
+                  "universe": {
+                    "$ref": "../common/defs.schema.json#/$defs/uint64"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "uptime_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            }
+          },
+          "required": [
+            "uptime_ms"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/bridge/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP Bridge payloads"
+    },
+    "capability/messages.schema.json": {
+      "$defs": {
+        "changed": {
+          "additionalProperties": true,
+          "properties": {
+            "added": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            },
+            "capabilities": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            },
+            "removed": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "capabilities"
+          ],
+          "type": "object"
+        },
+        "list": {
+          "additionalProperties": true,
+          "properties": {
+            "capabilities": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "capabilities"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/capability/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP capability payloads"
+    },
+    "chart/messages.schema.json": {
+      "$defs": {
+        "assignment": {
+          "additionalProperties": true,
+          "properties": {
+            "chart": {
+              "additionalProperties": true,
+              "properties": {
+                "asset_id": {
+                  "$ref": "../common/defs.schema.json#/$defs/uuid"
+                },
+                "revision": {
+                  "$ref": "../common/defs.schema.json#/$defs/uint64"
+                },
+                "sha256": {
+                  "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+                }
+              },
+              "required": [
+                "asset_id",
+                "revision",
+                "sha256"
+              ],
+              "type": "object"
+            },
+            "device_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "reason": {
+              "$ref": "../common/defs.schema.json#/$defs/assignment_reason"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "show_id",
+            "song_id",
+            "participant_id",
+            "chart"
+          ],
+          "type": "object"
+        },
+        "assignment_set": {
+          "additionalProperties": true,
+          "properties": {
+            "assignments": {
+              "items": {
+                "$ref": "#/$defs/assignment"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "assignments"
+          ],
+          "type": "object"
+        },
+        "catalog": {
+          "additionalProperties": true,
+          "properties": {
+            "charts": {
+              "items": {
+                "$ref": "#/$defs/metadata"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "charts"
+          ],
+          "type": "object"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "properties": {
+            "asset_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "asset_type": {
+              "const": "lyric.chart"
+            },
+            "chart_type": {
+              "$ref": "../common/defs.schema.json#/$defs/chart_type"
+            },
+            "display_metadata": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "instrument": {
+              "type": "string"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "song_id": {
+              "type": "string"
+            },
+            "transposition": {
+              "type": "integer"
+            },
+            "variant": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "asset_id",
+            "asset_type",
+            "song_id",
+            "revision",
+            "sha256",
+            "chart_type"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/chart/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP chart payloads"
+    },
+    "command/messages.schema.json": {
+      "$defs": {
+        "ack": {
+          "additionalProperties": true,
+          "properties": {
+            "error": {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            },
+            "result": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/command_status"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        "execute": {
+          "additionalProperties": true,
+          "properties": {
+            "args": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "execute_at_utc": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "late_policy": {
+              "$ref": "../common/defs.schema.json#/$defs/late_policy"
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "tolerance_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/command/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP command payloads"
+    },
+    "common/defs.schema.json": {
+      "$defs": {
+        "apply_mode": {
+          "enum": [
+            "validate_then_commit"
+          ],
+          "type": "string"
+        },
+        "asset_ref": {
+          "additionalProperties": true,
+          "properties": {
+            "asset_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "asset_type": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "media_type": {
+              "type": "string"
+            },
+            "producer": {
+              "type": "string"
+            },
+            "revision": {
+              "$ref": "#/$defs/uint64"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256_hex"
+            },
+            "size_bytes": {
+              "$ref": "#/$defs/uint64"
+            }
+          },
+          "required": [
+            "asset_id",
+            "asset_type",
+            "revision",
+            "sha256"
+          ],
+          "type": "object"
+        },
+        "assignment_reason": {
+          "enum": [
+            "explicit_assignment",
+            "performer_preference",
+            "show_default",
+            "fallback"
+          ],
+          "type": "string"
+        },
+        "auth_mode": {
+          "enum": [
+            "trusted_lan",
+            "tls",
+            "mutual_tls"
+          ],
+          "type": "string"
+        },
+        "capability": {
+          "additionalProperties": true,
+          "properties": {
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "version": {
+              "$ref": "#/$defs/version"
+            }
+          },
+          "required": [
+            "id",
+            "version"
+          ],
+          "type": "object"
+        },
+        "chart_type": {
+          "description": "Extensible. Well-known: nashville_number, chord_lyrics, lyrics_only, lead_sheet, sheet_music, custom",
+          "type": "string"
+        },
+        "command_status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "applied",
+            "completed",
+            "failed",
+            "duplicate"
+          ],
+          "type": "string"
+        },
+        "confidence": {
+          "enum": [
+            "unverified",
+            "sent_assumed",
+            "pending",
+            "confirmed",
+            "mismatch"
+          ],
+          "type": "string"
+        },
+        "conformance_state": {
+          "enum": [
+            "ready",
+            "syncing",
+            "missing",
+            "stale",
+            "hash_mismatch",
+            "incompatible",
+            "degraded",
+            "failed"
+          ],
+          "type": "string"
+        },
+        "duration_ms": {
+          "description": "Duration in integer milliseconds",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "encoding": {
+          "enum": [
+            "cbor",
+            "json"
+          ],
+          "type": "string"
+        },
+        "endpoint": {
+          "additionalProperties": true,
+          "properties": {
+            "component_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "node_id": {
+              "$ref": "#/$defs/uuid"
+            }
+          },
+          "required": [
+            "node_id"
+          ],
+          "type": "object"
+        },
+        "error_body": {
+          "additionalProperties": true,
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/error_category"
+            },
+            "code": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "details": {
+              "$ref": "#/$defs/error_details"
+            },
+            "message": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "severity": {
+              "$ref": "#/$defs/error_severity"
+            }
+          },
+          "required": [
+            "code",
+            "category",
+            "severity",
+            "message",
+            "retryable"
+          ],
+          "type": "object"
+        },
+        "error_category": {
+          "enum": [
+            "protocol",
+            "validation",
+            "authorization",
+            "not_found",
+            "conflict",
+            "unavailable",
+            "timeout",
+            "internal"
+          ],
+          "type": "string"
+        },
+        "error_details": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "error_severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error",
+            "critical"
+          ],
+          "type": "string"
+        },
+        "flag": {
+          "description": "Unknown optional flags are ignored on typed decode",
+          "type": "string"
+        },
+        "health_status": {
+          "enum": [
+            "ok",
+            "degraded",
+            "warning",
+            "critical",
+            "offline"
+          ],
+          "type": "string"
+        },
+        "late_policy": {
+          "enum": [
+            "reject",
+            "execute_immediately"
+          ],
+          "type": "string"
+        },
+        "node_identity": {
+          "additionalProperties": true,
+          "properties": {
+            "instance_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "name": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "node_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "product_version": {
+              "type": "string"
+            },
+            "role": {
+              "$ref": "#/$defs/role"
+            }
+          },
+          "required": [
+            "node_id",
+            "instance_id",
+            "role",
+            "name"
+          ],
+          "type": "object"
+        },
+        "nonneg_int": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "protocol_range": {
+          "additionalProperties": true,
+          "properties": {
+            "max": {
+              "$ref": "#/$defs/version"
+            },
+            "min": {
+              "$ref": "#/$defs/version"
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        "qos": {
+          "enum": [
+            "reliable",
+            "latest",
+            "best_effort"
+          ],
+          "type": "string"
+        },
+        "remote_asset_type": {
+          "enum": [
+            "remote.layout",
+            "aurora.remote.surface",
+            "remote.control_set",
+            "remote.busking_page",
+            "remote.navigation_profile",
+            "remote.presentation_profile",
+            "remote.permission_profile"
+          ],
+          "type": "string"
+        },
+        "remote_concurrency": {
+          "enum": [
+            "shared",
+            "exclusive",
+            "single_owner",
+            "authority_defined"
+          ],
+          "type": "string"
+        },
+        "remote_control_type": {
+          "description": "Known types are enumerated in constants; unknown types are skipped by compatible clients.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "remote_control_type_known": {
+          "enum": [
+            "button",
+            "momentary",
+            "momentary_button",
+            "toggle",
+            "slider",
+            "fader",
+            "encoder",
+            "rotary",
+            "selector",
+            "segmented_selector",
+            "xy",
+            "xy_pad",
+            "transport",
+            "navigation",
+            "status",
+            "meter",
+            "color",
+            "color_control",
+            "preset_tile",
+            "label",
+            "value_display",
+            "status_indicator",
+            "group",
+            "spacer"
+          ],
+          "type": "string"
+        },
+        "remote_delivery": {
+          "enum": [
+            "stateful",
+            "impulse",
+            "live_ephemeral"
+          ],
+          "type": "string"
+        },
+        "remote_failsafe": {
+          "enum": [
+            "release_on_disconnect",
+            "release_on_timeout",
+            "hold_last_state",
+            "authority_defined"
+          ],
+          "type": "string"
+        },
+        "remote_feedback": {
+          "enum": [
+            "none",
+            "ack_only",
+            "state",
+            "meter",
+            "progress"
+          ],
+          "type": "string"
+        },
+        "remote_interaction": {
+          "enum": [
+            "activate",
+            "set",
+            "adjust",
+            "momentary_begin",
+            "momentary_end",
+            "momentary_cancel"
+          ],
+          "type": "string"
+        },
+        "remote_permission": {
+          "enum": [
+            "observe",
+            "song.select",
+            "song.load",
+            "cue.execute",
+            "look.execute",
+            "busk.execute",
+            "output.grand_master",
+            "output.blackout",
+            "remote.surface.use"
+          ],
+          "type": "string"
+        },
+        "remote_platform": {
+          "enum": [
+            "ios",
+            "ipados",
+            "macos",
+            "android",
+            "web",
+            "hardware",
+            "simulator"
+          ],
+          "type": "string"
+        },
+        "remote_profile_id": {
+          "enum": [
+            "aurora.remote.prism.v1",
+            "aurora.remote.conductor.v1",
+            "remote"
+          ],
+          "type": "string"
+        },
+        "remote_readiness": {
+          "enum": [
+            "connecting",
+            "negotiating",
+            "syncing_assets",
+            "syncing_state",
+            "ready",
+            "ready_with_warnings",
+            "degraded",
+            "blocked",
+            "disconnected"
+          ],
+          "type": "string"
+        },
+        "remote_role": {
+          "enum": [
+            "remote.viewer",
+            "remote.operator",
+            "remote.busker",
+            "remote.show_navigation",
+            "remote.admin"
+          ],
+          "type": "string"
+        },
+        "remote_safety_class": {
+          "enum": [
+            "normal",
+            "caution",
+            "dangerous"
+          ],
+          "type": "string"
+        },
+        "remote_show_mode": {
+          "enum": [
+            "programmed",
+            "free_play"
+          ],
+          "type": "string"
+        },
+        "remote_style": {
+          "enum": [
+            "normal",
+            "primary",
+            "secondary",
+            "warning",
+            "danger",
+            "success",
+            "performance"
+          ],
+          "type": "string"
+        },
+        "remote_transition_mode": {
+          "enum": [
+            "cut",
+            "fade"
+          ],
+          "type": "string"
+        },
+        "requirement": {
+          "enum": [
+            "required",
+            "recommended",
+            "optional"
+          ],
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "conductor",
+            "prism",
+            "lyric",
+            "bridge",
+            "tool",
+            "simulator",
+            "remote"
+          ],
+          "type": "string"
+        },
+        "sha256_hex": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "show_identity": {
+          "additionalProperties": true,
+          "properties": {
+            "manifest_sha256": {
+              "$ref": "#/$defs/sha256_hex"
+            },
+            "policy": {
+              "type": "string"
+            },
+            "revision": {
+              "$ref": "#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "show_name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "manifest_sha256"
+          ],
+          "type": "object"
+        },
+        "state_resource": {
+          "additionalProperties": true,
+          "properties": {
+            "authority_epoch": {
+              "$ref": "#/$defs/uint64"
+            },
+            "authority_node_id": {
+              "$ref": "#/$defs/uuid"
+            },
+            "confidence": {
+              "$ref": "#/$defs/confidence"
+            },
+            "owner": {
+              "$ref": "#/$defs/endpoint"
+            },
+            "resource": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "$ref": "#/$defs/uint64"
+            },
+            "value": {
+              "additionalProperties": true,
+              "type": "object"
+            }
+          },
+          "required": [
+            "resource",
+            "revision",
+            "owner",
+            "value"
+          ],
+          "type": "object"
+        },
+        "timestamp_utc": {
+          "description": "RFC 3339 UTC with exactly millisecond precision and Z",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$",
+          "type": "string"
+        },
+        "transfer_locator_mode": {
+          "enum": [
+            "chunked",
+            "http"
+          ],
+          "type": "string"
+        },
+        "uint64": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "uuid": {
+          "description": "RFC 4122 UUID, lowercase hyphenated hex. No preferred version.",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "version": {
+          "description": "MAJOR.MINOR protocol or capability version",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/common/defs.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP common definitions"
+    },
+    "config/get.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/config/get.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "config.get payload",
+      "type": "object"
+    },
+    "config/result.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/config/result.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "error": {
+          "$ref": "../common/defs.schema.json#/$defs/error_body"
+        },
+        "field_results": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "configured": {
+                "type": "boolean"
+              },
+              "error": {
+                "$ref": "../common/defs.schema.json#/$defs/error_body"
+              },
+              "path": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "new_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "restart_required": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "../common/defs.schema.json#/$defs/command_status"
+        },
+        "transaction_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        }
+      },
+      "required": [
+        "transaction_id",
+        "status"
+      ],
+      "title": "config.result payload \u2014 secrets must not appear",
+      "type": "object"
+    },
+    "config/schema.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/config/schema.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "restart_required": {
+                "type": "boolean"
+              },
+              "secret": {
+                "type": "boolean"
+              },
+              "value_type": {
+                "type": "string"
+              },
+              "writable": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "path",
+              "value_type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "title": "config.schema payload",
+      "type": "object"
+    },
+    "config/set.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/config/set.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "apply": {
+          "$ref": "../common/defs.schema.json#/$defs/apply_mode"
+        },
+        "changes": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "value": true
+            },
+            "required": [
+              "path",
+              "value"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "expected_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "idempotency_key": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "transaction_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        }
+      },
+      "required": [
+        "transaction_id",
+        "expected_revision",
+        "changes",
+        "apply"
+      ],
+      "title": "config.set payload \u2014 write side; secrets allowed as values",
+      "type": "object"
+    },
+    "cue/messages.schema.json": {
+      "$defs": {
+        "fire": {
+          "additionalProperties": true,
+          "properties": {
+            "cue_id": {
+              "type": "string"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "cue_id"
+          ],
+          "type": "object"
+        },
+        "go": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "target_context": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "stop": {
+          "additionalProperties": true,
+          "properties": {
+            "cue_id": {
+              "type": "string"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/cue/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP cue payloads"
+    },
+    "discovery/messages.schema.json": {
+      "$defs": {
+        "advertisement": {
+          "additionalProperties": true,
+          "properties": {
+            "capabilities_digest": {
+              "type": "string"
+            },
+            "endpoint_url": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "node": {
+              "$ref": "../common/defs.schema.json#/$defs/node_identity"
+            },
+            "product": {
+              "type": "string"
+            },
+            "product_role": {
+              "type": "string"
+            },
+            "protocol": {
+              "$ref": "../common/defs.schema.json#/$defs/protocol_range"
+            },
+            "remote_profiles": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/remote_profile_id"
+              },
+              "type": "array"
+            },
+            "security_mode": {
+              "$ref": "../common/defs.schema.json#/$defs/auth_mode"
+            }
+          },
+          "required": [
+            "node",
+            "protocol",
+            "endpoint_url",
+            "capabilities_digest",
+            "security_mode"
+          ],
+          "type": "object"
+        },
+        "query": {
+          "additionalProperties": true,
+          "properties": {
+            "requester": {
+              "$ref": "../common/defs.schema.json#/$defs/node_identity"
+            },
+            "role_filter": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/role"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/discovery/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP discovery payloads"
+    },
+    "envelope.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/envelope.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": true,
+      "properties": {
+        "acp": {
+          "description": "Message schema version used to encode this envelope. Must be <= negotiated session version.",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "causation_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "correlation_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "destination": {
+          "$ref": "common/defs.schema.json#/$defs/endpoint"
+        },
+        "flags": {
+          "description": "Empty array allowed. Unknown optional flags ignored.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "message_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "qos": {
+          "$ref": "common/defs.schema.json#/$defs/qos"
+        },
+        "sequence": {
+          "description": "Assigned after QoS, only for transmitted messages. Required after HELLO.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "session_id": {
+          "description": "Required after HELLO completes",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "common/defs.schema.json#/$defs/endpoint"
+        },
+        "timestamp_utc": {
+          "$ref": "common/defs.schema.json#/$defs/timestamp_utc"
+        },
+        "type": {
+          "description": "Lowercase dotted message type",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acp",
+        "message_id",
+        "type",
+        "source",
+        "timestamp_utc",
+        "qos",
+        "flags",
+        "payload"
+      ],
+      "title": "ACP common envelope",
+      "type": "object"
+    },
+    "error/messages.schema.json": {
+      "$defs": {
+        "report": {
+          "$ref": "../common/defs.schema.json#/$defs/error_body"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/error/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP error payloads"
+    },
+    "health/messages.schema.json": {
+      "$defs": {
+        "component": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/health_status"
+            },
+            "summary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "status"
+          ],
+          "type": "object"
+        },
+        "heartbeat": {
+          "additionalProperties": true,
+          "properties": {
+            "components": {
+              "items": {
+                "$ref": "#/$defs/component"
+              },
+              "type": "array"
+            },
+            "metrics": {
+              "additionalProperties": true,
+              "properties": {
+                "cpu_pct": {
+                  "type": "number"
+                },
+                "memory_pct": {
+                  "type": "number"
+                },
+                "temperature_c": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/health_status"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "uptime_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            }
+          },
+          "required": [
+            "uptime_ms",
+            "status"
+          ],
+          "type": "object"
+        },
+        "snapshot": {
+          "additionalProperties": true,
+          "properties": {
+            "components": {
+              "items": {
+                "$ref": "#/$defs/component"
+              },
+              "type": "array"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/health_status"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "warnings": {
+              "items": {
+                "$ref": "#/$defs/warning"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        "warning": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "count": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "first_seen": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "last_seen": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "message": {
+              "type": "string"
+            },
+            "remediation": {
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "../common/defs.schema.json#/$defs/error_severity"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "message",
+            "first_seen",
+            "last_seen",
+            "count"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/health/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP health payloads"
+    },
+    "log/messages.schema.json": {
+      "$defs": {
+        "event": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "fields": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "message": {
+              "type": "string"
+            },
+            "severity": {
+              "$ref": "../common/defs.schema.json#/$defs/error_severity"
+            }
+          },
+          "required": [
+            "code",
+            "severity",
+            "message"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/log/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP log payloads"
+    },
+    "lyric/messages.schema.json": {
+      "$defs": {
+        "assignment_manifest": {
+          "additionalProperties": true,
+          "properties": {
+            "assets": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+              },
+              "type": "array"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            }
+          },
+          "required": [
+            "participant_id",
+            "show_id",
+            "assets"
+          ],
+          "type": "object"
+        },
+        "assignment_status": {
+          "additionalProperties": true,
+          "properties": {
+            "assigned_count": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "problems": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "asset_id": {
+                    "$ref": "../common/defs.schema.json#/$defs/uuid"
+                  },
+                  "required_revision": {
+                    "$ref": "../common/defs.schema.json#/$defs/uint64"
+                  },
+                  "song_id": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+            },
+            "verified_count": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            }
+          },
+          "required": [
+            "participant_id",
+            "show_id",
+            "status"
+          ],
+          "type": "object"
+        },
+        "client_ready": {
+          "additionalProperties": true,
+          "properties": {
+            "device_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "node_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "supported_chart_types": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/chart_type"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "node_id",
+            "device_id",
+            "supported_chart_types"
+          ],
+          "type": "object"
+        },
+        "ready": {
+          "additionalProperties": true,
+          "properties": {
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "ready": {
+              "type": "boolean"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+            }
+          },
+          "required": [
+            "participant_id",
+            "ready"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/lyric/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP Lyric payloads"
+    },
+    "participant/messages.schema.json": {
+      "$defs": {
+        "assignment": {
+          "additionalProperties": true,
+          "properties": {
+            "device_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "node_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "participant_id",
+            "device_id"
+          ],
+          "type": "object"
+        },
+        "identity": {
+          "additionalProperties": true,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "participant_id"
+          ],
+          "type": "object"
+        },
+        "preference": {
+          "additionalProperties": true,
+          "properties": {
+            "participant_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "preferred_chart_type": {
+              "$ref": "../common/defs.schema.json#/$defs/chart_type"
+            }
+          },
+          "required": [
+            "participant_id",
+            "preferred_chart_type"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/participant/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP participant payloads"
+    },
+    "remote/messages.schema.json": {
+      "$defs": {
+        "control_snapshot": {
+          "additionalProperties": false,
+          "properties": {
+            "controls": {
+              "items": {
+                "$ref": "remote_control_state.schema.json"
+              },
+              "type": "array"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "snapshot_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            }
+          },
+          "required": [
+            "controls"
+          ],
+          "type": "object"
+        },
+        "error": {
+          "allOf": [
+            {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            }
+          ]
+        },
+        "hello": {
+          "additionalProperties": false,
+          "properties": {
+            "capabilities": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "remote": {
+              "$ref": "remote_identity.schema.json"
+            },
+            "roles": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/remote_role"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "remote",
+            "roles"
+          ],
+          "type": "object"
+        },
+        "hello_ack": {
+          "additionalProperties": false,
+          "properties": {
+            "accepted": {
+              "type": "boolean"
+            },
+            "error": {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "layout_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "layout_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "permissions": {
+              "$ref": "remote_permission_set.schema.json"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "surface_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "accepted"
+          ],
+          "type": "object"
+        },
+        "layout_report": {
+          "additionalProperties": false,
+          "properties": {
+            "asset": {
+              "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+            },
+            "cached": {
+              "type": "boolean"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "layout": {
+              "$ref": "remote_layout.schema.json"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "surface_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        },
+        "layout_request": {
+          "additionalProperties": false,
+          "properties": {
+            "cached_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "layout_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "surface_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        },
+        "momentary_refresh": {
+          "additionalProperties": false,
+          "properties": {
+            "control_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "invocation_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "lease_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "control_id",
+            "invocation_id",
+            "lease_id"
+          ],
+          "type": "object"
+        },
+        "navigation_request": {
+          "additionalProperties": false,
+          "properties": {
+            "cue_id": {
+              "type": "string"
+            },
+            "delivery": {
+              "$ref": "../common/defs.schema.json#/$defs/remote_delivery"
+            },
+            "expires_at": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "issued_at": {
+              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+            },
+            "kind": {
+              "enum": [
+                "browse",
+                "select",
+                "load",
+                "next",
+                "previous",
+                "go"
+              ],
+              "type": "string"
+            },
+            "max_age_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        "navigation_state": {
+          "additionalProperties": false,
+          "properties": {
+            "browsing_song_id": {
+              "type": "string"
+            },
+            "cue_id": {
+              "type": "string"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "mode": {
+              "$ref": "../common/defs.schema.json#/$defs/remote_show_mode"
+            },
+            "next_cue_id": {
+              "type": "string"
+            },
+            "next_song_id": {
+              "type": "string"
+            },
+            "return_context": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "selected_song_id": {
+              "type": "string"
+            },
+            "setlist_id": {
+              "type": "string"
+            },
+            "setlist_name": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            },
+            "songs": {
+              "items": {
+                "type": "object"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "show_id"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/remote/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP Remote envelope payloads"
+    },
+    "remote/remote_control_definition.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_control_definition.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "accessibility_hint": {
+          "type": "string"
+        },
+        "accessibility_label": {
+          "type": "string"
+        },
+        "binding": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "extensions": {
+              "type": "object"
+            },
+            "parameters": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "target": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "target",
+            "action"
+          ],
+          "type": "object"
+        },
+        "concurrency": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_concurrency"
+        },
+        "conditions": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "predicate": {
+                "enum": [
+                  "equals",
+                  "not_equals",
+                  "exists",
+                  "capability_present",
+                  "permission_present"
+                ],
+                "type": "string"
+              },
+              "value": true
+            },
+            "required": [
+              "predicate"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "control_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "control_type": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_control_type"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "feedback": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_feedback"
+        },
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "max": {
+          "type": "number"
+        },
+        "max_rate_hz": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "nominal_rate_hz": {
+          "type": "number"
+        },
+        "permission": {
+          "anyOf": [
+            {
+              "$ref": "../common/defs.schema.json#/$defs/remote_role"
+            },
+            {
+              "$ref": "../common/defs.schema.json#/$defs/remote_permission"
+            }
+          ]
+        },
+        "qos": {
+          "$ref": "../common/defs.schema.json#/$defs/qos"
+        },
+        "safety": {
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "$ref": "../common/defs.schema.json#/$defs/remote_safety_class"
+            },
+            "confirm": {
+              "type": "string"
+            },
+            "failsafe": {
+              "$ref": "../common/defs.schema.json#/$defs/remote_failsafe"
+            },
+            "failsafe_required": {
+              "type": "boolean"
+            },
+            "heartbeat_required": {
+              "type": "boolean"
+            },
+            "max_hold_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            }
+          },
+          "type": "object"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "step": {
+          "type": "number"
+        },
+        "style": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_style"
+        },
+        "units": {
+          "type": "string"
+        },
+        "update_mode": {
+          "enum": [
+            "end",
+            "continuous"
+          ],
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "control_id",
+        "label",
+        "control_type",
+        "binding"
+      ],
+      "title": "ACP Remote control definition",
+      "type": "object"
+    },
+    "remote/remote_control_invocation.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_control_invocation.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "interaction": {
+                "enum": [
+                  "momentary_end",
+                  "momentary_cancel"
+                ]
+              }
+            },
+            "required": [
+              "interaction"
+            ]
+          },
+          "then": {
+            "required": [
+              "lease_id"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "client_timestamp_utc": {
+          "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+        },
+        "control_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "delivery": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_delivery"
+        },
+        "expires_at": {
+          "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "idempotency_key": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "interaction": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_interaction"
+        },
+        "invocation_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "issued_at": {
+          "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+        },
+        "layout_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "layout_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "lease_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "max_age_ms": {
+          "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+        },
+        "show_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "show_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "transition": {
+          "additionalProperties": false,
+          "properties": {
+            "transition_mode": {
+              "$ref": "../common/defs.schema.json#/$defs/remote_transition_mode"
+            },
+            "transition_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "transition_preset": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "value": true
+      },
+      "required": [
+        "control_id",
+        "invocation_id",
+        "interaction"
+      ],
+      "title": "ACP Remote control invocation",
+      "type": "object"
+    },
+    "remote/remote_control_state.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_control_state.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "$ref": "../common/defs.schema.json#/$defs/confidence"
+        },
+        "control_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "expires_ms": {
+          "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "lease_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "value": true
+      },
+      "required": [
+        "control_id",
+        "revision",
+        "enabled",
+        "available"
+      ],
+      "title": "ACP Remote control state",
+      "type": "object"
+    },
+    "remote/remote_identity.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_identity.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "app_version": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "device_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "device_name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "instance_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "node_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "participant_id": {
+          "anyOf": [
+            {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "platform": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_platform"
+        },
+        "remote_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        }
+      },
+      "required": [
+        "node_id",
+        "instance_id",
+        "device_id",
+        "remote_id",
+        "device_name",
+        "platform",
+        "app_version"
+      ],
+      "title": "ACP Remote identity",
+      "type": "object"
+    },
+    "remote/remote_layout.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_layout.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "layout_id"
+          ]
+        },
+        {
+          "required": [
+            "surface_id"
+          ]
+        }
+      ],
+      "properties": {
+        "asset_type": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_asset_type"
+        },
+        "compatible_profile": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_profile_id"
+        },
+        "controls": {
+          "items": {
+            "$ref": "remote_control_definition.schema.json"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "layout_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "max_client_schema": {
+          "$ref": "../common/defs.schema.json#/$defs/version"
+        },
+        "min_client_schema": {
+          "$ref": "../common/defs.schema.json#/$defs/version"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "pages": {
+          "items": {
+            "$ref": "remote_page.schema.json"
+          },
+          "type": "array"
+        },
+        "revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "schema_version": {
+          "$ref": "../common/defs.schema.json#/$defs/version"
+        },
+        "sha256": {
+          "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+        },
+        "show_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "show_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "surface_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        }
+      },
+      "required": [
+        "revision",
+        "show_id",
+        "name",
+        "pages",
+        "controls"
+      ],
+      "title": "ACP Remote layout asset",
+      "type": "object"
+    },
+    "remote/remote_page.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_page.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "extensions": {
+          "type": "object"
+        },
+        "groups": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "controls": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "extensions": {
+                "type": "object"
+              },
+              "group_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "order": {
+                "$ref": "../common/defs.schema.json#/$defs/uint64"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "group_id",
+              "controls"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "order": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "page_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "page_id",
+        "title",
+        "groups"
+      ],
+      "title": "ACP Remote layout page",
+      "type": "object"
+    },
+    "remote/remote_permission_set.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_permission_set.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "permissions": {
+          "items": {
+            "$ref": "../common/defs.schema.json#/$defs/remote_permission"
+          },
+          "type": "array"
+        },
+        "revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "roles": {
+          "items": {
+            "$ref": "../common/defs.schema.json#/$defs/remote_role"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "roles",
+        "revision"
+      ],
+      "title": "ACP Remote permission set",
+      "type": "object"
+    },
+    "remote/remote_presentation.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_presentation.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "connection": {
+          "type": "string"
+        },
+        "cue_id": {
+          "type": "string"
+        },
+        "extensions": {
+          "type": "object"
+        },
+        "next_cue_id": {
+          "type": "string"
+        },
+        "next_song_id": {
+          "type": "string"
+        },
+        "progress_ms": {
+          "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+        },
+        "section_id": {
+          "type": "string"
+        },
+        "show_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "show_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "song_id": {
+          "type": "string"
+        },
+        "transport": {
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "show_id"
+      ],
+      "title": "ACP Remote presentation state",
+      "type": "object"
+    },
+    "remote/remote_readiness.schema.json": {
+      "$id": "https://aurora.invalid/acp/schema/remote/remote_readiness.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "properties": {
+        "extensions": {
+          "type": "object"
+        },
+        "layout_hash": {
+          "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+        },
+        "layout_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "permissions_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "remote_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "session_id": {
+          "$ref": "../common/defs.schema.json#/$defs/uuid"
+        },
+        "sha256": {
+          "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+        },
+        "snapshot_revision": {
+          "$ref": "../common/defs.schema.json#/$defs/uint64"
+        },
+        "state": {
+          "$ref": "../common/defs.schema.json#/$defs/remote_readiness"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "ACP Remote readiness",
+      "type": "object"
+    },
+    "resource/messages.schema.json": {
+      "$defs": {
+        "accept": {
+          "additionalProperties": true,
+          "properties": {
+            "max_chunk_bytes": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id"
+          ],
+          "type": "object"
+        },
+        "activate": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id"
+          ],
+          "type": "object"
+        },
+        "activation_result": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "applied",
+                "failed"
+              ],
+              "type": "string"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id",
+            "status"
+          ],
+          "type": "object"
+        },
+        "cancel": {
+          "additionalProperties": true,
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id"
+          ],
+          "type": "object"
+        },
+        "chunk": {
+          "additionalProperties": true,
+          "properties": {
+            "data": {
+              "description": "JSON encoding: base64. CBOR encoding: byte string.",
+              "type": "string"
+            },
+            "length": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "offset": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id",
+            "offset",
+            "length",
+            "data"
+          ],
+          "type": "object"
+        },
+        "complete": {
+          "additionalProperties": true,
+          "properties": {
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id"
+          ],
+          "type": "object"
+        },
+        "locator": {
+          "additionalProperties": true,
+          "properties": {
+            "mode": {
+              "$ref": "../common/defs.schema.json#/$defs/transfer_locator_mode"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "type": "object"
+        },
+        "offer": {
+          "additionalProperties": true,
+          "properties": {
+            "asset": {
+              "$ref": "../common/defs.schema.json#/$defs/asset_ref"
+            },
+            "locator": {
+              "$ref": "#/$defs/locator"
+            },
+            "max_chunk_bytes": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "purpose": {
+              "type": "string"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id",
+            "asset",
+            "locator"
+          ],
+          "type": "object"
+        },
+        "reject": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id",
+            "code"
+          ],
+          "type": "object"
+        },
+        "transfer_result": {
+          "additionalProperties": true,
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "verified",
+                "failed"
+              ],
+              "type": "string"
+            },
+            "transfer_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "transfer_id",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/resource/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP resource-transfer payloads"
+    },
+    "section/messages.schema.json": {
+      "$defs": {
+        "enter": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "section_id"
+          ],
+          "type": "object"
+        },
+        "exit": {
+          "additionalProperties": true,
+          "properties": {
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "section_id"
+          ],
+          "type": "object"
+        },
+        "position": {
+          "additionalProperties": true,
+          "properties": {
+            "bar": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "beat": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "section_id"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/section/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP section payloads"
+    },
+    "session/messages.schema.json": {
+      "$defs": {
+        "goodbye": {
+          "additionalProperties": true,
+          "properties": {
+            "reason": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "hello": {
+          "additionalProperties": true,
+          "properties": {
+            "auth": {
+              "additionalProperties": true,
+              "properties": {
+                "mode": {
+                  "$ref": "../common/defs.schema.json#/$defs/auth_mode"
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "type": "object"
+            },
+            "capabilities": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            },
+            "encodings": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/encoding"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "node": {
+              "$ref": "../common/defs.schema.json#/$defs/node_identity"
+            },
+            "profiles": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "protocol": {
+              "$ref": "../common/defs.schema.json#/$defs/protocol_range"
+            }
+          },
+          "required": [
+            "node",
+            "protocol",
+            "encodings",
+            "profiles",
+            "capabilities",
+            "auth"
+          ],
+          "type": "object"
+        },
+        "hello_ack": {
+          "additionalProperties": true,
+          "properties": {
+            "accepted": {
+              "type": "boolean"
+            },
+            "encoding": {
+              "$ref": "../common/defs.schema.json#/$defs/encoding"
+            },
+            "error": {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            },
+            "heartbeat_interval_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "limits": {
+              "additionalProperties": true,
+              "properties": {
+                "max_message_bytes": {
+                  "$ref": "../common/defs.schema.json#/$defs/uint64"
+                }
+              },
+              "type": "object"
+            },
+            "node": {
+              "$ref": "../common/defs.schema.json#/$defs/node_identity"
+            },
+            "peer_capabilities": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/capability"
+              },
+              "type": "array"
+            },
+            "protocol": {
+              "$ref": "../common/defs.schema.json#/$defs/version"
+            },
+            "session_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "accepted",
+            "protocol",
+            "encoding",
+            "session_id",
+            "heartbeat_interval_ms",
+            "peer_capabilities",
+            "limits",
+            "node"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/session/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP session payloads"
+    },
+    "show/messages.schema.json": {
+      "$defs": {
+        "arm": {
+          "additionalProperties": true,
+          "properties": {
+            "deviations": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "force": {
+              "type": "boolean"
+            },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "manifest_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "manifest_sha256"
+          ],
+          "type": "object"
+        },
+        "armed": {
+          "additionalProperties": true,
+          "properties": {
+            "armed": {
+              "type": "boolean"
+            },
+            "deviations": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "manifest_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "manifest_sha256",
+            "armed"
+          ],
+          "type": "object"
+        },
+        "conformance": {
+          "additionalProperties": true,
+          "properties": {
+            "problems": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "status": {
+              "$ref": "../common/defs.schema.json#/$defs/conformance_state"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "status"
+          ],
+          "type": "object"
+        },
+        "disarm": {
+          "additionalProperties": true,
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id"
+          ],
+          "type": "object"
+        },
+        "load": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "manifest_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id"
+          ],
+          "type": "object"
+        },
+        "position": {
+          "additionalProperties": true,
+          "properties": {
+            "bar": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "beat": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "elapsed_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "show_id"
+          ],
+          "type": "object"
+        },
+        "prepare": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show": {
+              "$ref": "../common/defs.schema.json#/$defs/show_identity"
+            }
+          },
+          "required": [
+            "show"
+          ],
+          "type": "object"
+        },
+        "ready": {
+          "additionalProperties": true,
+          "properties": {
+            "degraded": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "ready": {
+              "type": "boolean"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "ready"
+          ],
+          "type": "object"
+        },
+        "verify": {
+          "additionalProperties": true,
+          "properties": {
+            "manifest_sha256": {
+              "$ref": "../common/defs.schema.json#/$defs/sha256_hex"
+            },
+            "revision": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "required": [
+            "show_id",
+            "revision",
+            "manifest_sha256"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/show/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP show payloads"
+    },
+    "song/messages.schema.json": {
+      "$defs": {
+        "position": {
+          "additionalProperties": true,
+          "properties": {
+            "bar": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "beat": {
+              "$ref": "../common/defs.schema.json#/$defs/uint64"
+            },
+            "elapsed_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            },
+            "section_id": {
+              "type": "string"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            },
+            "tempo_bpm": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "song_id"
+          ],
+          "type": "object"
+        },
+        "select": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "song_id"
+          ],
+          "type": "object"
+        },
+        "start": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "song_id"
+          ],
+          "type": "object"
+        },
+        "stop": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "show_id": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "song_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "song_id"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/song/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP song payloads"
+    },
+    "state/messages.schema.json": {
+      "$defs": {
+        "delta": {
+          "allOf": [
+            {
+              "$ref": "../common/defs.schema.json#/$defs/state_resource"
+            }
+          ]
+        },
+        "request": {
+          "additionalProperties": true,
+          "properties": {
+            "resources": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "snapshot": {
+          "additionalProperties": true,
+          "properties": {
+            "resources": {
+              "items": {
+                "$ref": "../common/defs.schema.json#/$defs/state_resource"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "resources"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/state/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP state payloads"
+    },
+    "telemetry/messages.schema.json": {
+      "$defs": {
+        "batch": {
+          "additionalProperties": true,
+          "properties": {
+            "metrics": {
+              "items": {
+                "$ref": "#/$defs/metric"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "metrics"
+          ],
+          "type": "object"
+        },
+        "metric": {
+          "additionalProperties": true,
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ],
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/telemetry/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP telemetry payloads"
+    },
+    "transport/messages.schema.json": {
+      "$defs": {
+        "pause": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        },
+        "play": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        },
+        "seek": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
+            "position_ms": {
+              "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+            }
+          },
+          "required": [
+            "position_ms"
+          ],
+          "type": "object"
+        },
+        "stop": {
+          "additionalProperties": true,
+          "properties": {
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "$id": "https://aurora.invalid/acp/schema/transport/messages.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "ACP transport payloads"
+    }
+  },
+  "messages": {
+    "asset.inventory": "asset/messages.schema.json#/$defs/inventory",
+    "asset.required": "asset/messages.schema.json#/$defs/required",
+    "asset.status": "asset/messages.schema.json#/$defs/status",
+    "asset.sync": "asset/messages.schema.json#/$defs/sync",
+    "asset.sync_result": "asset/messages.schema.json#/$defs/sync_result",
+    "bridge.blackout": "bridge/messages.schema.json#/$defs/blackout",
+    "bridge.status": "bridge/messages.schema.json#/$defs/status",
+    "capability.changed": "capability/messages.schema.json#/$defs/changed",
+    "capability.list": "capability/messages.schema.json#/$defs/list",
+    "chart.assignment": "chart/messages.schema.json#/$defs/assignment",
+    "chart.assignment_set": "chart/messages.schema.json#/$defs/assignment_set",
+    "chart.catalog": "chart/messages.schema.json#/$defs/catalog",
+    "chart.metadata": "chart/messages.schema.json#/$defs/metadata",
+    "command.ack": "command/messages.schema.json#/$defs/ack",
+    "command.execute": "command/messages.schema.json#/$defs/execute",
+    "config.get": "config/get.schema.json",
+    "config.result": "config/result.schema.json",
+    "config.schema": "config/schema.schema.json",
+    "config.set": "config/set.schema.json",
+    "cue.fire": "cue/messages.schema.json#/$defs/fire",
+    "cue.go": "cue/messages.schema.json#/$defs/go",
+    "cue.stop": "cue/messages.schema.json#/$defs/stop",
+    "discovery.advertisement": "discovery/messages.schema.json#/$defs/advertisement",
+    "discovery.query": "discovery/messages.schema.json#/$defs/query",
+    "error.report": "error/messages.schema.json#/$defs/report",
+    "health.heartbeat": "health/messages.schema.json#/$defs/heartbeat",
+    "health.snapshot": "health/messages.schema.json#/$defs/snapshot",
+    "health.warning": "health/messages.schema.json#/$defs/warning",
+    "log.event": "log/messages.schema.json#/$defs/event",
+    "lyric.assignment_manifest": "lyric/messages.schema.json#/$defs/assignment_manifest",
+    "lyric.assignment_status": "lyric/messages.schema.json#/$defs/assignment_status",
+    "lyric.client_ready": "lyric/messages.schema.json#/$defs/client_ready",
+    "lyric.ready": "lyric/messages.schema.json#/$defs/ready",
+    "manifest.get": "asset/messages.schema.json#/$defs/manifest_get",
+    "manifest.report": "asset/messages.schema.json#/$defs/manifest_report",
+    "participant.assignment": "participant/messages.schema.json#/$defs/assignment",
+    "participant.identity": "participant/messages.schema.json#/$defs/identity",
+    "participant.preference": "participant/messages.schema.json#/$defs/preference",
+    "remote.control.invoke": "remote/remote_control_invocation.schema.json",
+    "remote.control.snapshot": "remote/messages.schema.json#/$defs/control_snapshot",
+    "remote.control.state": "remote/remote_control_state.schema.json",
+    "remote.error": "remote/messages.schema.json#/$defs/error",
+    "remote.hello": "remote/messages.schema.json#/$defs/hello",
+    "remote.hello_ack": "remote/messages.schema.json#/$defs/hello_ack",
+    "remote.layout.report": "remote/messages.schema.json#/$defs/layout_report",
+    "remote.layout.request": "remote/messages.schema.json#/$defs/layout_request",
+    "remote.momentary.refresh": "remote/messages.schema.json#/$defs/momentary_refresh",
+    "remote.navigation.request": "remote/messages.schema.json#/$defs/navigation_request",
+    "remote.navigation.state": "remote/messages.schema.json#/$defs/navigation_state",
+    "remote.permissions": "remote/remote_permission_set.schema.json",
+    "remote.permissions.changed": "remote/remote_permission_set.schema.json",
+    "remote.presentation.state": "remote/remote_presentation.schema.json",
+    "remote.readiness": "remote/remote_readiness.schema.json",
+    "remote.readiness.changed": "remote/remote_readiness.schema.json",
+    "resource.accept": "resource/messages.schema.json#/$defs/accept",
+    "resource.activate": "resource/messages.schema.json#/$defs/activate",
+    "resource.activation_result": "resource/messages.schema.json#/$defs/activation_result",
+    "resource.cancel": "resource/messages.schema.json#/$defs/cancel",
+    "resource.chunk": "resource/messages.schema.json#/$defs/chunk",
+    "resource.complete": "resource/messages.schema.json#/$defs/complete",
+    "resource.offer": "resource/messages.schema.json#/$defs/offer",
+    "resource.reject": "resource/messages.schema.json#/$defs/reject",
+    "resource.transfer_result": "resource/messages.schema.json#/$defs/transfer_result",
+    "section.enter": "section/messages.schema.json#/$defs/enter",
+    "section.exit": "section/messages.schema.json#/$defs/exit",
+    "section.position": "section/messages.schema.json#/$defs/position",
+    "session.goodbye": "session/messages.schema.json#/$defs/goodbye",
+    "session.hello": "session/messages.schema.json#/$defs/hello",
+    "session.hello_ack": "session/messages.schema.json#/$defs/hello_ack",
+    "show.arm": "show/messages.schema.json#/$defs/arm",
+    "show.armed": "show/messages.schema.json#/$defs/armed",
+    "show.conformance": "show/messages.schema.json#/$defs/conformance",
+    "show.disarm": "show/messages.schema.json#/$defs/disarm",
+    "show.load": "show/messages.schema.json#/$defs/load",
+    "show.position": "show/messages.schema.json#/$defs/position",
+    "show.prepare": "show/messages.schema.json#/$defs/prepare",
+    "show.ready": "show/messages.schema.json#/$defs/ready",
+    "show.verify": "show/messages.schema.json#/$defs/verify",
+    "song.position": "song/messages.schema.json#/$defs/position",
+    "song.select": "song/messages.schema.json#/$defs/select",
+    "song.start": "song/messages.schema.json#/$defs/start",
+    "song.stop": "song/messages.schema.json#/$defs/stop",
+    "state.delta": "state/messages.schema.json#/$defs/delta",
+    "state.request": "state/messages.schema.json#/$defs/request",
+    "state.snapshot": "state/messages.schema.json#/$defs/snapshot",
+    "telemetry.batch": "telemetry/messages.schema.json#/$defs/batch",
+    "telemetry.metric": "telemetry/messages.schema.json#/$defs/metric",
+    "transport.pause": "transport/messages.schema.json#/$defs/pause",
+    "transport.play": "transport/messages.schema.json#/$defs/play",
+    "transport.seek": "transport/messages.schema.json#/$defs/seek",
+    "transport.stop": "transport/messages.schema.json#/$defs/stop"
+  }
+}

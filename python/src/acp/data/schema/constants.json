@@ -75,5 +75,65 @@
   },
   "blackout": {
     "clear_on_disconnect_default": false
+  },
+  "remote": {
+    "profile": "remote",
+    "profiles": ["aurora.remote.prism.v1"],
+    "reserved_profiles": ["aurora.remote.conductor.v1"],
+    "surface_schema_version": "1.0",
+    "surface_schema_min": "1.0",
+    "surface_schema_max": "1.0",
+    "feature_capabilities": [
+      "show.navigation",
+      "song.selection",
+      "song.loading",
+      "cue.go",
+      "cue.selection",
+      "look.global",
+      "remote.surfaces",
+      "busk.controls",
+      "control.momentary",
+      "output.blackout",
+      "output.grand_master",
+      "state.live",
+      "system.health"
+    ],
+    "permissions": [
+      "observe",
+      "song.select",
+      "song.load",
+      "cue.execute",
+      "look.execute",
+      "busk.execute",
+      "output.grand_master",
+      "output.blackout",
+      "remote.surface.use"
+    ],
+    "capabilities": [
+      "remote.profile",
+      "remote.layout",
+      "remote.control.invoke",
+      "remote.control.momentary",
+      "remote.control.state",
+      "remote.navigation.song",
+      "remote.navigation.section",
+      "remote.navigation.cue",
+      "remote.transport",
+      "remote.busking",
+      "remote.readiness",
+      "remote.asset_sync",
+      "remote.presentation"
+    ],
+    "optional_capabilities": [
+      "remote.haptics",
+      "remote.multitouch",
+      "remote.hardware_surface",
+      "remote.local_macros",
+      "remote.voice_accessibility",
+      "remote.offline_cache"
+    ],
+    "default_failsafe": "release_on_disconnect",
+    "default_max_hold_ms": 10000,
+    "slider_ui_hz": 25
   }
 }

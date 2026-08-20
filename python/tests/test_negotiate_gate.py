@@ -21,3 +21,50 @@ def test_capability_required() -> None:
         handshake_complete=True,
     )
     assert err == "capability_not_permitted"
+
+
+def test_min_capability_version_requires_explicit_negotiated_version() -> None:
+    err = allowed_to_send(
+        "remote.control.invoke",
+        session_version="1.2",
+        sender_role="remote",
+        negotiated_capabilities={"remote.control.invoke"},
+        handshake_complete=True,
+    )
+    assert err == "capability_not_permitted"
+    err = allowed_to_send(
+        "remote.control.invoke",
+        session_version="1.2",
+        sender_role="remote",
+        negotiated_capabilities={"remote.control.invoke"},
+        handshake_complete=True,
+        negotiated_versions={},
+    )
+    assert err == "capability_not_permitted"
+    err = allowed_to_send(
+        "remote.control.invoke",
+        session_version="1.2",
+        sender_role="remote",
+        negotiated_capabilities={"remote.control.invoke"},
+        handshake_complete=True,
+        negotiated_versions={"remote.control.invoke": "not-a-version"},
+    )
+    assert err == "capability_not_permitted"
+    err = allowed_to_send(
+        "remote.control.invoke",
+        session_version="1.2",
+        sender_role="remote",
+        negotiated_capabilities={"remote.control.invoke"},
+        handshake_complete=True,
+        negotiated_versions={"remote.control.invoke": "0.9"},
+    )
+    assert err == "capability_not_permitted"
+    err = allowed_to_send(
+        "remote.control.invoke",
+        session_version="1.2",
+        sender_role="remote",
+        negotiated_capabilities={"remote.control.invoke"},
+        handshake_complete=True,
+        negotiated_versions={"remote.control.invoke": "1.0"},
+    )
+    assert err is None

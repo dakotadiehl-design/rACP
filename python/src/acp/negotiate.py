@@ -22,6 +22,17 @@ def select_encoding(client: list[str], server: list[str]) -> str:
     raise VersionError("no common encoding")
 
 
+REMOTE_PROFILE_PRISM = "aurora.remote.prism.v1"
+REMOTE_PROFILE_CONDUCTOR = "aurora.remote.conductor.v1"
+REMOTE_PROFILES = frozenset({REMOTE_PROFILE_PRISM, REMOTE_PROFILE_CONDUCTOR, "remote"})
+
+
+def intersect_profiles(local: list[str], peer: list[str]) -> list[str]:
+    """Stable intersection of session hello profile identifiers."""
+    peer_set = set(peer)
+    return [name for name in local if name in peer_set]
+
+
 def intersect_capabilities(local: list[Capability], peer: list[Capability]) -> list[Capability]:
     peer_map = {c.id: c.version for c in peer}
     out: list[Capability] = []

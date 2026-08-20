@@ -15,5 +15,30 @@ Capability IDs are stable lowercase dotted strings. Versions evolve independentl
 | `resource.transfer` | 1.2 | Chunked (or stubbed HTTP) asset transfer |
 | `lyric.assignment` | 1.2 | Participant/chart assignment |
 | `authority` | 1.2 | `authority_node_id` / `authority_epoch` enforcement |
+| `remote.profile` | 1.2 | Remote identity, permissions, session readiness |
+| `remote.layout` | 1.2 | Versioned remote layout asset |
+| `remote.control.invoke` | 1.2 | Semantic control invocation |
+| `remote.control.momentary` | 1.2 | Momentary begin/end + fail-safe |
+| `remote.control.state` | 1.2 | Per-control enabled/value feedback |
+| `remote.navigation.song` | 1.2 | Browse vs activate song navigation |
+| `remote.navigation.section` | 1.2 | Section enter/next/previous |
+| `remote.navigation.cue` | 1.2 | Current/Next/GO presentation |
+| `remote.transport` | 1.2 | Transport controls exposed to Remote |
+| `remote.busking` | 1.2 | Explicitly published live busking actions |
+| `remote.readiness` | 1.2 | Remote show-readiness reporting |
+| `remote.asset_sync` | 1.2 | Remote layout/control-set conformance |
+| `remote.presentation` | 1.2 | Operator-facing presentation state |
+| `show.navigation` | 1.2 | Setlist / free-play / navigation feature |
+| `song.selection` | 1.2 | Select a song without making it live |
+| `song.loading` | 1.2 | Load/activate a song |
+| `cue.go` | 1.2 | Feature flag for GO / cue fire |
+| `look.global` | 1.2 | Global Look catalog and recall |
+| `remote.surfaces` | 1.2 | Declarative Remote Surface assets |
+| `busk.controls` | 1.2 | Published busk actions |
+| `control.momentary` | 1.2 | Feature flag for leased momentary holds |
+| `output.blackout` | 1.2 | Output blackout set |
+| `output.grand_master` | 1.2 | Grand-master set |
+| `state.live` | 1.2 | Live show state namespaces |
+| `system.health` | 1.2 | Health/warnings subscription |
 
-`trusted_lan` sessions accept the intersection of advertised and accepted capabilities. Missing capability → `capability_not_permitted`.
+`trusted_lan` sessions accept the intersection of advertised and accepted capabilities. Missing capability → `capability_not_permitted`. When a registry row has `min_capability_version`, an explicit negotiated version is required; absent, malformed, or below-minimum values also return `capability_not_permitted`.

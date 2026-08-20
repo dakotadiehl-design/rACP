@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_page.schema.json",
+  "title": "ACP Remote layout page",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["page_id", "title", "groups"],
+  "properties": {
+    "page_id": { "type": "string", "minLength": 1 },
+    "title": { "type": "string" },
+    "order": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "extensions": { "type": "object" },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["group_id", "controls"],
+        "properties": {
+          "group_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "order": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+          "controls": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "extensions": { "type": "object" }
+        }
+      }
+    }
+  }
+}

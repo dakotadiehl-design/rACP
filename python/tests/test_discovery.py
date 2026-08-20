@@ -1,4 +1,5 @@
 import pytest
+
 from acp.discovery import MAGIC, Advertisement, capabilities_digest, decode_datagram, encode_datagram
 from acp.types import NodeIdentity, ProtocolRange, Role, new_uuid
 

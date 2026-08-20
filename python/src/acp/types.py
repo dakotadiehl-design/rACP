@@ -20,6 +20,7 @@ class Role(str, Enum):
     BRIDGE = "bridge"
     TOOL = "tool"
     SIMULATOR = "simulator"
+    REMOTE = "remote"
 
 
 class QoS(str, Enum):

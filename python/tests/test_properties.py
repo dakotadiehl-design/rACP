@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from acp.cbor_cde import decode, encode
 from hypothesis import given, settings
 from hypothesis import strategies as st
+
+from acp.cbor_cde import decode, encode
 
 atoms = st.one_of(
     st.none(),

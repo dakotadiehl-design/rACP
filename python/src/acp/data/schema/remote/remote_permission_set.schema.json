@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/remote/remote_permission_set.schema.json",
+  "title": "ACP Remote permission set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["roles", "revision"],
+  "properties": {
+    "roles": {
+      "type": "array",
+      "items": { "$ref": "../common/defs.schema.json#/$defs/remote_role" }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "permissions": {
+      "type": "array",
+      "items": { "$ref": "../common/defs.schema.json#/$defs/remote_permission" }
+    },
+    "revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+    "extensions": { "type": "object" }
+  }
+}

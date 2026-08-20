@@ -1,0 +1,24 @@
+{
+  "acp": "1.2",
+  "message_id": "0193f8d8-4c4e-7d8b-a2ab-000000000103",
+  "type": "health.warning",
+  "source": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001"
+  },
+  "timestamp_utc": "2026-08-17T16:42:15.231Z",
+  "qos": "reliable",
+  "flags": [],
+  "payload": {
+    "code": "hot",
+    "severity": "warning",
+    "message": "warm",
+    "first_seen": "2026-08-17T16:42:15.231Z",
+    "last_seen": "2026-08-17T16:42:15.231Z",
+    "count": 1
+  },
+  "destination": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002"
+  },
+  "session_id": "0193f8d8-4c4e-7d8b-a2ab-000000000013",
+  "sequence": 1
+}

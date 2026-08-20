@@ -3,12 +3,24 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+
 from acp.codec import decode_cbor
 from acp.envelope import make_envelope
-from acp.negotiate import VersionError, intersect_capabilities, select_encoding, select_version
+from acp.negotiate import VersionError, intersect_capabilities, intersect_profiles, select_encoding, select_version
 from acp.session import ReliableOverflow, Session, SessionError, make_ack
 from acp.testkit import GateTransport, LoopbackTransport, connected_pair, default_caps, identity, linked_transports
 from acp.types import Capability, CommandStatus, Endpoint, ProtocolRange, QoS, Role, new_uuid
+
+
+def test_remote_profile_intersection() -> None:
+    assert intersect_profiles(
+        ["core", "remote", "aurora.remote.prism.v1"],
+        ["core", "aurora.remote.prism.v1"],
+    ) == ["core", "aurora.remote.prism.v1"]
+    assert "aurora.remote.conductor.v1" not in intersect_profiles(
+        ["aurora.remote.prism.v1"],
+        ["aurora.remote.conductor.v1"],
+    )
 
 
 def test_version_select() -> None:
@@ -140,6 +152,7 @@ def test_reliable_overflow() -> None:
         client.state = client.state.ESTABLISHED
         client.session_id = new_uuid()
         client.negotiated_capabilities = {"prism.cue_control"}
+        client.negotiated_capability_versions = {"prism.cue_control": "1.0"}
         for _ in range(client.limits["outbound_reliable_queue"]):
             client._reliable_q.append((make_envelope(
                 type="cue.go",

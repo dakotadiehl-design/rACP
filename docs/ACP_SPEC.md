@@ -12,4 +12,4 @@ ACP is the Aurora-family control plane. It is not Art-Net, sACN, DMX, MIDI, or O
 - Unknown optional fields are ignored on typed decode.
 - Safety actions (blackout) are explicit, scoped, acked, logged, and state-reflected.
 
-See [STATE_MACHINES.md](STATE_MACHINES.md), [CAPABILITIES.md](CAPABILITIES.md), [ERROR_CODES.md](ERROR_CODES.md), and `schema/registry.json`.
+See [STATE_MACHINES.md](STATE_MACHINES.md), [CAPABILITIES.md](CAPABILITIES.md), [ERROR_CODES.md](ERROR_CODES.md), [REMOTE.md](REMOTE.md), and `schema/registry.json`.

@@ -51,6 +51,9 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["UP042"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["acp"]
+
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
@@ -61,7 +64,7 @@ ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["acp"]
-omit = ["*/tests/*", "*/acp/__main__.py", "*/acp/ws.py"]
+omit = ["*/tests/*", "*/acp/__main__.py"]
 
 [tool.coverage.report]
 fail_under = 70

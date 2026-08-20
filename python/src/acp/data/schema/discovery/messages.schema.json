@@ -23,7 +23,13 @@
         "protocol": { "$ref": "../common/defs.schema.json#/$defs/protocol_range" },
         "endpoint_url": { "type": "string", "minLength": 1 },
         "capabilities_digest": { "type": "string" },
-        "security_mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" }
+        "security_mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" },
+        "product": { "type": "string" },
+        "product_role": { "type": "string" },
+        "remote_profiles": {
+          "type": "array",
+          "items": { "$ref": "../common/defs.schema.json#/$defs/remote_profile_id" }
+        }
       }
     }
   }

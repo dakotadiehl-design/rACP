@@ -77,6 +77,26 @@ def default_caps() -> list[Capability]:
         Capability("asset.conformance", "1.2"),
         Capability("resource.transfer", "1.2"),
         Capability("lyric.assignment", "1.2"),
+        Capability("remote.profile", "1.0"),
+        Capability("remote.layout", "1.0"),
+        Capability("remote.control.invoke", "1.0"),
+        Capability("remote.control.momentary", "1.0"),
+        Capability("remote.control.state", "1.0"),
+        Capability("remote.presentation", "1.0"),
+        Capability("remote.navigation.song", "1.0"),
+        Capability("remote.readiness", "1.0"),
+        Capability("show.navigation", "1.0"),
+        Capability("song.selection", "1.0"),
+        Capability("song.loading", "1.0"),
+        Capability("cue.go", "1.0"),
+        Capability("look.global", "1.0"),
+        Capability("remote.surfaces", "1.0"),
+        Capability("busk.controls", "1.0"),
+        Capability("control.momentary", "1.0"),
+        Capability("output.blackout", "1.0"),
+        Capability("output.grand_master", "1.0"),
+        Capability("state.live", "1.0"),
+        Capability("system.health", "1.0"),
     ]
 
 
@@ -87,8 +107,14 @@ async def connected_pair(
 ) -> tuple[Session, Session]:
     caps = capabilities or default_caps()
     ta, tb = linked_transports()
-    client = Session(ta, identity(left_role), is_server=False, allow_plaintext=True)
-    server = Session(tb, identity(right_role), is_server=True, allow_plaintext=True)
+    client = Session(
+        ta, identity(left_role), is_server=False, allow_plaintext=True,
+        profiles=["core", "remote", "aurora.remote.prism.v1"],
+    )
+    server = Session(
+        tb, identity(right_role), is_server=True, allow_plaintext=True,
+        profiles=["core", "remote", "aurora.remote.prism.v1"],
+    )
     await server.start_receiver()
 
     async def run() -> None:
