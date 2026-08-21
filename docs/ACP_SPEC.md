@@ -11,5 +11,6 @@ ACP is the Aurora-family control plane. It is not Art-Net, sACN, DMX, MIDI, or O
 - One owner per state kind. State is reconstructable via snapshots.
 - Unknown optional fields are ignored on typed decode.
 - Safety actions (blackout) are explicit, scoped, acked, logged, and state-reflected.
+- Aurora Trust is an additive ACP 1.2 security extension. Its candidate normative profile and production-approval gate are defined in [SECURITY.md](SECURITY.md); discovery and peer claims never establish authentication or authorization.
 
 See [STATE_MACHINES.md](STATE_MACHINES.md), [CAPABILITIES.md](CAPABILITIES.md), [ERROR_CODES.md](ERROR_CODES.md), [REMOTE.md](REMOTE.md), and `schema/registry.json`.
