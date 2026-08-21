@@ -252,6 +252,16 @@ fn validate(
             return Err(cerr("oneOf failed"));
         }
     }
+    if let Some(if_schema) = schema.get("if") {
+        let matched = validate(instance, if_schema, pack, path, doc).is_ok();
+        if matched {
+            if let Some(then_schema) = schema.get("then") {
+                validate(instance, then_schema, pack, path, doc)?;
+            }
+        } else if let Some(else_schema) = schema.get("else") {
+            validate(instance, else_schema, pack, path, doc)?;
+        }
+    }
     Ok(())
 }
 

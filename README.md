@@ -98,12 +98,14 @@ let (clientTransport, serverTransport) = await acpLinkedTransports()
 let client = ACPSession(
     transport: clientTransport,
     local: ACPIdentity(role: "conductor", name: "example"),
-    isServer: false
+    isServer: false,
+    allowPlaintext: true // linked/in-process development transport only
 )
 let server = ACPSession(
     transport: serverTransport,
     local: ACPIdentity(role: "bridge", name: "example"),
-    isServer: true
+    isServer: true,
+    allowPlaintext: true // linked/in-process development transport only
 )
 async let serverAck = server.handshake()
 _ = try await client.handshake()
@@ -143,17 +145,17 @@ See [`docs/ADDING_A_MESSAGE.md`](docs/ADDING_A_MESSAGE.md). Short version: schem
 | Bridge / config / blackout | yes | — | — |
 | Resource transfer | chunk + SHA-256 + activate | — | — |
 | Lyric assignment | resolver | — | — |
-| Remote Profile | session-hosted production authority | non-production simulator | non-production simulator |
+| Remote Profile | session-hosted production authority | non-production simulator | safety core + non-production simulator; production host not yet complete |
 | Live session transport | WebSocket + framed TCP | framed TCP + loopback | framed TCP + loopback |
 | CLI | `python3 -m acp inspect\|sim\|remote` | — | — |
 
-- Schema + 91-type `schema/registry.json` + semantic invariants
-- Frozen golden vectors in `vectors/` (one JSON/CBOR pair per registry message)
+- Schema + 93-type `schema/registry.json` + semantic invariants
+- Frozen golden vectors in `vectors/` (one JSON/CBOR pair for each of the 93 registry messages)
 - Shared malformed CBOR corpus in `vectors/malformed/`
 - Localhost Python WebSocket HELLO: `python3 tests/interop/test_ws_hello.py`
 - Localhost Python WebSocket Remote hello/sync/commands: `python3 tests/interop/test_ws_remote.py`
 - Cross-language framed TCP: `python3 tests/interop/test_framed_cross.py --sdk rust|swift|rust-swift --suite hello|session|remote|negative`
-- Coverage matrix: **codec** (all 91 golden vectors plus the invalid-message corpus), **session** (loopback plus framed TCP HELLO, heartbeat, correlated `state.request`/`state.snapshot`, goodbye), **Remote profile** (Python production host; Rust/Swift simulators exchange chunk/activate/invoke over an established session). Rust↔Swift framed session is covered by `--sdk rust-swift`.
+- Coverage matrix: **codec** (all 93 golden vectors plus the invalid-message corpus), **session** (loopback plus framed TCP HELLO, heartbeat, correlated `state.request`/`state.snapshot`, goodbye), **Remote profile** (Python production host; Rust/Swift simulators exchange chunk/activate/invoke over an established session). Rust↔Swift framed session is covered by `--sdk rust-swift`.
 - Wireshark Lua dissector: `tools/wireshark/`
 
 Remote Profile (v1.2 profile, recommended future revision 1.3): see `docs/REMOTE.md` and `Aurora_ACP_Remote_Profile_Implementation_Spec.md`.

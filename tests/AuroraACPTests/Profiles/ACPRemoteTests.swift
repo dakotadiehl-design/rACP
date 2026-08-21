@@ -45,7 +45,7 @@ final class ACPRemoteTests: XCTestCase {
 
     func testRemoteSessionNotReadyWhileStale() async throws {
         let (ta, _) = await acpLinkedTransports()
-        let session = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false)
+        let session = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false, allowPlaintext: true)
         let remote = ACPRemoteSession(
             session: session,
             identity: ACPRemoteIdentity(
@@ -123,7 +123,7 @@ final class ACPRemoteTests: XCTestCase {
         XCTAssertEqual(conflict.code, "conflict")
 
         let (ta, _) = await acpLinkedTransports()
-        let session = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false)
+        let session = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false, allowPlaintext: true)
         let remote = ACPRemoteSession(
             session: session,
             identity: ACPRemoteIdentity(

@@ -30,6 +30,11 @@
     "issued_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
     "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
     "max_age_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+    "requested_lease_ms": { "$ref": "../common/defs.schema.json#/$defs/duration_ms" },
+    "preconditions": {
+      "type": "array",
+      "items": { "$ref": "../common/defs.schema.json#/$defs/precondition" }
+    },
     "transition": {
       "type": "object",
       "additionalProperties": false,

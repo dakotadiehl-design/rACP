@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "remote-prism.momentary-release",
+  "name": "Momentary control begins and ends authoritatively",
+  "simulate": "remote",
+  "target": "prism",
+  "profile": "remote-prism",
+  "tags": ["momentary", "safety", "live_show_unsafe"],
+  "timeout": "15s",
+  "steps": [
+    {"connect": {}},
+    {"invoke": {"control_id": "fog_burst", "interaction": "momentary_begin", "value": 1.0}},
+    {"expect": {"type": "command.ack", "where": {"payload.status": "applied"}, "capture": {"lease_id": "payload.result.lease_id"}, "timeout": "2s"}},
+    {"expect_state_change": {"types": ["remote.control.state"], "where": {"payload.value": true}, "timeout": "2s"}},
+    {"invoke": {"control_id": "fog_burst", "interaction": "momentary_end", "invocation_id": "${last_invocation_id}", "lease_id": "${lease_id}"}},
+    {"expect": {"type": "command.ack", "where": {"payload.status": "applied"}, "timeout": "2s"}},
+    {"expect_state_change": {"types": ["remote.control.state"], "where": {"payload.value": false}, "timeout": "2s"}},
+    {"disconnect": {}}
+  ]
+}
+

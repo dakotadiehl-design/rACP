@@ -116,6 +116,16 @@
       "error": "invalid_type"
     },
     {
+      "id": "remote.control.invoke-momentary-end-missing-lease",
+      "json": "invalid/remote.control.invoke-momentary-end-missing-lease.json",
+      "error": "invalid_type"
+    },
+    {
+      "id": "chart.metadata-bad-asset-type",
+      "json": "invalid/chart.metadata-bad-asset-type.json",
+      "error": "invalid_type"
+    },
+    {
       "id": "unknown-type",
       "json": "invalid/unknown-type.json",
       "error": "unsupported_message"

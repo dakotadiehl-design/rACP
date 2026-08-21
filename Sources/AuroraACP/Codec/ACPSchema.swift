@@ -131,6 +131,11 @@ enum ACPSchema {
                 throw ACPCodecError.malformed("value not in enum")
             }
         }
+        if let expected = schema["const"] {
+            if !jsonEqual(expected, instance) {
+                throw ACPCodecError.malformed("const mismatch")
+            }
+        }
         if let pat = schema["pattern"] as? String, let text = instance as? String {
             if (try? NSRegularExpression(pattern: pat))?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) == nil {
                 throw ACPCodecError.malformed("pattern \(pat) failed")
@@ -179,6 +184,21 @@ enum ACPSchema {
             let hits = one.filter { (try? validate(instance: instance, schema: $0, path: path, doc: doc)) != nil }.count
             if hits != 1 { throw ACPCodecError.malformed("oneOf failed") }
         }
+        if let ifSchema = schema["if"] as? [String: Any] {
+            let matched = (try? validate(instance: instance, schema: ifSchema, path: path, doc: doc)) != nil
+            if matched {
+                if let thenSchema = schema["then"] as? [String: Any] {
+                    try validate(instance: instance, schema: thenSchema, path: path, doc: doc)
+                }
+            } else if let elseSchema = schema["else"] as? [String: Any] {
+                try validate(instance: instance, schema: elseSchema, path: path, doc: doc)
+            }
+        }
+    }
+
+    /// Test helper for isolated schema fragments, including `if`/`then`/`else`.
+    static func validateInstance(_ instance: Any, schema: [String: Any]) throws {
+        try validate(instance: instance, schema: schema, path: "", doc: schema)
     }
 
     private static func jsonType(_ value: Any) -> String {

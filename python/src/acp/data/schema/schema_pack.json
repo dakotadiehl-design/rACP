@@ -705,17 +705,22 @@
           "type": "object"
         },
         "command_status": {
-          "enum": [
+          "description": "Command disposition. Unknown values are non-success and must not confirm state.",
+          "minLength": 1,
+          "type": "string",
+          "x-known-values": [
             "accepted",
             "rejected",
             "applied",
             "completed",
             "failed",
             "duplicate",
+            "in_flight",
+            "conflict",
+            "expired",
             "precondition_failed",
             "unknown"
-          ],
-          "type": "string"
+          ]
         },
         "confidence": {
           "enum": [
@@ -1041,7 +1046,10 @@
           "type": "string"
         },
         "remote_permission": {
-          "enum": [
+          "description": "Permission identifier. Unknown permissions never grant access and are preserved for forward-compatible policy display.",
+          "minLength": 1,
+          "type": "string",
+          "x-known-values": [
             "observe",
             "song.select",
             "song.load",
@@ -1050,9 +1058,10 @@
             "busk.execute",
             "output.grand_master",
             "output.blackout",
+            "output.blackout.engage",
+            "output.blackout.clear",
             "remote.surface.use"
-          ],
-          "type": "string"
+          ]
         },
         "remote_platform": {
           "enum": [
@@ -2125,6 +2134,9 @@
             "extensions": {
               "type": "object"
             },
+            "idempotency_key": {
+              "$ref": "../common/defs.schema.json#/$defs/uuid"
+            },
             "invocation_id": {
               "$ref": "../common/defs.schema.json#/$defs/uuid"
             },
@@ -2506,6 +2518,15 @@
           "$ref": "../common/defs.schema.json#/$defs/uuid"
         },
         "max_age_ms": {
+          "$ref": "../common/defs.schema.json#/$defs/duration_ms"
+        },
+        "preconditions": {
+          "items": {
+            "$ref": "../common/defs.schema.json#/$defs/precondition"
+          },
+          "type": "array"
+        },
+        "requested_lease_ms": {
           "$ref": "../common/defs.schema.json#/$defs/duration_ms"
         },
         "show_id": {

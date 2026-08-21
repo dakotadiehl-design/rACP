@@ -6,7 +6,13 @@ Remote expresses operator intent. Conductor/Prism own state and execution. Remot
 
 ## Profiles
 
-Negotiate `aurora.remote.prism.v1` in `session.hello.profiles` (Conductor: reserved `aurora.remote.conductor.v1`). The registry family name remains `remote`.
+Negotiate `aurora.remote.prism.v1` in `session.hello.profiles` (Conductor: reserved `aurora.remote.conductor.v1`). The registry family name remains `remote`. Swift exposes these as `ACPRemoteProfileID.prismV1` / `.conductorV1`.
+
+Surfaces use a stable `surface_id`. `layout_id` remains a one-minor compatibility alias for the same UUID. Swift production APIs prefer `surfaceID`.
+
+Before activation, Swift `ACPRemoteSurfaceValidator` checks SHA-256, client schema range, compatible profile, semantic allowlisted bindings, safety constraints, and rejects executable/script keys. Unknown control types are skipped, not executed. A rejected dynamic surface must not take down native song selection, GO, Master Dimmer, Blackout, or monitoring; the ACP session stays alive.
+
+Remote permission identifiers (`observe`, `song.select`, `cue.execute`, …) are distinct from Remote roles (`remote.viewer`, `remote.operator`, …). Swift types them as `ACPRemotePermission` and `ACPRemoteRole`. Semantic Prism Remote 1.0 actions are allowlisted in `schema/constants.json` `remote.actions` and `ACPRemoteAction`.
 
 ## Discovery mapping
 
@@ -31,6 +37,8 @@ Momentary begin/end are reliable. Fail-safe (`release_on_disconnect`, `max_hold_
 ACP node role `remote` is distinct from Remote capability roles (`remote.viewer`, `remote.operator`, `remote.busker`, `remote.show_navigation`, `remote.admin`). Layout metadata never grants access.
 
 Wire policy:
+
+- Permission identifiers and command dispositions are forward-compatible strings. Unknown permissions grant nothing; unknown dispositions are non-success and never confirm state. `schema/common/defs.schema.json` carries the known catalog as `x-known-values`, not a closed enum. New behavior is still gated by its negotiated feature/capability identifier.
 
 - This is an ACP **1.2 profile extension**. New messages have `min_protocol` 1.2 and `min_capability_version` 1.0.
 - Client `remote.hello` roles and device/Remote/participant IDs are untrusted claims. Effective roles come from server-side policy keyed by the authenticated transport/node principal only.

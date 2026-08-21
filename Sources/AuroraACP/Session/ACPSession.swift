@@ -42,7 +42,7 @@ public actor ACPSession {
     public var sessionVersion: String = "1.2"
     public var encoding: String = "cbor"
     public var peer: ACPIdentity?
-    public var allowPlaintext: Bool = true
+    public var allowPlaintext: Bool
     public let local: ACPIdentity
     public let isServer: Bool
     public var profiles: [String] = ["core"]
@@ -71,10 +71,11 @@ public actor ACPSession {
         ACPCapability(id: "remote.control.momentary", version: "1.0"),
     ]
 
-    public init(transport: any ACPTransport, local: ACPIdentity, isServer: Bool) {
+    public init(transport: any ACPTransport, local: ACPIdentity, isServer: Bool, allowPlaintext: Bool = false) {
         self.transport = transport
         self.local = local
         self.isServer = isServer
+        self.allowPlaintext = allowPlaintext
     }
 
     public func setEncodings(_ value: [String]) { encodings = value }

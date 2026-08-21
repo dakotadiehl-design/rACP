@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "remote-prism.go-authoritative-state",
+  "name": "GO has a disposition and authoritative navigation state",
+  "simulate": "remote",
+  "target": "prism",
+  "profile": "remote-prism",
+  "tags": ["smoke", "remote", "live_show_unsafe"],
+  "timeout": "15s",
+  "steps": [
+    {"connect": {}},
+    {"invoke": {"control_id": "cue_go"}},
+    {"expect": {"type": "command.ack", "where": {"payload.status": "applied"}, "timeout": "2s"}},
+    {"expect_state_change": {"types": ["remote.navigation.state", "state.delta"], "timeout": "2s"}},
+    {"disconnect": {}}
+  ]
+}

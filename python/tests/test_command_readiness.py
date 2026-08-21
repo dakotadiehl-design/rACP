@@ -126,3 +126,25 @@ def test_priority_queue_never_coalesces_go_and_drops_telemetry_first() -> None:
     assert first is not None and first.action == "performance.go"
     second = q.pop()
     assert second is not None and second.payload == 2
+
+
+def test_priority_queue_never_coalesces_live_ephemeral_section_go() -> None:
+    q = PriorityQueue()
+    assert q.push(OutboundItem(
+        "interactive",
+        "section-a",
+        coalescing_key="section",
+        delivery="latest_value_wins",
+        action="show.section.next",
+    ))
+    assert q.push(OutboundItem(
+        "interactive",
+        "section-b",
+        coalescing_key="section",
+        delivery="latest_value_wins",
+        action="show.section.next",
+    ))
+    first = q.pop()
+    second = q.pop()
+    assert first is not None and first.payload == "section-a"
+    assert second is not None and second.payload == "section-b"

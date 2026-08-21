@@ -23,7 +23,9 @@
     },
     "remote_permission": {
       "type": "string",
-      "enum": [
+      "minLength": 1,
+      "description": "Permission identifier. Unknown permissions never grant access and are preserved for forward-compatible policy display.",
+      "x-known-values": [
         "observe",
         "song.select",
         "song.load",
@@ -32,6 +34,8 @@
         "busk.execute",
         "output.grand_master",
         "output.blackout",
+        "output.blackout.engage",
+        "output.blackout.clear",
         "remote.surface.use"
       ]
     },
@@ -139,13 +143,18 @@
     },
     "command_status": {
       "type": "string",
-      "enum": [
+      "minLength": 1,
+      "description": "Command disposition. Unknown values are non-success and must not confirm state.",
+      "x-known-values": [
         "accepted",
         "rejected",
         "applied",
         "completed",
         "failed",
         "duplicate",
+        "in_flight",
+        "conflict",
+        "expired",
         "precondition_failed",
         "unknown"
       ]

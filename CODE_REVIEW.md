@@ -1,138 +1,124 @@
-# Aurora Communications Protocol — Tenth Deep Code Review
+# Aurora Communications Protocol — Remediation Report
 
-Review date: 2026-08-18
+Review/remediation date: 2026-08-20
 
-Normative target: ACP 1.2 plus `DesignDocs/ACP_Remote_Profile_Amendments.md`.
-
-Path note (2026-08-19): Swift sources now live under `Sources/AuroraACP/` and `Sources/acp-framed-hello/`. Location citations below still refer to the pre-package `swift/` tree.
-
-This report contains only the fixes still required after Grok's latest pass. The ninth-review findings were rechecked across the repository, all language gates were rerun, and live Python/Rust/Swift interoperability was exercised in CBOR and JSON.
+Baseline: ACP 1.2, tagged Swift package `1.0.0` (`426f401`), current `main` (`1.1.0-dev.2`), Remote amendments, and the Prism integration/final implementation directives.
 
 ## Outcome
 
-The previous six findings are substantially resolved:
+All actionable P0/P1 defects from the design-philosophy review have been fixed. The incomplete Swift Remote component has been deliberately reclassified as an authority **safety core**, not falsely completed as a production host. This preserves the original architecture: Python remains the reference production Remote authority; a future Swift production host must add authenticated session binding, readiness, persistence, publication, command recovery, backpressure, and audit around the core.
 
-- All **91 registry messages now have shared JSON and canonical-CBOR vectors**.
-- `resource.chunk` binary/base64 normalization interoperates across Python, Rust, and Swift.
-- Rust and Swift expose transport abstractions and framed TCP peers.
-- Python↔Rust and Python↔Swift HELLO sessions pass as client and server, with CBOR and JSON and the Aurora Remote profiles enabled.
-- Rust and Swift use configurable profiles; Swift request matching is registry-driven.
-- CI now runs the Python Remote WebSocket scenario and framed cross-language tests.
+No known P0/P1 defect remains in the implemented scope. Aurora Trust remains a proposed design, explicitly marked as unimplemented; plaintext sessions are now denied by default.
 
-No P0 issue was found. The remaining release work is **two P1 defects and three P2 test/hardening gaps**. The framed cross-language result currently proves successful HELLO negotiation only; it does not prove cross-language ACP application traffic or Aurora Remote behavior.
+## Implemented fixes
 
-## Required fixes
+### Momentary safety and authority ownership
 
-### P1-1. Swift session negotiation fails open
+`Sources/AuroraACP/Profiles/Remote/ACPRemoteProduction.swift`
 
-Locations: `swift/Sources/ACPSession/ACPSession.swift:193-238,241-275,362-370`.
+- Renamed the implementation to `ACPRemoteAuthorityCore`; retained the old production name only as a deprecated type alias with an explicit warning.
+- Holds are keyed by authenticated node ID plus invocation ID, preventing cross-principal UUID collisions from overwriting active effects.
+- END/CANCEL now requires the exact issued lease and resolves only the initiating principal's hold.
+- BEGIN reserves command identity before awaiting the semantic router, preventing actor reentrancy from executing concurrent duplicates twice.
+- Added autonomous lease timers; expiry no longer requires inbound traffic or a test clock advance.
+- Disconnect, expiry, disarm, shutdown, layout replacement, and policy replacement use the common release path.
+- Layout replacement fails closed while any release remains active/pending, so a new layout cannot orphan the old control binding.
+- Failed release remains `release_pending` and `physical_active`; it is never reported confirmed inactive.
+- The bounded replay table no longer evicts old identities and make them executable again; saturation rejects new work safely.
 
-The Swift server does not negotiate the client's protocol range; it always selects `1.2`. `selectEncoding()` returns the server's first encoding when there is no common encoding, so a HELLO offering only an unsupported encoding is accepted. On the client, `applyHelloAck()` permits missing `protocol` and `encoding`, accepts an out-of-range protocol or unoffered encoding, does not validate heartbeat or limits, and transitions to `established` anyway.
+New tests cover two principals sharing an invocation ID, missing/wrong leases, autonomous expiry, concurrent duplicate execution, replacement-session body conflicts, disconnect, and failed physical release.
 
-An incompatible or malicious peer can therefore create a session whose subsequent frames cannot be interpreted consistently. Rust already rejects these cases.
+### Command ledger once-only semantics
 
-Required fix:
+`Sources/AuroraACP/Session/ACPCommandLedger.swift`
 
-- Parse and validate the HELLO protocol range and select the highest mutually supported version; reject the handshake if there is no intersection.
-- Make encoding selection throwing/failable and reject a HELLO with no common encoding.
-- Require the ACK fields mandated by the session schema, including `protocol`, `encoding`, `heartbeat_interval_ms`, `peer_capabilities`, and `limits`.
-- Verify that the selected protocol is inside the offered range, encoding was offered, profiles are a subset of those offered, heartbeat/limits are valid, and envelope/source identity is consistent before mutating state.
-- On every failure path, leave the session in `failed` and close or make the transport unusable.
-- Add negative Swift and cross-language tests for disjoint protocol ranges, no common encoding, missing ACK fields, unoffered ACK values, invalid heartbeat/limits, and source/node mismatch.
+- Added an explicit unavailable reservation result for safe backpressure.
+- Mutating reservations require a non-empty canonical semantic fingerprint.
+- In-flight records are never evicted. If capacity contains only unresolved records, new reservations fail closed.
+- Completion permits only defined terminal dispositions and cannot rewrite an already terminal record.
+- Idempotency and command-ID conflicts compare operation, authenticated principal, and body fingerprint.
 
-### P1-2. Swift's handshake and request timeouts do not bound I/O
+Tests cover capacity pressure, missing fingerprints, invalid transitions, duplicate reservations, and different-body reuse.
 
-Locations: `swift/Sources/ACPSession/ACPSession.swift:158-166,282-299`; `swift/Sources/ACPSession/ACPFramed.swift:19-37,53-86,103-130`.
+### Swift WebSocket lifecycle
 
-`waitType()` and `request()` compare a deadline only before calling `pumpOnce()`. `pumpOnce()` awaits `transport.recv()` without a deadline. A peer that connects but sends no frame can suspend these APIs forever despite the advertised timeout. Listener startup and `accept()` have the same unbounded-wait characteristic.
+`Sources/AuroraACP/Transport/ACPWebSocket.swift`
 
-Required fix:
+- Timeout/cancellation now removes and resumes the exact accept waiter instead of leaving an uncancellable checked continuation.
+- A timed-out waiter cannot steal the next connection.
+- Listener startup and accept validate positive finite deadlines and are bounded.
+- Stop resumes all waiters and closes all pending connections.
+- Listener instances are explicitly one-shot; restart is rejected deterministically.
+- Connections offered after stop are closed.
 
-- Race each blocking receive against the remaining deadline using structured concurrency, cancel the losing operation, and ensure cancellation reaches the transport read.
-- Apply bounded waits to connect/start and listener accept in the framed peer, or expose caller-supplied deadlines.
-- Set a deterministic session state on timeout and define whether the connection is closed or reusable.
-- Add silent loopback and real-TCP tests proving elapsed time is bounded and no read task/continuation leaks.
+Real loopback tests cover timeout bounds, post-timeout acceptance, data roundtrip, stop, and restart rejection.
 
-### P2-1. Cross-language live tests stop after HELLO
+### Trust boundary and authentication status
 
-Locations: `tests/interop/test_framed_cross.py:22-65,99-165`; `rust/acp-session/examples/framed_hello.rs`; `swift/Sources/acp-framed-hello/main.swift`.
+`Sources/AuroraACP/Session/ACPSession.swift`; `DesignDocs/ACP_Aurora_Trust_Authentication_Implementation_Design.md`
 
-Each foreign pairing negotiates a session and immediately sends `session.goodbye`. No established-session application envelope crosses a language boundary. The test does not exercise sequence handling, registry admission, request correlation, post-handshake encoding, payload decoding, or an Aurora Remote message. There is also no direct Rust↔Swift pairing.
+- `ACPSession` now denies plaintext by default. Tests and interop fixtures opt in explicitly because they are development transports.
+- The Aurora Trust document now states prominently that it is design-only and that `trusted_lan`/`allow_plaintext` do not authenticate a principal.
+- Current Swift Remote code is no longer described as a complete production authority.
+- The Phase 5 checkpoint was corrected: it proves selected safety-core behavior and does not authorize production deployment or legacy deletion.
 
-Required fix:
+Production Remote control must remain disabled until an authenticated transport principal, server-owned authorization, TLS/WSS or equivalent protected transport, revocation/offline policy, and conformance vectors are implemented.
 
-- After HELLO, exchange and assert `health.heartbeat`, `state.request` → correlated `state.snapshot`, and `session.goodbye` in both directions and encodings.
-- Add a Remote scenario that negotiates capabilities/profiles, transfers a binary `resource.chunk`, completes and activates the resource, performs a control invoke/result pair, and verifies state convergence.
-- Add negative live cases for wrong session ID/source, sequence errors, unsupported message/capability, malformed payload/frame, connection loss, and request timeout.
-- Add direct Rust-client↔Swift-server and Swift-client↔Rust-server runs, or explicitly track that missing edge in the support matrix.
+### Forward-compatible catalogs
 
-### P2-2. Rust and Swift do not enforce payload schemas at the codec/session boundary
+`schema/common/defs.schema.json` and packaged schema copies/packs
 
-Locations: `python/src/acp/codec.py:72-97`; `rust/acp-codec/src/lib.rs`; `rust/acp-session/src/session.rs:652-746`; `swift/Sources/ACPEncoding/ACPEncoding.swift`; `swift/Sources/ACPSession/ACPSession.swift:144-155,313-324`.
+- Remote permissions and command dispositions are now forward-compatible non-empty strings with `x-known-values` catalogs rather than closed enums silently extended under the same wire version.
+- Unknown permissions grant no authority; unknown dispositions are non-success and cannot confirm state.
+- Added schema tests for extension permissions and unknown future statuses.
+- Regenerated all canonical schema packs and verified packaged-schema parity.
 
-Python validates the envelope and registry-selected payload schema during decode. Rust and Swift decode envelope fields but do not validate the per-message schema. Rust admission enforces registry role/capability/QoS rules, but a schema-invalid payload can enter the inbox. Swift admission enforces only handshake/session ID/sequence/source and omits registry sender, capability, QoS, minimum-protocol, and known-message rules.
+### Workbench security and hygiene
 
-Required fix:
+`tools/acp-workbench/src/acp_workbench/transcript.py`; `.gitignore`
 
-- Generate or implement payload validators from the canonical schemas in Rust and Swift and invoke them before an envelope reaches application/session code.
-- Add Swift registry admission equivalent to Rust/Python for known type, legal-before-handshake, sender role, negotiated capability/version, minimum protocol, and allowed QoS.
-- Fail closed on unknown messages and malformed required fields with the ACP-defined error category.
-- Add a shared invalid-message corpus covering every schema family and tests proving invalid envelopes never enter the inbox or mutate Remote state.
+- Transcript redaction now covers complete nested `auth` objects and trust-sensitive credential, enrollment, PAKE, proof, private-key, secret, and token names/suffixes.
+- Redaction is represented structurally as `{"$redacted": true}`, so it cannot be confused with a transmitted string.
+- Added nested trust-material redaction tests.
+- Repository hygiene now ignores Workbench live captures, Python caches/bytecode/egg-info, Ruff/pytest caches, and `.DS_Store`; an artifacts `.gitkeep` preserves the intended directory.
 
-### P2-3. The framed CI harness is nondeterministic and may silently skip its target SDK
+### Interop cleanup
 
-Locations: `tests/interop/test_framed_cross.py:150-158`; `.github/workflows/ci.yml:66-77,91-103`.
+`python/src/acp/session.py`
 
-The harness auto-runs every compiler it finds. The Python/Rust job may also attempt Swift on Ubuntu, while the Python/Swift macOS job may also run Rust. If the intended toolchain is absent, the script can print a skip and exit successfully. Coverage therefore depends on runner contents.
+- Shutdown/writer failure explicitly observes exceptions placed on orphanable futures. Negative interop no longer emits “Future exception was never retrieved” warnings while preserving exceptions for active awaiters.
 
-Required fix:
+## Design philosophy status
 
-- Add a required `--sdk rust|swift` argument and fail if the selected peer cannot be built or found.
-- Pass `--sdk rust` in the Rust job and `--sdk swift` in the Swift job.
-- Give every subprocess a total deadline, print captured output on failure, and terminate then wait for children in all cleanup paths.
-- Split HELLO-only and full-session/Remote jobs so CI names accurately state the behavior proved.
+The original non-negotiables remain intact:
 
-## Verification completed
+- Intent and ACK remain separate from authoritative state.
+- All effects route through an injected semantic router; ACP does not drive hardware or become a show engine.
+- Client role claims do not grant permissions in the authority core.
+- Discovery grants no trust.
+- Unknown permissions/statuses fail safe while remaining forward compatible.
+- Once-only commands are reserved before execution and cannot become replayable through in-flight eviction.
+- Momentary release is authority-owned and independently scheduled.
+- Blackout remains explicit, idempotent, state-reflected, and not cleared by reconnect.
+- ACP retains no runtime Internet dependency.
+- Prism is not made permanent architectural authority; the core is product-neutral.
 
-- Python: **130 passed**, 81.91% coverage; Ruff passed; mypy passed for 23 source files.
-- Rust: **21 tests passed**; Clippy with `-D warnings` passed; rustfmt passed.
-- Swift: **16 tests passed**.
-- Registry/vector checks: **91 registry rows, 91 vectors**; frozen vectors passed.
-- Python localhost WebSocket HELLO: passed.
-- Python localhost Aurora Remote scenario: passed.
-- Python↔Rust framed HELLO: passed as client/server using CBOR and JSON with Remote profiles.
-- Python↔Swift framed HELLO: passed as client/server using CBOR and JSON with Remote profiles.
-- `git diff --check`: passed before this report update.
+## Final verification
 
-## Release recommendation
+- Swift: **44 passed**.
+- Python: **137 passed**, 81.37% coverage; Ruff passed; mypy passed for 27 source files.
+- Rust: **22 passed**; Clippy with `-D warnings` passed; rustfmt passed.
+- ACP Workbench: **22 passed plus 3 subtests**; Ruff passed.
+- Registry/schema/vector gates: **93 registry messages, 93 vectors**; frozen vectors and schema-pack drift checks passed.
+- Python WebSocket HELLO and full Remote scenarios passed.
+- Python↔Rust HELLO/session/Remote/negative suites passed in CBOR and JSON.
+- Python↔Swift HELLO/session/Remote/negative suites passed in CBOR and JSON.
+- Rust↔Swift direct session suite passed in CBOR and JSON.
+- Negative interop completed without unhandled-future warnings.
+- `git diff --check` passed.
 
-The previous wire-format blocker is resolved, and the Python Remote implementation remains a credible reference. Do not yet describe Rust/Swift as production-complete live ACP or Aurora Remote implementations. Fix both P1 items before shipping the Swift session API, and complete P2-1/P2-2 before claiming full cross-language session or Remote interoperability.
+## Release boundary
 
----
+The codec/session SDKs and Workbench changes are test-clean. `ACPRemoteAuthorityCore` is suitable only as a safety primitive within a future production host. It must not be used by itself to claim production Swift Remote support or to enable live safety-sensitive output.
 
-## Phase 0A freeze addendum (2026-08-19)
-
-Tag **`AuroraACP 1.0.0`** at `426f40185b6b7510448c5e4229a7fb09b47f4cc3` (package conversion `56c429b6002e6fd2008c5414e5d4032a15ccf5b0`). Wire protocol remains **ACP 1.2**.
-
-The tenth-review P1/P2 list above describes the pre-freeze tree. Rechecked against `Sources/AuroraACP/` and the 0A verification suite:
-
-| Finding | 1.0.0 status | Evidence |
-|---|---|---|
-| P1-1 Swift negotiation fail-open | **Resolved** | `ACPNegotiate.selectVersion` / `selectEncoding` throw; `applyHelloAckValidated` requires ACK fields; `testRejectsDisjointProtocolAndEncoding`, `testApplyHelloAckRequiresFields` |
-| P1-2 unbounded handshake I/O | **Resolved** | `recvBounded`; `testHandshakeTimeoutIsBounded`; `testFramedAcceptAndHandshakeTimeoutsAreBounded` |
-| P2-1 HELLO-only interop | **Resolved** | `test_framed_cross.py --suite session\|remote\|negative`; `--sdk rust-swift --suite session` |
-| P2-2 payload schema at Swift/Rust boundary | **Open (Phase 0B)** | Swift `admit` uses registry role/capability/QoS/protocol rules. Per-message payload schema validation is still Python-complete and not fully applied on Swift/Rust decode-before-inbox. |
-| P2-3 CI SDK skip | **Resolved** | `--sdk rust\|swift\|rust-swift` is required; CI jobs pass `--sdk` and split hello vs session/remote/negative |
-
-Re-run counts at freeze (not the tenth-review counts):
-
-- Python: **131 passed**, 81.93% coverage; Ruff passed; mypy passed for 23 source files
-- Rust: **22 tests passed**; Clippy `-D warnings` passed; rustfmt passed
-- Swift: **22 tests passed**
-- Registry/vectors: **91 / 91**
-- Python WebSocket HELLO + Remote: passed
-- Python↔Swift and Python↔Rust framed hello/session/remote/negative: passed
-- Rust↔Swift framed session: passed
-- External dummy package `import AuroraACP`: passed
-
-Remaining work after this tag is **Phase 0B feature development**, not another package conversion: snapshot/delta epoch envelopes, `command.status_*`, command ledger, preconditions, availability vs capability, provenance, priority/coalescing, generic Swift WebSocket, portable discovery + Bonjour mapping, P2-2 schema admission, and a production Swift Remote authority (do not promote `ACPRemoteAuthority`).
+Implementing the full Aurora Trust protocol and full Swift production Remote host is new feature work, not silently completed by this remediation. Those capabilities require their own staged security, persistence, lifecycle, interoperability, and safety review before deployment.

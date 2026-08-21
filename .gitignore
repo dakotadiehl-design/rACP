@@ -1,5 +1,13 @@
 # OS / editor
 .DS_Store
+**/.DS_Store
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.egg-info/
+tools/acp-workbench/artifacts/*
+!tools/acp-workbench/artifacts/.gitkeep
 .idea/
 .vscode/
 *.swp

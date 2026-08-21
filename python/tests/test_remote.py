@@ -9,6 +9,11 @@ import pytest
 from acp.envelope import Envelope, make_envelope
 from acp.persist import NodeStore
 from acp.remote import (
+    ACTION_DELIVERY,
+    ACTION_FEATURE,
+    ACTION_POLICY,
+    EXECUTABLE_SURFACE_KEYS,
+    PERMISSION_FOR_ACTION,
     ActionContext,
     ActionResult,
     Enrollment,
@@ -792,6 +797,39 @@ def test_unknown_control_type_does_not_fail_surface() -> None:
     assert denied[0].payload["error"]["code"] == "unsupported"
 
 
+PRISM_REMOTE_1_0_ACTIONS = (
+    "show.song.stop",
+    "show.song.next",
+    "show.song.previous",
+    "show.section.next",
+    "show.section.previous",
+    "show.section.restart",
+    "show.progression.hold",
+    "effects.stop",
+)
+
+
+def test_prism_remote_1_0_actions_are_allowlisted() -> None:
+    from acp.constants import load
+    from acp.state_revision import NEVER_COALESCE_ACTIONS
+
+    catalog = load()["remote"]
+    for action in catalog["actions"]:
+        assert action in ACTION_POLICY
+        assert action in ACTION_FEATURE
+        assert action in PERMISSION_FOR_ACTION
+        assert ACTION_DELIVERY.get(action) in {"live_ephemeral", "impulse", "stateful"}
+    for action in PRISM_REMOTE_1_0_ACTIONS:
+        assert action in catalog["actions"]
+    assert set(ACTION_POLICY) == set(catalog["actions"])
+    assert set(ACTION_DELIVERY) == set(catalog["action_delivery"])
+    assert ACTION_DELIVERY == catalog["action_delivery"]
+    assert set(EXECUTABLE_SURFACE_KEYS) == set(catalog["executable_surface_keys"])
+    assert "expression" in EXECUTABLE_SURFACE_KEYS
+    assert set(NEVER_COALESCE_ACTIONS) == set(catalog["never_coalesce_actions"])
+    assert "prism.internal.setChannel" not in ACTION_POLICY
+
+
 def test_executable_surface_payload_rejected() -> None:
     auth = authority()
     nxt = sample_layout(show_id=SHOW, layout_id=LAYOUT)
@@ -799,6 +837,38 @@ def test_executable_surface_payload_rejected() -> None:
     nxt["controls"][0]["script"] = "alert(1)"
     ok, _ = auth.activate_layout(nxt)
     assert ok is False
+
+
+def test_expression_surface_payload_rejected() -> None:
+    auth = authority()
+    nxt = sample_layout(show_id=SHOW, layout_id=LAYOUT)
+    nxt["revision"] = 9
+    nxt["controls"][0]["expression"] = "x+1"
+    ok, _ = auth.activate_layout(nxt)
+    assert ok is False
+
+
+def test_prism_remote_1_0_namespaces_are_published() -> None:
+    from acp.constants import load
+
+    auth = authority()
+    catalog = load()["remote"]["state_namespaces"]
+    allowed = auth._authorized_namespaces(SRC.node_id, None)
+    for ns in catalog:
+        assert ns in allowed, ns
+        assert auth._namespace_resource(ns) is not None, ns
+    for ns in (
+        "show.current_section",
+        "show.next_section",
+        "show.running",
+        "show.progression",
+        "look.catalog",
+        "look.preview",
+    ):
+        assert ns in allowed
+        item = auth._namespace_resource(ns)
+        assert item is not None
+        assert item["resource"] == ns
 
 
 def test_observe_only_denied_go_and_look() -> None:

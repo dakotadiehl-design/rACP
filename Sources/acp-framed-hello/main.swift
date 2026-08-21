@@ -161,7 +161,7 @@ func run() async {
         if mode == "client" {
             let transport = try await ACPFramedConnection.connect(host: host, port: port)
             let role = remote ? "remote" : "conductor"
-            let session = ACPSession(transport: transport, local: ACPIdentity(role: role, name: "sw-client"), isServer: false)
+            let session = ACPSession(transport: transport, local: ACPIdentity(role: role, name: "sw-client"), isServer: false, allowPlaintext: true)
             await configure(session)
             _ = try await session.handshake()
             print("ok client \(await session.sessionID ?? "") \(await session.sessionVersion) \(await session.encoding)")
@@ -177,7 +177,7 @@ func run() async {
             fflush(stdout)
             let transport = try await listener.accept()
             let role = remote ? "conductor" : "bridge"
-            let session = ACPSession(transport: transport, local: ACPIdentity(role: role, name: "sw-server"), isServer: true)
+            let session = ACPSession(transport: transport, local: ACPIdentity(role: role, name: "sw-server"), isServer: true, allowPlaintext: true)
             await configure(session)
             _ = try await session.handshake()
             print("ok server \(await session.sessionID ?? "") \(await session.sessionVersion) \(await session.encoding)")

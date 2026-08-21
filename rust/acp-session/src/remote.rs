@@ -14,6 +14,11 @@ use uuid::Uuid;
 
 const MAX_APPLIED: usize = 1024;
 
+pub use acp_model::remote::{
+    ACTIONS as REMOTE_ACTIONS, CONTROL_TYPES as REMOTE_CONTROL_TYPES,
+    PERMISSIONS as REMOTE_PERMISSIONS, PROFILE_CONDUCTOR, PROFILE_LEGACY, PROFILE_PRISM,
+};
+
 #[derive(Debug, Clone)]
 pub struct ControlDef {
     pub control_id: String,
@@ -411,6 +416,15 @@ fn fail(code: &str) -> InvokeResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shared_remote_vocabulary_is_reexported() {
+        assert_eq!(PROFILE_PRISM, "aurora.remote.prism.v1");
+        assert!(REMOTE_ACTIONS.contains(&"show.song.stop"));
+        assert!(REMOTE_ACTIONS.contains(&"effects.stop"));
+        assert!(REMOTE_PERMISSIONS.contains(&"observe"));
+        assert!(REMOTE_CONTROL_TYPES.contains(&"fader"));
+    }
 
     fn ready() -> RemoteAuthority {
         let mut a = RemoteAuthority::new("show", "layout");

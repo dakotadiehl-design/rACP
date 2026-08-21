@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "id": "remote-prism.blackout-authoritative-state",
+  "name": "Blackout changes only from authoritative state",
+  "simulate": "remote",
+  "target": "prism",
+  "profile": "remote-prism",
+  "tags": ["lighting", "safety", "live_show_unsafe"],
+  "timeout": "15s",
+  "steps": [
+    {"connect": {}},
+    {"invoke": {"control_id": "blackout", "interaction": "set", "value": true}},
+    {"expect": {"type": "command.ack", "where": {"payload.status": "applied"}, "timeout": "2s"}},
+    {"expect_state_change": {"types": ["state.delta"], "where": {"payload.resource": "output.blackout", "payload.value.value": true}, "timeout": "2s"}},
+    {"disconnect": {}}
+  ]
+}

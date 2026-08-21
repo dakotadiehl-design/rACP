@@ -126,6 +126,7 @@
         "control_id": { "type": "string", "minLength": 1 },
         "invocation_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
         "lease_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "idempotency_key": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
         "extensions": { "type": "object" }
       }
     },

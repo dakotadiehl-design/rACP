@@ -7,8 +7,9 @@ public struct ACPRemoteHoldHandle: Sendable {
 }
 
 /// Non-production Remote Profile simulator.
-/// The amendment-conformant production authority is the Python `RemoteHost` /
-/// `RemoteAuthority`. Accepts raw session ID strings and does not consume
+/// A future production host may compose `ACPRemoteAuthorityCore` with
+/// authenticated session, persistence, readiness, publication, and audit
+/// facilities. This simulator accepts raw session ID strings and does not consume
 /// validated ACP envelopes or authenticated transport principals. Not safe for
 /// live show-control outputs.
 public actor ACPRemoteAuthority {
@@ -146,12 +147,17 @@ public actor ACPRemoteAuthority {
 }
 
 public actor ACPRemoteSession {
+    public static let maxLiveEphemeralAgeMs: UInt64 = 5_000
+
     public var viewState = ACPRemoteViewState()
     public let identity: ACPRemoteIdentity
     private let session: ACPSession
     public var values: [String: AnySendable] = [:]
     public var errors: [String: String] = [:]
     public var leases: [String: String] = [:]
+    public private(set) var sentCount = 0
+    private var sentInvokes: [String: ACPEnvelope] = [:]
+    private var ephemeralPending: Set<String> = []
 
     public init(session: ACPSession, identity: ACPRemoteIdentity) {
         self.session = session
@@ -175,6 +181,16 @@ public actor ACPRemoteSession {
             throw ACPSessionError("remote.session.not_ready", "remote is not interactive")
         }
         let id = invocationID ?? UUID().uuidString.lowercased()
+        let resolvedLease = leaseID ?? leases[id]
+        if interaction == .momentaryEnd || interaction == .momentaryCancel, resolvedLease == nil {
+            throw ACPSessionError("invalid_type", "lease_id required")
+        }
+        let sentKey = "\(id):\(interaction.rawValue):\(resolvedLease ?? "")"
+        if sentInvokes[sentKey] != nil {
+            return id
+        }
+        let control = viewState.layout?.control(controlID)
+        let live = Self.isLiveEphemeral(interaction: interaction, action: control?.action, delivery: control?.delivery)
         var payload: [String: AnySendable] = [
             "control_id": .string(controlID),
             "invocation_id": .string(id),
@@ -189,8 +205,15 @@ public actor ACPRemoteSession {
         if let value {
             payload["value"] = value
         }
-        if let leaseID {
-            payload["lease_id"] = .string(leaseID)
+        if let resolvedLease {
+            payload["lease_id"] = .string(resolvedLease)
+        }
+        if live {
+            let issued = Date()
+            payload["delivery"] = .string("live_ephemeral")
+            payload["issued_at"] = .string(Self.utcNow(issued))
+            payload["expires_at"] = .string(Self.utcNow(issued.addingTimeInterval(Double(Self.maxLiveEphemeralAgeMs) / 1000)))
+            payload["max_age_ms"] = .uint(Self.maxLiveEphemeralAgeMs)
         }
         let env = ACPEnvelope(
             acp: "1.2",
@@ -202,9 +225,14 @@ public actor ACPRemoteSession {
             qos: .reliable,
             payload: payload
         )
+        sentInvokes[sentKey] = env
+        if live {
+            ephemeralPending.insert(id)
+        }
         if !viewState.pending.contains(id) {
             viewState.pending.append(id)
         }
+        sentCount += 1
         if wait {
             let ack = try await session.request(env)
             applyAcknowledgement(invocationID: id, ack: ack)
@@ -212,6 +240,50 @@ public actor ACPRemoteSession {
             _ = try await session.send(env)
         }
         return id
+    }
+
+    public func refreshMomentary(_ handle: ACPRemoteHoldHandle) async throws {
+        let lease = handle.leaseID ?? leases[handle.invocationID]
+        guard let lease else {
+            throw ACPSessionError("invalid_type", "lease_id required")
+        }
+        let payload: [String: AnySendable] = [
+            "control_id": .string(handle.controlID),
+            "invocation_id": .string(handle.invocationID),
+            "lease_id": .string(lease),
+        ]
+        let env = ACPEnvelope(
+            acp: "1.2",
+            messageID: UUID().uuidString.lowercased(),
+            type: "remote.momentary.refresh",
+            source: ACPEndpoint(nodeID: identity.nodeID),
+            timestampUTC: Self.utcNow(),
+            qos: .reliable,
+            payload: payload
+        )
+        sentCount += 1
+        _ = try await session.send(env)
+    }
+
+    public func markDisconnected() {
+        viewState.stale = true
+        viewState.readiness = .disconnected
+        viewState.pending.removeAll()
+        ephemeralPending.removeAll()
+        leases.removeAll()
+    }
+
+    public var pendingInvocationIDs: [String] { viewState.pending }
+
+    public static func isLiveEphemeral(interaction: ACPRemoteInteraction, action: String?, delivery: String?) -> Bool {
+        if delivery == "live_ephemeral" { return true }
+        if interaction == .momentaryBegin || interaction == .momentaryEnd || interaction == .momentaryCancel {
+            return true
+        }
+        if let action {
+            return ACPRemoteAction(rawValue: action).delivery == "live_ephemeral"
+        }
+        return false
     }
 
     public func beginMomentary(controlID: String) async throws -> ACPRemoteHoldHandle {
@@ -245,20 +317,19 @@ public actor ACPRemoteSession {
         if case .bool(false) = result["active"] {
             leases[invocationID] = nil
         }
-        if let value = result["value"], case .string(let cid) = result["control_id"] {
-            values[cid] = value
-        }
+        // ACK is command disposition and lease tracking only.
+        // Operational values come from ACPRemoteStateStore publications.
     }
 
     public func acknowledge(invocationID: String) {
         viewState.pending.removeAll { $0 == invocationID }
     }
 
-    private static func utcNow() -> String {
+    private static func utcNow(_ date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
-        return formatter.string(from: Date())
+        return formatter.string(from: date)
     }
 }

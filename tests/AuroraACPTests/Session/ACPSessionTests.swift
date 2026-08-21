@@ -3,10 +3,22 @@ import XCTest
 import AuroraACP
 
 final class ACPSessionTests: XCTestCase {
+    func testPlaintextIsDeniedByDefault() async {
+        let (transport, _) = await acpLinkedTransports()
+        let session = ACPSession(transport: transport, local: ACPIdentity(role: "tool", name: "secure-default"), isServer: false)
+        do {
+            _ = try await session.handshake()
+            XCTFail("plaintext must require explicit opt-in")
+        } catch let error as ACPSessionError {
+            XCTAssertEqual(error.code, "authentication")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
     func testHandshakePeerRole() async throws {
         let (ta, tb) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
-        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
+        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true, allowPlaintext: true)
         async let serverAck = server.handshake()
         let _ = try await client.handshake()
         _ = try await serverAck
@@ -20,7 +32,7 @@ final class ACPSessionTests: XCTestCase {
 
     func testAssignRequiresEstablished() async {
         let (ta, _) = await acpLinkedTransports()
-        let s = ACPSession(transport: ta, local: ACPIdentity(role: "tool", name: "t"), isServer: false)
+        let s = ACPSession(transport: ta, local: ACPIdentity(role: "tool", name: "t"), isServer: false, allowPlaintext: true)
         do {
             _ = try await s.assignSequence(
                 // compile-only: assign before handshake
@@ -41,8 +53,8 @@ final class ACPSessionTests: XCTestCase {
 
     func testSecondSequenceGapFails() async throws {
         let (ta, tb) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
-        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
+        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true, allowPlaintext: true)
         async let serverAck = server.handshake()
         _ = try await client.handshake()
         _ = try await serverAck
@@ -81,8 +93,8 @@ final class ACPSessionTests: XCTestCase {
 
     func testNegotiatesRemoteProfiles() async throws {
         let (ta, tb) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false)
-        let server = ACPSession(transport: tb, local: ACPIdentity(role: "conductor", name: "auth"), isServer: true)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false, allowPlaintext: true)
+        let server = ACPSession(transport: tb, local: ACPIdentity(role: "conductor", name: "auth"), isServer: true, allowPlaintext: true)
         await client.setProfiles(["core", "remote", "aurora.remote.prism.v1"])
         await server.setProfiles(["core", "remote", "aurora.remote.prism.v1"])
         async let serverAck = server.handshake()
@@ -96,8 +108,8 @@ final class ACPSessionTests: XCTestCase {
 
     func testRequestMatchesRegistryResponse() async throws {
         let (ta, tb) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false)
-        let server = ACPSession(transport: tb, local: ACPIdentity(role: "conductor", name: "auth"), isServer: true)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "remote", name: "pad"), isServer: false, allowPlaintext: true)
+        let server = ACPSession(transport: tb, local: ACPIdentity(role: "conductor", name: "auth"), isServer: true, allowPlaintext: true)
         async let serverAck = server.handshake()
         _ = try await client.handshake()
         _ = try await serverAck
@@ -137,8 +149,8 @@ final class ACPSessionTests: XCTestCase {
 
     func testRejectsDisjointProtocolAndEncoding() async throws {
         let (ta, tb) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
-        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
+        let server = ACPSession(transport: tb, local: ACPIdentity(role: "bridge", name: "b"), isServer: true, allowPlaintext: true)
         await client.setHandshakeTimeout(0.4)
         await server.setHandshakeTimeout(0.4)
         await client.setProtocolRange(min: "1.0", max: "1.0")
@@ -156,8 +168,8 @@ final class ACPSessionTests: XCTestCase {
         await server.goodbye()
 
         let (tc, td) = await acpLinkedTransports()
-        let c2 = ACPSession(transport: tc, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
-        let s2 = ACPSession(transport: td, local: ACPIdentity(role: "bridge", name: "b"), isServer: true)
+        let c2 = ACPSession(transport: tc, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
+        let s2 = ACPSession(transport: td, local: ACPIdentity(role: "bridge", name: "b"), isServer: true, allowPlaintext: true)
         await c2.setHandshakeTimeout(0.4)
         await s2.setHandshakeTimeout(0.4)
         await c2.setEncodings(["json"])
@@ -177,7 +189,7 @@ final class ACPSessionTests: XCTestCase {
 
     func testApplyHelloAckRequiresFields() async throws {
         let (ta, _) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
         let ack = ACPEnvelope(
             acp: "1.2",
             messageID: UUID().uuidString.lowercased(),
@@ -215,7 +227,7 @@ final class ACPSessionTests: XCTestCase {
         async let inbound = listener.accept(timeout: 2)
         let transport = try await ACPFramedConnection.connect(host: "127.0.0.1", port: port, timeout: 2)
         _ = try await inbound
-        let client = ACPSession(transport: transport, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
+        let client = ACPSession(transport: transport, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
         await client.setHandshakeTimeout(0.4)
         let start = Date()
         do {
@@ -231,7 +243,7 @@ final class ACPSessionTests: XCTestCase {
 
     func testHandshakeTimeoutIsBounded() async throws {
         let (ta, _) = await acpLinkedTransports()
-        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false)
+        let client = ACPSession(transport: ta, local: ACPIdentity(role: "conductor", name: "c"), isServer: false, allowPlaintext: true)
         await client.setHandshakeTimeout(0.3)
         let start = Date()
         do {

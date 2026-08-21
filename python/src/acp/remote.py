@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
+from .constants import load as load_constants
 from .envelope import Envelope, make_envelope
 from .idempotency import IdempotencyCache
 from .negotiate import REMOTE_PROFILE_CONDUCTOR, REMOTE_PROFILE_PRISM, version_at_least
@@ -90,12 +91,20 @@ ACTION_POLICY: dict[str, str] = {
     "nav.section.enter": "remote.show_navigation",
     "show.song.select": "remote.viewer",
     "show.song.load": "remote.viewer",
+    "show.song.stop": "remote.operator",
+    "show.song.next": "remote.show_navigation",
+    "show.song.previous": "remote.show_navigation",
+    "show.section.next": "remote.operator",
+    "show.section.previous": "remote.operator",
+    "show.section.restart": "remote.operator",
+    "show.progression.hold": "remote.operator",
     "show.free_play.enter": "remote.operator",
     "show.free_play.exit": "remote.operator",
     "look.recall": "remote.operator",
     "look.preview": "remote.operator",
     "look.take": "remote.operator",
     "look.preview.cancel": "remote.operator",
+    "effects.stop": "remote.operator",
 }
 
 ACTION_FEATURE: dict[str, str] = {
@@ -113,29 +122,23 @@ ACTION_FEATURE: dict[str, str] = {
     "nav.section.enter": "show.navigation",
     "show.song.select": "song.selection",
     "show.song.load": "song.loading",
+    "show.song.stop": "song.loading",
+    "show.song.next": "song.selection",
+    "show.song.previous": "song.selection",
+    "show.section.next": "show.navigation",
+    "show.section.previous": "show.navigation",
+    "show.section.restart": "show.navigation",
+    "show.progression.hold": "show.navigation",
     "show.free_play.enter": "show.navigation",
     "show.free_play.exit": "show.navigation",
     "look.recall": "look.global",
     "look.preview": "look.global",
     "look.take": "look.global",
     "look.preview.cancel": "look.global",
+    "effects.stop": "look.global",
 }
 
-ACTION_DELIVERY: dict[str, str] = {
-    "cue.go": "live_ephemeral",
-    "nav.go": "live_ephemeral",
-    "look.take": "live_ephemeral",
-    "look.recall": "impulse",
-    "look.preview": "impulse",
-    "look.preview.cancel": "impulse",
-    "show.free_play.enter": "impulse",
-    "show.free_play.exit": "impulse",
-    "show.song.load": "impulse",
-    "show.song.select": "stateful",
-    "output.blackout.set": "stateful",
-    "output.grand_master.set": "stateful",
-    "busk.work_lights": "stateful",
-}
+ACTION_DELIVERY: dict[str, str] = dict(load_constants()["remote"]["action_delivery"])
 
 PERMISSION_FOR_ACTION: dict[str, str] = {
     "cue.go": "cue.execute",
@@ -147,12 +150,25 @@ PERMISSION_FOR_ACTION: dict[str, str] = {
     "output.blackout.set": "output.blackout",
     "output.grand_master.set": "output.grand_master",
     "nav.song.select": "song.select",
+    "nav.section.enter": "song.select",
+    "transport.play": "song.load",
+    "transport.stop": "song.load",
+    "show.free_play.enter": "song.load",
+    "show.free_play.exit": "song.load",
     "show.song.select": "song.select",
     "show.song.load": "song.load",
+    "show.song.stop": "song.load",
+    "show.song.next": "song.select",
+    "show.song.previous": "song.select",
+    "show.section.next": "cue.execute",
+    "show.section.previous": "cue.execute",
+    "show.section.restart": "cue.execute",
+    "show.progression.hold": "cue.execute",
     "look.recall": "look.execute",
     "look.preview": "look.execute",
     "look.take": "look.execute",
     "look.preview.cancel": "look.execute",
+    "effects.stop": "look.execute",
 }
 
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -182,11 +198,7 @@ CONTROL_TYPE_ALIASES = {
 DISPLAY_ONLY_TYPES = frozenset({
     "label", "value_display", "status_indicator", "status", "meter", "group", "spacer",
 })
-EXECUTABLE_SURFACE_KEYS = frozenset({
-    "script", "javascript", "js", "lua", "python", "wasm", "html", "command", "shell",
-    "bytecode", "plugin", "url", "href", "path", "file", "filename", "exec", "eval",
-    "src", "onclick", "onpress", "code", "binary", "wasm_b64",
-})
+EXECUTABLE_SURFACE_KEYS = frozenset(load_constants()["remote"]["executable_surface_keys"])
 MAX_LIVE_EPHEMERAL_AGE_MS = 5_000
 MAX_CLOCK_SKEW_MS = 2_000
 SAFETY_STATE_VERSION = 2
@@ -252,9 +264,15 @@ NAMESPACE_POLICY: dict[str, tuple[str, str | None]] = {
     "cue.next": ("observe", "cue.go"),
     "show.current_song": ("observe", "show.navigation"),
     "show.selected_song": ("observe", "song.selection"),
+    "show.current_section": ("observe", "show.navigation"),
+    "show.next_section": ("observe", "show.navigation"),
+    "show.running": ("observe", "show.navigation"),
+    "show.progression": ("observe", "show.navigation"),
     "show.mode": ("observe", "show.navigation"),
     "show.setlist": ("observe", "show.navigation"),
+    "look.catalog": ("observe", "look.global"),
     "look.current": ("observe", "look.global"),
+    "look.preview": ("observe", "look.global"),
     "output.blackout": ("observe", "output.blackout"),
     "output.grand_master": ("observe", "output.grand_master"),
     "output.status": ("observe", "state.live"),
@@ -658,6 +676,10 @@ class RemoteAuthority:
     store: NodeStore | None = None
     allowed_remote_profiles: set[str] = field(default_factory=lambda: {REMOTE_PROFILE_PRISM})
     selected_song_id: str = "haywire"
+    section_id: str = "intro"
+    next_section_id: str = "verse"
+    running: bool = False
+    progression_held: bool = False
     mode: str = "programmed"
     return_context: dict[str, Any] = field(default_factory=dict)
     looks: list[dict[str, Any]] = field(default_factory=lambda: [dict(item) for item in DEFAULT_LOOKS])
@@ -1930,11 +1952,21 @@ class RemoteAuthority:
                 self._resource_delta(env, "cue.next", {"cue_id": self.next_cue_id}),
                 self._presentation(env),
             ])
-        if action in {"show.song.select", "show.song.load"}:
+        if action in {"show.song.select", "show.song.load", "show.song.stop"}:
             out.append(self._resource_delta(env, "show.selected_song", {"song_id": self.selected_song_id}))
-            if action == "show.song.load":
+            if action in {"show.song.load", "show.song.stop"}:
                 out.append(self._resource_delta(env, "show.current_song", {"song_id": self.song_id}))
+                out.append(self._resource_delta(env, "show.running", {"value": self.running}))
             out.append(self._nav_state(env))
+        if action in {"show.section.next", "show.section.previous", "show.section.restart", "nav.section.enter"}:
+            out.append(self._resource_delta(env, "show.current_section", {"section_id": self.section_id}))
+            out.append(self._resource_delta(env, "show.next_section", {"section_id": self.next_section_id}))
+        if action == "show.progression.hold":
+            out.append(self._resource_delta(
+                env,
+                "show.progression",
+                {"held": self.progression_held, "running": self.running},
+            ))
         if action in {"show.free_play.enter", "show.free_play.exit"}:
             out.append(self._resource_delta(
                 env,
@@ -1948,6 +1980,9 @@ class RemoteAuthority:
                 "preview_look_id": self.preview_look_id,
                 "transition": result_body.extra.get("transition"),
             }))
+            out.append(self._resource_delta(env, "look.preview", {"look_id": self.preview_look_id}))
+            if action in {"look.recall", "look.take"}:
+                out.append(self._resource_delta(env, "look.catalog", {"looks": list(self.looks)}))
         if action in {"output.blackout.set", "bridge.blackout"}:
             out.append(self._resource_delta(env, "output.blackout", {"value": self.blackout}))
         if action == "output.grand_master.set":
@@ -2079,10 +2114,22 @@ class RemoteAuthority:
             value = {"song_id": self.song_id}
         elif ns == "show.selected_song":
             value = {"song_id": self.selected_song_id}
+        elif ns == "show.current_section":
+            value = {"section_id": self.section_id}
+        elif ns == "show.next_section":
+            value = {"section_id": self.next_section_id}
+        elif ns == "show.running":
+            value = {"value": self.running}
+        elif ns == "show.progression":
+            value = {"held": self.progression_held, "running": self.running}
         elif ns == "show.mode":
             value = {"mode": self.mode, "return_context": dict(self.return_context)}
+        elif ns == "look.catalog":
+            value = {"looks": list(self.looks)}
         elif ns == "look.current":
             value = {"look_id": self.current_look_id, "preview_look_id": self.preview_look_id}
+        elif ns == "look.preview":
+            value = {"look_id": self.preview_look_id}
         elif ns == "output.blackout":
             value = {"value": self.blackout}
         elif ns == "output.grand_master":

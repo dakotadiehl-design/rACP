@@ -438,6 +438,43 @@ mod tests {
     }
 
     #[test]
+    fn remote_momentary_end_lease_conditional() {
+        let with_lease = br#"{
+          "acp":"1.2",
+          "message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000042",
+          "type":"remote.control.invoke",
+          "source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-0000000000b0"},
+          "timestamp_utc":"2026-08-17T16:42:15.231Z",
+          "qos":"reliable",
+          "flags":[],
+          "payload":{
+            "control_id":"fog_burst",
+            "invocation_id":"0193f8d8-4c4e-7d8b-a2ab-0000000000d1",
+            "interaction":"momentary_end",
+            "lease_id":"0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
+            "idempotency_key":"0193f8d8-4c4e-7d8b-a2ab-0000000000d1"
+          }
+        }"#;
+        assert!(decode_json(with_lease).is_ok());
+        let activate = br#"{
+          "acp":"1.2",
+          "message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000042",
+          "type":"remote.control.invoke",
+          "source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-0000000000b0"},
+          "timestamp_utc":"2026-08-17T16:42:15.231Z",
+          "qos":"reliable",
+          "flags":[],
+          "payload":{
+            "control_id":"cue_go",
+            "invocation_id":"0193f8d8-4c4e-7d8b-a2ab-0000000000d1",
+            "interaction":"activate",
+            "idempotency_key":"0193f8d8-4c4e-7d8b-a2ab-0000000000d1"
+          }
+        }"#;
+        assert!(decode_json(activate).is_ok());
+    }
+
+    #[test]
     fn invalid_corpus_rejected() {
         let dir = repo_root().join("vectors/invalid");
         let manifest: serde_json::Value =

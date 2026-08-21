@@ -491,10 +491,14 @@ class Session:
         for waiter in list(self._waiters.values()):
             if not waiter.future.done():
                 waiter.future.set_exception(SessionError(code, message))
+                # Mark the exception observed even if the owning request task
+                # was concurrently cancelled; awaiting the future still raises.
+                waiter.future.exception()
         self._waiters.clear()
         for _, fut in list(self._reliable_q):
             if not fut.done():
                 fut.set_exception(SessionError(code, message))
+                fut.exception()
         self._reliable_q.clear()
         self._latest_q.clear()
         self._best_q.clear()
@@ -547,9 +551,11 @@ class Session:
                 except Exception as exc:  # noqa: BLE001
                     if fut is not None and not fut.done():
                         fut.set_exception(exc)
+                        fut.exception()
                     for _, leftover in list(self._reliable_q):
                         if not leftover.done():
                             leftover.set_exception(exc)
+                            leftover.exception()
                     self._reliable_q.clear()
                     await self._fail("internal", f"send failed: {exc}")
                     return

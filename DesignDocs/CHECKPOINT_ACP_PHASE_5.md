@@ -1,11 +1,11 @@
-# Checkpoint — ACP Phase 5 / 6 / 7 (production authority, leases, blackout mapping)
+# Checkpoint — ACP Phase 5 / 6 / 7 prototype (authority safety core, leases, blackout mapping)
 
 **Date:** 2026-08-19  
 **ACP tag:** `1.1.0-dev.2`
 
 ## Implemented
 
-- `ACPRemoteProductionAuthority` (not the simulator) keys policy on authenticated node ID.
+- `ACPRemoteAuthorityCore` (not a production host) keys policy on a caller-supplied authenticated node ID.
 - Client-claimed roles cannot grant GO.
 - Duplicate invocation IDs do not apply twice across session replacement.
 - Momentary BEGIN grants a lease; expiry and disconnect enter the same release path.
@@ -19,4 +19,8 @@ ACP `swift test` — **33 passed** including 4 production-authority tests.
 
 ## Statement
 
-Phases 5–7 core safety behavior is review-satisfied at the ACP/Prism adapter layer. Proceed to Phase 8 deletion.
+This checkpoint proves selected safety-core behavior only. It does **not** satisfy
+the Phase 4–7 production exit gates and does not authorize legacy deletion or
+safety-sensitive deployment. A production host still requires authenticated
+session binding, readiness, persistence/restart recovery, autonomous lease
+scheduling, state publication, command recovery, backpressure, and audit.

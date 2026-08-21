@@ -14,6 +14,9 @@ public struct ACPCommandRecord: Sendable, Equatable {
     public var resultingEpoch: UInt64?
     public var resultingRevision: UInt64?
     public var expiresAt: String?
+    /// Canonical semantic request fingerprint. This is retained locally for
+    /// conflict detection and is deliberately not exposed in status reports.
+    public var fingerprint: String?
 
     public init(
         commandID: String,
@@ -28,7 +31,8 @@ public struct ACPCommandRecord: Sendable, Equatable {
         result: [String: AnySendable] = [:],
         resultingEpoch: UInt64? = nil,
         resultingRevision: UInt64? = nil,
-        expiresAt: String? = nil
+        expiresAt: String? = nil,
+        fingerprint: String? = nil
     ) {
         self.commandID = commandID
         self.idempotencyKey = idempotencyKey
@@ -43,6 +47,7 @@ public struct ACPCommandRecord: Sendable, Equatable {
         self.resultingEpoch = resultingEpoch
         self.resultingRevision = resultingRevision
         self.expiresAt = expiresAt
+        self.fingerprint = fingerprint
     }
 
     public func reportPayload() -> [String: AnySendable] {
@@ -65,6 +70,13 @@ public struct ACPCommandRecord: Sendable, Equatable {
     }
 }
 
+public enum ACPCommandReservation: Sendable, Equatable {
+    case reserved(ACPCommandRecord)
+    case existing(ACPCommandRecord)
+    case conflict(ACPCommandRecord)
+    case unavailable
+}
+
 /// Bounded ledger keyed by origin node + command identity. Session replacement does not drop records.
 public actor ACPCommandLedger {
     private var byCommand: [String: ACPCommandRecord] = [:]
@@ -73,13 +85,52 @@ public actor ACPCommandLedger {
     private let maxRecords: Int
 
     public init(maxRecords: Int = 1024) {
-        self.maxRecords = maxRecords
+        self.maxRecords = max(1, maxRecords)
+    }
+
+    /// Atomically reserves a command before semantic execution. Concurrent
+    /// duplicates observe the same in-flight record and must not execute.
+    public func reserve(_ record: ACPCommandRecord) -> ACPCommandReservation {
+        guard let fingerprint = record.fingerprint, !fingerprint.isEmpty else {
+            return .conflict(record)
+        }
+        let key = Self.commandKey(node: record.originNodeID, command: record.commandID)
+        if let existing = byCommand[key] {
+            return Self.matches(existing, record) ? .existing(existing) : .conflict(existing)
+        }
+        if let idem = record.idempotencyKey {
+            let ikey = Self.commandKey(node: record.originNodeID, command: idem)
+            if let prior = byIdempotency[ikey], let existing = byCommand[prior] {
+                return Self.matches(existing, record) ? .existing(existing) : .conflict(existing)
+            }
+        }
+        guard insert(record, key: key) else { return .unavailable }
+        return .reserved(record)
+    }
+
+    /// Replaces an existing in-flight reservation with its terminal result.
+    /// Only the matching authenticated request may complete the reservation.
+    public func complete(_ record: ACPCommandRecord) throws -> ACPCommandRecord {
+        let key = Self.commandKey(node: record.originNodeID, command: record.commandID)
+        guard let existing = byCommand[key] else {
+            throw ACPSessionError("not_found", "command was not reserved")
+        }
+        guard Self.matches(existing, record) else {
+            throw ACPSessionError("conflict", "terminal result does not match reserved command")
+        }
+        guard existing.disposition == "in_flight" else { return existing }
+        let terminal = ["rejected", "applied", "completed", "failed", "duplicate", "conflict", "expired", "precondition_failed"]
+        guard terminal.contains(record.disposition) else {
+            throw ACPSessionError("invalid_type", "command completion is not terminal")
+        }
+        byCommand[key] = record
+        return record
     }
 
     public func remember(_ record: ACPCommandRecord) throws -> ACPCommandRecord {
         let key = Self.commandKey(node: record.originNodeID, command: record.commandID)
         if let existing = byCommand[key] {
-            if existing.operation != record.operation {
+            if !Self.matches(existing, record) {
                 throw ACPSessionError("conflict", "command_id reused with different operation")
             }
             return existing
@@ -87,22 +138,36 @@ public actor ACPCommandLedger {
         if let idem = record.idempotencyKey {
             let ikey = Self.commandKey(node: record.originNodeID, command: idem)
             if let prior = byIdempotency[ikey], let held = byCommand[prior] {
-                if held.operation != record.operation {
+                if !Self.matches(held, record) {
                     throw ACPSessionError("conflict", "idempotency key reused with different operation")
                 }
                 return held
             }
-            byIdempotency[ikey] = key
         }
-        if order.count >= maxRecords, let old = order.first {
-            order.removeFirst()
+        guard insert(record, key: key) else {
+            throw ACPSessionError("unavailable", "command ledger capacity contains unresolved records")
+        }
+        return record
+    }
+
+    @discardableResult
+    private func insert(_ record: ACPCommandRecord, key: String) -> Bool {
+        if order.count >= maxRecords {
+            guard let index = order.firstIndex(where: { candidate in
+                guard let held = byCommand[candidate] else { return true }
+                return held.disposition != "in_flight"
+            }) else { return false }
+            let old = order.remove(at: index)
             if let dropped = byCommand.removeValue(forKey: old), let idem = dropped.idempotencyKey {
                 byIdempotency.removeValue(forKey: Self.commandKey(node: dropped.originNodeID, command: idem))
             }
         }
         byCommand[key] = record
         order.append(key)
-        return record
+        if let idem = record.idempotencyKey {
+            byIdempotency[Self.commandKey(node: record.originNodeID, command: idem)] = key
+        }
+        return true
     }
 
     public func lookup(
@@ -132,5 +197,11 @@ public actor ACPCommandLedger {
 
     private static func commandKey(node: String, command: String) -> String {
         "\(node.lowercased())|\(command.lowercased())"
+    }
+
+    private static func matches(_ existing: ACPCommandRecord, _ candidate: ACPCommandRecord) -> Bool {
+        existing.operation == candidate.operation
+            && existing.originPrincipal == candidate.originPrincipal
+            && existing.fingerprint == candidate.fingerprint
     }
 }

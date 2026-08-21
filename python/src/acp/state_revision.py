@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from .constants import load as load_constants
+
 
 class StateSyncRequired(ValueError):
     def __init__(self, reason: str) -> None:
@@ -64,15 +66,4 @@ def apply_delta(
     return local_epoch, local_revision + 1
 
 
-NEVER_COALESCE_ACTIONS = frozenset(
-    {
-        "performance.go",
-        "performance.back",
-        "cue.fire",
-        "cue.go",
-        "momentary.begin",
-        "momentary.end",
-        "blackoutOn",
-        "blackoutOff",
-    }
-)
+NEVER_COALESCE_ACTIONS = frozenset(load_constants()["remote"]["never_coalesce_actions"])

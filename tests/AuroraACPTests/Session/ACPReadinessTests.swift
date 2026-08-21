@@ -29,6 +29,14 @@ final class ACPReadinessTests: XCTestCase {
         )
     }
 
+    func testEpochPreconditionTreatsJSONSignedAndUnsignedValuesEqually() throws {
+        try ACPStateRevision.evaluatePreconditions(
+            [ACPPrecondition(op: "equals", field: "authority_epoch", value: .int(7))],
+            authorityEpoch: 7,
+            revision: 1
+        )
+    }
+
     func testCommandLedgerHidesOtherPrincipalsAndSurvivesSessionReplace() async throws {
         let ledger = ACPCommandLedger()
         let first = try await ledger.remember(ACPCommandRecord(
@@ -56,6 +64,94 @@ final class ACPReadinessTests: XCTestCase {
             originSessionID: "session-2"
         ))
         XCTAssertEqual(again.originSessionID, "session-1")
+    }
+
+    func testCommandLedgerAtomicallyReservesAndCompletesOnce() async throws {
+        let ledger = ACPCommandLedger()
+        let reservation = ACPCommandRecord(
+            commandID: command,
+            originNodeID: node,
+            originInstanceID: node,
+            operation: "performance.go",
+            disposition: "in_flight",
+            idempotencyKey: command,
+            originPrincipal: "alice",
+            fingerprint: "go|epoch=1|cue=cue-a"
+        )
+        guard case .reserved = await ledger.reserve(reservation) else {
+            return XCTFail("first request must reserve")
+        }
+        guard case .existing(let duplicate) = await ledger.reserve(reservation) else {
+            return XCTFail("duplicate must observe the reservation")
+        }
+        XCTAssertEqual(duplicate.disposition, "in_flight")
+
+        var terminal = reservation
+        terminal.disposition = "applied"
+        terminal.resultingEpoch = 1
+        terminal.resultingRevision = 8
+        let completed = try await ledger.complete(terminal)
+        XCTAssertEqual(completed.disposition, "applied")
+        XCTAssertEqual(completed.resultingRevision, 8)
+        guard case .existing(let replay) = await ledger.reserve(reservation) else {
+            return XCTFail("replay must return the terminal disposition")
+        }
+        XCTAssertEqual(replay.disposition, "applied")
+    }
+
+    func testCommandLedgerRejectsSameIdentityWithDifferentFingerprint() async {
+        let ledger = ACPCommandLedger()
+        let first = ACPCommandRecord(
+            commandID: command,
+            originNodeID: node,
+            originInstanceID: node,
+            operation: "performance.go",
+            disposition: "in_flight",
+            originPrincipal: "alice",
+            fingerprint: "cue-a"
+        )
+        guard case .reserved = await ledger.reserve(first) else {
+            return XCTFail("first request must reserve")
+        }
+        var changed = first
+        changed.fingerprint = "cue-b"
+        guard case .conflict = await ledger.reserve(changed) else {
+            return XCTFail("changed request must conflict")
+        }
+    }
+
+    func testCommandLedgerNeverEvictsInflightAndRequiresFingerprint() async throws {
+        let ledger = ACPCommandLedger(maxRecords: 1)
+        let first = ACPCommandRecord(
+            commandID: command,
+            originNodeID: node,
+            originInstanceID: node,
+            operation: "performance.go",
+            disposition: "in_flight",
+            originPrincipal: "alice",
+            fingerprint: "go-a"
+        )
+        guard case .reserved = await ledger.reserve(first) else { return XCTFail("must reserve") }
+        var second = first
+        second.commandID = "0193f8d8-4c4e-7d8b-a2ab-000000000098"
+        second.idempotencyKey = nil
+        second.fingerprint = "go-b"
+        guard case .unavailable = await ledger.reserve(second) else {
+            return XCTFail("must backpressure instead of evicting in-flight")
+        }
+        var missing = second
+        missing.fingerprint = nil
+        guard case .conflict = await ledger.reserve(missing) else {
+            return XCTFail("fingerprint-less mutation must fail closed")
+        }
+        var invalidCompletion = first
+        invalidCompletion.disposition = "accepted"
+        do {
+            _ = try await ledger.complete(invalidCompletion)
+            XCTFail("nonterminal completion must fail")
+        } catch let error as ACPSessionError {
+            XCTAssertEqual(error.code, "invalid_type")
+        }
     }
 
     func testPriorityNeverCoalescesGo() {
@@ -116,5 +212,54 @@ final class ACPReadinessTests: XCTestCase {
         let bound = try ACPWebSocketListener(port: 27431)
         try await bound.start()
         await bound.stop()
+        do {
+            try await bound.start(timeout: 0.1)
+            XCTFail("listener restart must be explicitly rejected")
+        } catch let error as ACPSessionError {
+            XCTAssertEqual(error.code, "conflict")
+        }
+    }
+
+    func testWebSocketLoopbackRoundTrip() async throws {
+        let port = UInt16.random(in: 29100...29299)
+        let listener = try ACPWebSocketListener(port: port, loopbackOnly: true)
+        try await listener.start()
+        let bound = await listener.port ?? port
+        async let accepted = listener.accept(timeout: 8)
+        let client = try await ACPWebSocketConnection.connect(host: "127.0.0.1", port: bound, timeout: 8)
+        let server = try await accepted
+        let payload = Data("acp-ws".utf8)
+        try await client.send(payload, text: true)
+        let received = try await server.recv()
+        XCTAssertEqual(received.0, payload)
+        XCTAssertTrue(received.1)
+        await client.close()
+        await server.close()
+        await listener.stop()
+    }
+
+    func testWebSocketAcceptTimeoutDoesNotStealNextConnection() async throws {
+        let listener = try ACPWebSocketListener(port: 0, loopbackOnly: true)
+        try await listener.start()
+        let advertisedPort = await listener.port
+        let port = try XCTUnwrap(advertisedPort)
+        let started = Date()
+        do {
+            _ = try await listener.accept(timeout: 0.05)
+            XCTFail("expected timeout")
+        } catch let error as ACPSessionError {
+            XCTAssertEqual(error.code, "timeout")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 1)
+
+        async let accepted = listener.accept(timeout: 2)
+        let client = try await ACPWebSocketConnection.connect(host: "127.0.0.1", port: port, timeout: 2)
+        let server = try await accepted
+        try await client.send(Data("next".utf8), text: true)
+        let received = try await server.recv()
+        XCTAssertEqual(received.0, Data("next".utf8))
+        await client.close()
+        await server.close()
+        await listener.stop()
     }
 }

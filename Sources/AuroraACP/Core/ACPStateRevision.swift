@@ -99,7 +99,7 @@ public enum ACPStateRevision {
             }
             switch pred.op {
             case "equals":
-                if actual != pred.value {
+                if !equivalent(actual, pred.value) {
                     throw ACPStateSyncError.preconditionFailed("\(pred.field) equals failed")
                 }
             case "at_least":
@@ -115,6 +115,8 @@ public enum ACPStateRevision {
     public static let neverCoalesceActions: Set<String> = [
         "performance.go", "performance.back", "cue.fire", "cue.go",
         "momentary.begin", "momentary.end", "blackoutOn", "blackoutOff",
+        "nav.go", "look.take", "show.section.next", "show.section.previous", "show.section.restart",
+        "busk.fog.output", "busk.blinder",
     ]
 
     private static func uint(_ value: AnySendable?) -> UInt64 {
@@ -122,6 +124,18 @@ public enum ACPStateRevision {
         case .uint(let u): return u
         case .int(let i) where i >= 0: return UInt64(i)
         default: return 0
+        }
+    }
+
+    private static func equivalent(_ lhs: AnySendable, _ rhs: AnySendable) -> Bool {
+        if lhs == rhs { return true }
+        switch (lhs, rhs) {
+        case (.uint(let left), .int(let right)) where right >= 0:
+            return left == UInt64(right)
+        case (.int(let left), .uint(let right)) where left >= 0:
+            return UInt64(left) == right
+        default:
+            return false
         }
     }
 }

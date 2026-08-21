@@ -161,6 +161,240 @@ impl Json {
 
 pub const PROTOCOL_VERSION: &str = "1.2";
 
+/// Shared Remote-profile identifiers. Rust does not ship a production Remote client;
+/// these constants keep the wire vocabulary in parity with Python and Swift.
+pub mod remote {
+    pub const MAX_LIVE_EPHEMERAL_AGE_MS: u64 = 5_000;
+
+    pub const PROFILE_PRISM: &str = "aurora.remote.prism.v1";
+    pub const PROFILE_CONDUCTOR: &str = "aurora.remote.conductor.v1";
+    pub const PROFILE_LEGACY: &str = "remote";
+
+    pub const PERMISSIONS: &[&str] = &[
+        "observe",
+        "song.select",
+        "song.load",
+        "cue.execute",
+        "look.execute",
+        "busk.execute",
+        "output.grand_master",
+        "output.blackout",
+        "output.blackout.engage",
+        "output.blackout.clear",
+        "remote.surface.use",
+    ];
+
+    pub const CONTROL_TYPES: &[&str] = &[
+        "button",
+        "momentary",
+        "momentary_button",
+        "toggle",
+        "slider",
+        "fader",
+        "encoder",
+        "rotary",
+        "selector",
+        "segmented_selector",
+        "xy",
+        "xy_pad",
+        "transport",
+        "navigation",
+        "status",
+        "meter",
+        "color",
+        "color_control",
+        "preset_tile",
+        "label",
+        "value_display",
+        "status_indicator",
+        "group",
+        "spacer",
+    ];
+
+    pub const ACTIONS: &[&str] = &[
+        "cue.go",
+        "nav.go",
+        "busk.fog.output",
+        "busk.work_lights",
+        "busk.blinder",
+        "bridge.blackout",
+        "output.blackout.set",
+        "output.grand_master.set",
+        "transport.play",
+        "transport.stop",
+        "nav.song.select",
+        "nav.section.enter",
+        "show.song.select",
+        "show.song.load",
+        "show.song.stop",
+        "show.song.next",
+        "show.song.previous",
+        "show.section.next",
+        "show.section.previous",
+        "show.section.restart",
+        "show.progression.hold",
+        "show.free_play.enter",
+        "show.free_play.exit",
+        "look.recall",
+        "look.preview",
+        "look.take",
+        "look.preview.cancel",
+        "effects.stop",
+    ];
+
+    pub fn is_known_action(action: &str) -> bool {
+        ACTIONS.contains(&action)
+    }
+
+    pub fn is_known_permission(permission: &str) -> bool {
+        PERMISSIONS.contains(&permission)
+    }
+
+    pub const CAPABILITIES: &[&str] = &[
+        "remote.profile",
+        "remote.layout",
+        "remote.control.invoke",
+        "remote.control.momentary",
+        "remote.control.state",
+        "remote.navigation.song",
+        "remote.navigation.section",
+        "remote.navigation.cue",
+        "remote.transport",
+        "remote.busking",
+        "remote.readiness",
+        "remote.asset_sync",
+        "remote.presentation",
+    ];
+
+    pub const EXECUTABLE_SURFACE_KEYS: &[&str] = &[
+        "script",
+        "javascript",
+        "js",
+        "lua",
+        "python",
+        "wasm",
+        "html",
+        "command",
+        "shell",
+        "bytecode",
+        "plugin",
+        "url",
+        "href",
+        "path",
+        "file",
+        "filename",
+        "exec",
+        "eval",
+        "src",
+        "onclick",
+        "onpress",
+        "code",
+        "binary",
+        "wasm_b64",
+        "executable",
+        "source",
+        "expression",
+    ];
+
+    pub const STATE_NAMESPACES: &[&str] = &[
+        "show.setlist",
+        "show.selected_song",
+        "show.current_song",
+        "show.current_section",
+        "show.next_section",
+        "show.mode",
+        "show.running",
+        "show.progression",
+        "look.catalog",
+        "look.current",
+        "look.preview",
+        "output.grand_master",
+        "output.blackout",
+        "system.health",
+    ];
+
+    pub const NEVER_COALESCE_ACTIONS: &[&str] = &[
+        "performance.go",
+        "performance.back",
+        "cue.fire",
+        "cue.go",
+        "momentary.begin",
+        "momentary.end",
+        "blackoutOn",
+        "blackoutOff",
+        "nav.go",
+        "look.take",
+        "show.section.next",
+        "show.section.previous",
+        "show.section.restart",
+        "busk.fog.output",
+        "busk.blinder",
+    ];
+
+    pub fn action_delivery(action: &str) -> &'static str {
+        match action {
+            "cue.go" | "nav.go" | "look.take" | "show.section.next" | "show.section.previous"
+            | "show.section.restart" | "busk.fog.output" | "busk.blinder" => "live_ephemeral",
+            "show.song.select" | "output.blackout.set" | "output.grand_master.set"
+            | "busk.work_lights" | "show.progression.hold" | "bridge.blackout"
+            | "nav.song.select" => "stateful",
+            _ => "impulse",
+        }
+    }
+
+    pub fn reject_executable(value: &crate::Json) -> Result<(), &'static str> {
+        reject_executable_inner(value, "", 0)
+    }
+
+    fn reject_executable_inner(
+        value: &crate::Json,
+        key: &str,
+        depth: usize,
+    ) -> Result<(), &'static str> {
+        if depth > 16 {
+            return Err("surface nesting too deep");
+        }
+        let norm = key.to_ascii_lowercase().replace('-', "_");
+        if EXECUTABLE_SURFACE_KEYS.contains(&norm.as_str()) || norm.starts_with("on_") {
+            return Err("executable surface payload");
+        }
+        match value {
+            crate::Json::String(text) if text.contains("://") => Err("executable surface payload"),
+            crate::Json::Object(pairs) => {
+                for (nested_key, nested) in pairs {
+                    reject_executable_inner(nested, nested_key, depth + 1)?;
+                }
+                Ok(())
+            }
+            crate::Json::Array(items) => {
+                for item in items {
+                    reject_executable_inner(item, "", depth + 1)?;
+                }
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    pub const FEATURE_CAPABILITIES: &[&str] = &[
+        "show.navigation",
+        "song.selection",
+        "song.loading",
+        "cue.go",
+        "cue.selection",
+        "look.global",
+        "remote.surfaces",
+        "busk.controls",
+        "control.momentary",
+        "output.blackout",
+        "output.blackout.engage",
+        "output.blackout.clear",
+        "output.grand_master",
+        "state.live",
+        "system.health",
+    ];
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,5 +402,29 @@ mod tests {
     #[test]
     fn protocol_version_is_baseline() {
         assert_eq!(PROTOCOL_VERSION, "1.2");
+    }
+
+    #[test]
+    fn remote_prism_1_0_vocabulary_matches_constants() {
+        assert_eq!(remote::PROFILE_PRISM, "aurora.remote.prism.v1");
+        assert_eq!(remote::PROFILE_CONDUCTOR, "aurora.remote.conductor.v1");
+        assert!(remote::is_known_action("show.song.stop"));
+        assert!(remote::is_known_action("show.section.next"));
+        assert!(remote::is_known_action("effects.stop"));
+        assert!(remote::is_known_permission("cue.execute"));
+        assert!(remote::CONTROL_TYPES.contains(&"slider"));
+        assert!(!remote::is_known_action("prism.internal.setChannel"));
+        assert!(remote::CAPABILITIES.contains(&"remote.profile"));
+        assert!(remote::FEATURE_CAPABILITIES.contains(&"output.grand_master"));
+        assert!(remote::EXECUTABLE_SURFACE_KEYS.contains(&"script"));
+        assert!(remote::EXECUTABLE_SURFACE_KEYS.contains(&"expression"));
+        assert!(remote::STATE_NAMESPACES.contains(&"show.current_section"));
+        assert_eq!(remote::action_delivery("cue.go"), "live_ephemeral");
+        assert_eq!(remote::action_delivery("output.grand_master.set"), "stateful");
+        assert!(remote::NEVER_COALESCE_ACTIONS.contains(&"nav.go"));
+        let bad = Json::object(vec![("expression", Json::String("x+1".into()))]);
+        assert!(remote::reject_executable(&bad).is_err());
+        let ok = Json::object(vec![("label", Json::String("GO".into()))]);
+        assert!(remote::reject_executable(&ok).is_ok());
     }
 }

@@ -73,16 +73,30 @@ public struct ACPRemoteHoldState: Sendable, Equatable {
     public var physicalActive: Bool
 }
 
-/// Production Remote authority. Policy is keyed by authenticated transport node ID, never client-claimed roles.
-public actor ACPRemoteProductionAuthority {
-    public var showID: String
-    public var layoutID: String
-    public var armed: Bool
+/// Remote authority safety core. Policy is keyed by an authenticated transport
+/// node ID, never client-claimed roles. A production host must derive the
+/// principal from an established authenticated session and provide the
+/// surrounding readiness, persistence, publication, and audit facilities.
+public actor ACPRemoteAuthorityCore {
+    private struct HoldKey: Hashable, Sendable {
+        var principalNodeID: String
+        var invocationID: String
+    }
+    private struct AppliedRecord: Sendable {
+        var fingerprint: String
+        var status: String
+        var leaseID: String?
+    }
+    public private(set) var showID: String
+    public private(set) var layoutID: String
+    public private(set) var armed: Bool
     private var controls: [String: ACPRemoteControl]
     private var policy: any ACPRemotePolicyProviding
     private var router: any ACPRemoteActionRouting
-    private var applied: [String: String] = [:]
-    private var holds: [String: ACPRemoteHoldState] = [:]
+    private var applied: [String: AppliedRecord] = [:]
+    private let maxApplied = 1_024
+    private var holds: [HoldKey: ACPRemoteHoldState] = [:]
+    private var holdTimers: [HoldKey: Task<Void, Never>] = [:]
     private var nowMs: UInt64 = 0
     private var failRelease = false
 
@@ -119,9 +133,14 @@ public actor ACPRemoteProductionAuthority {
         leaseID: String? = nil
     ) async -> (status: String, code: String?, leaseID: String?, hold: ACPRemoteHoldState?) {
         _ = claimedRoles
+        let holdKey = HoldKey(principalNodeID: principal.nodeID.lowercased(), invocationID: invocationID.lowercased())
         let key = "\(principal.nodeID)|\(invocationID)|\(interaction.rawValue)"
+        let fingerprint = "\(controlID)|\(interaction.rawValue)|\(leaseID ?? "")"
         if let prev = applied[key] {
-            return (prev, nil, holds[invocationID]?.leaseID, holds[invocationID])
+            guard prev.fingerprint == fingerprint else {
+                return ("conflict", "command_identity_conflict", nil, holds[holdKey])
+            }
+            return (prev.status, nil, prev.leaseID, holds[holdKey])
         }
         if !armed { return ("rejected", "remote.control.not_armed", nil, nil) }
         guard let control = controls[controlID] else { return ("rejected", "remote.control.unknown", nil, nil) }
@@ -131,13 +150,25 @@ public actor ACPRemoteProductionAuthority {
         }
         switch interaction {
         case .activate, .set, .adjust:
+            guard remember(key: key, fingerprint: fingerprint, status: "in_flight", leaseID: nil) else {
+                return ("rejected", "unavailable", nil, nil)
+            }
             let result = await router.apply(action: control.action, controlID: controlID)
             let status = result.ok ? "applied" : "rejected"
-            applied[key] = status
+            _ = remember(key: key, fingerprint: fingerprint, status: status, leaseID: nil)
             return (status, result.ok ? nil : "unavailable", nil, nil)
         case .momentaryBegin:
+            if let existing = holds[holdKey] {
+                return ("conflict", "command_identity_conflict", existing.leaseID, existing)
+            }
+            guard remember(key: key, fingerprint: fingerprint, status: "in_flight", leaseID: nil) else {
+                return ("rejected", "unavailable", nil, nil)
+            }
             let result = await router.begin(action: control.action, controlID: controlID)
-            guard result.ok else { return ("rejected", "unavailable", nil, nil) }
+            guard result.ok else {
+                _ = remember(key: key, fingerprint: fingerprint, status: "rejected", leaseID: nil)
+                return ("rejected", "unavailable", nil, nil)
+            }
             let lease = UUID().uuidString.lowercased()
             let hold = ACPRemoteHoldState(
                 controlID: controlID,
@@ -148,28 +179,75 @@ public actor ACPRemoteProductionAuthority {
                 releasePending: false,
                 physicalActive: result.physicalActive
             )
-            holds[invocationID] = hold
-            applied[key] = "applied"
+            holds[holdKey] = hold
+            scheduleExpiry(for: holdKey, leaseID: lease, afterMs: control.maxHoldMs)
+            _ = remember(key: key, fingerprint: fingerprint, status: "applied", leaseID: lease)
             return ("applied", nil, lease, hold)
         case .momentaryEnd, .momentaryCancel:
-            guard let hold = holds[invocationID] else {
+            guard let hold = holds[holdKey] else {
                 return ("rejected", "remote.momentary.unknown_invocation", nil, nil)
             }
-            if let leaseID, leaseID != hold.leaseID {
+            guard let leaseID, leaseID == hold.leaseID else {
                 return ("rejected", "remote.momentary.unknown_invocation", nil, hold)
             }
-            return await release(invocationID, reason: "end")
+            guard remember(key: key, fingerprint: fingerprint, status: "in_flight", leaseID: hold.leaseID) else {
+                return ("rejected", "unavailable", hold.leaseID, hold)
+            }
+            let result = await release(holdKey, reason: "end")
+            _ = remember(key: key, fingerprint: fingerprint, status: result.status, leaseID: hold.leaseID)
+            return result
         }
     }
 
     public func disconnect(nodeID: String) async {
-        for (id, hold) in holds where hold.principalNodeID == nodeID {
-            _ = await release(id, reason: "disconnect")
+        let keys = holds.keys.filter { $0.principalNodeID == nodeID.lowercased() }
+        for key in keys {
+            _ = await release(key, reason: "disconnect")
         }
     }
 
     public func hold(invocationID: String) -> ACPRemoteHoldState? {
-        holds[invocationID]
+        let matches = holds.values.filter { $0.invocationID.caseInsensitiveCompare(invocationID) == .orderedSame }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    public func hold(principalNodeID: String, invocationID: String) -> ACPRemoteHoldState? {
+        holds[HoldKey(principalNodeID: principalNodeID.lowercased(), invocationID: invocationID.lowercased())]
+    }
+
+    /// Rejects new mutations and releases every active hold through the same
+    /// fail-safe path used for disconnect and expiry.
+    public func shutdown() async {
+        armed = false
+        let keys = Array(holds.keys)
+        for key in keys { _ = await release(key, reason: "shutdown") }
+        for task in holdTimers.values { task.cancel() }
+        holdTimers.removeAll()
+    }
+
+    public func setArmed(_ newValue: Bool) async {
+        armed = newValue
+        if !newValue {
+            let keys = Array(holds.keys)
+            for key in keys { _ = await release(key, reason: "disarm") }
+        }
+    }
+
+    @discardableResult
+    public func replaceLayout(_ layout: ACPRemoteLayout, showID: String) async -> Bool {
+        let keys = Array(holds.keys)
+        for key in keys { _ = await release(key, reason: "layout_change") }
+        guard holds.isEmpty else { return false }
+        self.showID = showID
+        layoutID = layout.layoutID
+        controls = Dictionary(uniqueKeysWithValues: layout.controls.map { ($0.controlID, $0) })
+        return true
+    }
+
+    public func replacePolicy(_ newPolicy: any ACPRemotePolicyProviding) async {
+        let keys = Array(holds.keys)
+        for key in keys { _ = await release(key, reason: "policy_change") }
+        policy = newPolicy
     }
 
     public func helloRoles(principal: ACPRemotePrincipal, claimed: [String]) -> [String] {
@@ -177,15 +255,40 @@ public actor ACPRemoteProductionAuthority {
         return policy.roles(for: principal.nodeID)
     }
 
+    @discardableResult
+    private func remember(key: String, fingerprint: String, status: String, leaseID: String?) -> Bool {
+        if applied[key] == nil, applied.count >= maxApplied { return false }
+        applied[key] = AppliedRecord(fingerprint: fingerprint, status: status, leaseID: leaseID)
+        return true
+    }
+
     private func expireHolds() async {
         let due = holds.filter { $0.value.expiresAtMs <= nowMs && !$0.value.releasePending }.map(\.key)
-        for id in due {
-            _ = await release(id, reason: "expiry")
+        for key in due {
+            _ = await release(key, reason: "expiry")
         }
     }
 
-    private func release(_ invocationID: String, reason: String) async -> (status: String, code: String?, leaseID: String?, hold: ACPRemoteHoldState?) {
-        guard var hold = holds[invocationID], let control = controls[hold.controlID] else {
+    private func scheduleExpiry(for key: HoldKey, leaseID: String, afterMs: UInt64) {
+        holdTimers[key]?.cancel()
+        holdTimers[key] = Task { [weak self] in
+            do {
+                let product = afterMs.multipliedReportingOverflow(by: 1_000_000)
+                try await Task.sleep(nanoseconds: product.overflow ? UInt64.max : product.partialValue)
+            } catch {
+                return
+            }
+            await self?.expire(key, leaseID: leaseID)
+        }
+    }
+
+    private func expire(_ key: HoldKey, leaseID: String) async {
+        guard let hold = holds[key], hold.leaseID == leaseID, !hold.releasePending else { return }
+        _ = await release(key, reason: "expiry")
+    }
+
+    private func release(_ key: HoldKey, reason: String) async -> (status: String, code: String?, leaseID: String?, hold: ACPRemoteHoldState?) {
+        guard var hold = holds[key], let control = controls[hold.controlID] else {
             return ("rejected", "remote.momentary.unknown_invocation", nil, nil)
         }
         let result: ACPRemoteRouterResult
@@ -198,11 +301,14 @@ public actor ACPRemoteProductionAuthority {
         }
         hold.releasePending = result.releasePending || !result.ok
         hold.physicalActive = result.physicalActive || hold.releasePending
-        holds[invocationID] = hold
+        holds[key] = hold
         if !hold.releasePending && !hold.physicalActive {
-            holds.removeValue(forKey: invocationID)
+            holds.removeValue(forKey: key)
+            holdTimers.removeValue(forKey: key)?.cancel()
         }
-        let status = hold.releasePending ? "applied" : "applied"
-        return (status, hold.releasePending ? "remote.control.unconfirmed_release" : nil, hold.leaseID, hold)
+        return ("applied", hold.releasePending ? "remote.control.unconfirmed_release" : nil, hold.leaseID, hold)
     }
 }
+
+@available(*, deprecated, message: "This is a safety core, not a complete session-hosted production authority. Use ACPRemoteAuthorityCore and supply the required authenticated host facilities.")
+public typealias ACPRemoteProductionAuthority = ACPRemoteAuthorityCore

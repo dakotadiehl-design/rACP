@@ -43,3 +43,5 @@ Capability IDs are stable lowercase dotted strings. Versions evolve independentl
 | `system.health` | 1.2 | Health/warnings subscription |
 
 `trusted_lan` sessions accept the intersection of advertised and accepted capabilities. Missing capability → `capability_not_permitted`. When a registry row has `min_capability_version`, an explicit negotiated version is required; absent, malformed, or below-minimum values also return `capability_not_permitted`.
+
+Aurora Remote 1.0 must not use `ACPSession.defaultCapabilities`. Use `ACPCapabilitySet.prismRemoteClient`, which advertises the `remote.capabilities` and `remote.feature_capabilities` catalogs from `schema/constants.json`. After handshake, `ACPRemoteClient` fails closed if `aurora.remote.prism.v1` or a required Remote capability is missing from the intersection. `aurora.remote.conductor.v1` remains reserved.
