@@ -1,11 +1,14 @@
 # ACP Aurora Trust Conformance Matrix
 
 **Status:** Active evidence index
-**Current gate:** M0 blocked
+**Current gate:** M0 Candidate Freeze 2.1 awaiting GO confirmation and provider/hardware evidence
 
 | Milestone | Requirement | Evidence | Status |
 |---|---|---|---|
-| M0 | Twelve wire/security choices resolved | `docs/SECURITY.md` | candidate, review pending |
+| M0 | Twelve wire/security choices resolved | `docs/SECURITY.md` Candidate Freeze 2.1 | CONDITIONAL GO remediation applied; confirmation pending |
+| M0 | Candidate Freeze 1 independent review | `DesignDocs/ACP_Aurora_Trust_M0_Independent_Review.md` | NO-GO received |
+| M0 | Independent-review finding dispositions | `DesignDocs/ACP_Aurora_Trust_M0_Review_Remediation.md` | Freeze 1 findings received CONDITIONAL GO; Freeze 2 residuals remediated, confirmation pending |
+| M0 | Candidate Freeze 2 independent re-review | `DesignDocs/ACP_Aurora_Trust_M0_Independent_Review_Freeze2.md` | CONDITIONAL GO received |
 | M0 | Audited providers selected per target | `DesignDocs/ACP_Aurora_Trust_M0_Decision_Record.md` | blocked |
 | M0 | Provider capability probes pass | none | blocked |
 | M0 | Representative Lightweight hardware proof | none | blocked |

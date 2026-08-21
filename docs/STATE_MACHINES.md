@@ -19,7 +19,25 @@ Closed → Connecting → HelloSent → Established → GoodbyeSent → Closed
 Established → Reconnecting → HelloSent   # fresh session_id; sequence restarts at 1
 ```
 
-Only `session.hello`, `session.hello_ack`, handshake `error.report`, and discovery types are legal before Established. After Established, `session_id` and `sequence` are required.
+Only `session.hello`, `session.hello_ack`, handshake `error.report`, discovery types, and the Aurora Trust enrollment allowlist below are legal before Established. After Established, `session_id` and `sequence` are required.
+
+Aurora Trust adds a restricted enrollment pre-session state:
+
+```text
+Connected → EnrollmentRestricted → EnrollmentComplete → Closed
+                               ↘ Failed / Expired / Locked → Closed
+```
+
+Only `security.enrollment.status`, `security.enrollment.begin`, `security.enrollment.challenge`, `security.enrollment.response`, `security.enrollment.confirm`, `security.enrollment.approval`, `security.enrollment.install_result`, `security.enrollment.cancel`, and handshake `error.report` are legal in `EnrollmentRestricted`. This state has no ordinary ACP principal, negotiates only `security.enrollment`, cannot route Remote/control/resource messages, and cannot transition into an established control session. After successful enrollment both peers close it and establish a fresh authenticated connection.
+
+Lightweight authentication adds a distinct pre-HELLO state after mutual RPK TLS:
+
+```text
+TLSAuthenticated → LightweightBinding → HelloSent/HelloReceived → Established
+                                    ↘ Failed → Closed
+```
+
+Only `security.lightweight.finished` and handshake `error.report` are legal in `LightweightBinding`. HELLO is rejected until both finished messages verify. After both verify, `security.lightweight.finished` becomes illegal and ordinary HELLO proceeds. This state is not `EnrollmentRestricted` and cannot route any other ACP family.
 
 `session.goodbye` fails pending waiters with `cancelled`, aborts transfers, then closes. It does not mutate peer safety state (including blackout).
 

@@ -7,6 +7,12 @@
 **Audience:** Protocol maintainers, SDK implementers, product integrators, security reviewers, test engineers  
 **Document intent:** Define a platform-independent, interoperable way to authenticate ACP nodes, enroll new nodes without requiring a physical button or display, authorize capabilities, and manage credentials throughout a node's lifecycle.
 
+> **Normative security-profile precedence:** This architecture document is
+> informative where cryptographic bytes are concerned. `docs/SECURITY.md`
+> Candidate Freeze 2.1 supersedes its suite identifiers, registration function,
+> point encoding, transcript framing, key labels, credential encodings, and
+> transport binding. Implementers must not infer wire bytes from examples here.
+
 > **Implementation status (2026-08-20): design only.** No current ACP SDK
 > implements this trust protocol. `trusted_lan` and `allow_plaintext` are
 > explicit development/simulator modes and do not create an authenticated
@@ -44,7 +50,7 @@ The recommended cryptographic construction is:
 - TLS 1.3 for ordinary full-profile WebSocket sessions.
 - Mutual node authentication using production-local credentials.
 - P-256 ECDSA as the mandatory-to-implement identity/signature suite for broad platform compatibility.
-- Ed25519 as an optional negotiated suite.
+- No optional identity suite in Aurora Trust 1.0; Ed25519 requires a future reviewed suite.
 - A compact signed credential and pinned trust-domain key for constrained Lightweight nodes when full X.509 processing is impractical.
 
 No ACP implementation may substitute an unauthenticated hash exchange, plaintext PIN, home-grown key agreement, or unauthenticated Diffie-Hellman for the mechanisms described here.
@@ -253,14 +259,14 @@ Libraries/providers must be independently reviewed for each supported platform. 
 | Full transport | TLS 1.3 |
 | Full transport AEAD | TLS-negotiated AES-GCM or ChaCha20-Poly1305 |
 
-Ed25519 MAY be implemented as `identity.ed25519`. X25519 MAY be used by future negotiated suites. Optional algorithms may not change the mandatory suite's transcript format.
+Ed25519 and X25519 are reserved for future reviewed suites and MUST NOT be advertised by Aurora Trust 1.0.
 
 ### 7.3 SPAKE2+ suite identifier
 
 The initial suite identifier SHOULD be:
 
 ```text
-ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-v1
+ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1
 ```
 
 The exact SPAKE2+ ciphersuite parameters, point encoding, password-to-scalar preparation, confirmation MAC construction, and test vectors MUST be copied from or rigorously mapped to the selected standards-compliant library profile. This document does not authorize implementers to fill in missing cryptographic math from intuition.
@@ -317,10 +323,10 @@ A node may support membership in multiple trust domains if its product requires 
 
 The preferred bootstrap secret is 128 uniformly random bits. Human formatting may add separators but does not alter the entropy.
 
-Example display form:
+Example display form (grouping is cosmetic; the canonical value contains 26 characters):
 
 ```text
-A7KM-4QPF-9H2D-T6RX-3N8W-5CJV
+03N8-W5CJ-VA7K-M4QP-F9H2-DT6R-X3
 ```
 
 The encoded alphabet SHOULD omit visually ambiguous characters. The decoder may accept lowercase and separators but must normalize deterministically before PAKE input preparation.
@@ -356,7 +362,7 @@ The CBOR body contains:
   "bootstrap_secret": "base64url-no-padding",
   "identity_key_hash": "sha256:lowercase-hex",
   "expires_at": "RFC3339 timestamp",
-  "suite_hint": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-v1"
+  "suite_hint": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1"
 }
 ```
 
@@ -497,7 +503,7 @@ Enrollment messages MUST be added to the language-neutral schema, message regist
     "state": "open",
     "expires_at": "2026-08-20T16:10:00.000Z",
     "supported_suites": [
-      "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-v1"
+      "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1"
     ],
     "methods": ["manual_code", "qr", "provisioning_file"],
     "attempts_remaining": 5
@@ -519,7 +525,7 @@ This message never includes the bootstrap secret, visual fingerprint, private ke
     "attempt_id": "UUID",
     "commissioner_node_id": "UUID",
     "trust_domain_id": "UUID",
-    "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-v1",
+    "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1",
     "commissioner_nonce": "base64url",
     "requested_role": "bridge",
     "requested_permissions_digest": "sha256:..."
@@ -611,7 +617,7 @@ The SPAKE2+ context is deterministic CBOR under ACP-CDE-1.2 containing:
 }
 ```
 
-The transcript hash covers the context and every PAKE message in protocol order with explicit length prefixes or deterministic CBOR array framing. Concatenating ambiguous strings is forbidden.
+The transcript hash covers the closed context and every PAKE field using the exact deterministic CBOR array in `docs/SECURITY.md`; alternative length-prefixed framing is forbidden.
 
 ### 13.2 Derived keys
 
@@ -620,8 +626,8 @@ The PAKE output is never used directly. HKDF derives independent keys:
 ```text
 enrollment_root = HKDF-Extract(salt = transcript_hash, IKM = pake_shared_secret)
 
-client_confirm = HKDF-Expand(enrollment_root, "ACP enrollment client confirm v1", 32)
-server_confirm = HKDF-Expand(enrollment_root, "ACP enrollment server confirm v1", 32)
+candidate_confirm = HKDF-Expand(enrollment_root, "ACP enrollment candidate confirm v1", 32)
+commissioner_confirm = HKDF-Expand(enrollment_root, "ACP enrollment commissioner confirm v1", 32)
 approval_key   = HKDF-Expand(enrollment_root, "ACP enrollment approval AEAD v1", 32)
 sas_key        = HKDF-Expand(enrollment_root, "ACP enrollment SAS v1", 32)
 audit_key      = HKDF-Expand(enrollment_root, "ACP enrollment audit binding v1", 32)
@@ -646,7 +652,7 @@ The word list and mapping tables must be versioned assets shared by all SDKs. Lo
 The persistent identity tuple is:
 
 ```text
-(trust_domain_id, node_id, identity_public_key, credential_serial)
+(trust_domain_id, node_id, identity_key_id, credential_id)
 ```
 
 `instance_id` is intentionally excluded because it changes on boot.
