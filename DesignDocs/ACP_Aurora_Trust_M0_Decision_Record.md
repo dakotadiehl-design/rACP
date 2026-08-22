@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-21
 **Milestone:** M0 — Security profile freeze
-**Status:** BLOCKED at exit gate; Candidate Freeze 2.1.1, vectors, current-host provider probes, owner approval, and Rust MSRV proof pass, but required non-hardware platform adapters and Lightweight hardware proof remain open
+**Status:** CONDITIONALLY CLOSED — shared Full-profile protocol development may proceed to M1; deferred platform and hardware evidence remains release-blocking on each affected target
 
 ## 1. Work completed
 
@@ -108,7 +108,7 @@ M0 cannot pass, and M1 MUST NOT begin under the approved execution contract, unt
 
 ## 7. Gate decision
 
-**Decision: M0 remains blocked.** Candidate Freeze 2.1.1, security vectors, the Botan crypto profile, the macOS arm64 adapter, bounded project-owner provider/license/update approval, and the current Rust 1.75 workspace have evidence-backed PASS results. The repository still defines Full-platform tests for iOS, Linux, Windows, Raspberry Pi architecture, and additional runtime/language combinations, while those adapters remain `NOT_RUN` or blocked. The conditional-transition directive permits deferring only physical Pico HIL, not these non-hardware Full adapters. Advancing to M1 now would violate that directive.
+**Decision: M0 is conditionally closed for development.** Candidate Freeze 2.1.1, security vectors, Botan's crypto profile, the macOS arm64 adapter, the Simulator-applicable provider/Keychain/WebSocket probes, bounded project-owner approval, and Rust 1.75 have evidence-backed PASS results. The remaining iOS Simulator X.509 policy and authenticated-network negative matrices are `M1-DEPENDENT QUALIFICATION` and mandatory M1 exit criteria. Untested Full platforms, physical iOS/Secure Enclave behavior, and Pico HIL remain explicitly unqualified release gates. This authorizes M1 engineering only, not production or conformance claims.
 
 ## 8. Regression and review evidence
 

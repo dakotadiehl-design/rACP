@@ -1,7 +1,7 @@
 # ACP Aurora Trust Conformance Matrix
 
 **Status:** Active evidence index
-**Current gate:** M0 Candidate Freeze 2.1.1 has document-level GO; provider/vector/hardware/license evidence remains
+**Current gate:** M0 CONDITIONALLY CLOSED; M1 authorized with iOS identity-policy/network qualification as mandatory exit criteria
 
 | Milestone | Requirement | Evidence | Status |
 |---|---|---|---|
@@ -15,7 +15,9 @@
 | M0 | Security golden vectors | `vectors/security/manifest.json`; `scripts/security_vectors.py` | PASS — 17 sets, 31 hash-pinned artifacts; deterministic generation and two regression gates |
 | M0 | Botan 3.13.0 crypto-profile probes | `tools/security-probe/results/macos-arm64-botan-3.13.0.json` | PASS — provider capability separated from adapters |
 | M0 | macOS arm64 Full adapter probes | same result artifact | PASS — mutual TLS 1.3, peer evidence, exporter equality, no resumption/tickets, X.509 and revocation |
-| M0 | iOS Simulator Full-profile functional qualification | initial and remediation machine results; remediation report | FAIL — hosted Keychain and WebSocket remediation PASS (76/76); complete ACP X.509/network-negative adapter cases remain NOT_RUN |
+| M0 | iOS Simulator M0-applicable functional qualification | initial/remediation results and reports | PASS — vectors/provider/TLS/exporter/P-256/Keychain/WebSocket; 76/76 package tests |
+| M1 | iOS Simulator full ACP X.509 policy matrix | remediation report | M1-DEPENDENT QUALIFICATION — mandatory M1 exit criterion |
+| M1 | iOS Simulator authenticated-network negative suite | remediation report | M1-DEPENDENT QUALIFICATION — mandatory M1 exit criterion |
 | M0 | iOS physical-device Full-profile qualification | none | DEFERRED / NOT_RUN — Simulator evidence is not device evidence |
 | M0 | Secure Enclave hardware qualification | none | DEFERRED / NOT_RUN — physical device required |
 | M0 | Other claimed Full-platform probes | same result artifact platform matrix | NOT_RUN — macOS x86_64, iOS, Linux x86_64/arm64, Windows x86_64, and Pi target unavailable |
@@ -26,7 +28,7 @@
 | M0 | Pico-class Lightweight HIL | physical hardware testing deferred by project owner; future checklist retained in closeout report | DEFERRED — Lightweight production qualification NOT QUALIFIED; release/conformance claim BLOCKED |
 | M0 | Independent security review | Freeze 2.1.1 confirmation | document-level gate passed |
 | M0 | Existing ACP regression compatibility | M0 decision record section 8 | passed twice |
-| M1 | Schema/registry/vectors | not started; M0 gate enforced | pending |
+| M1 | Schema/registry/vectors | M0 conditionally closed; implementation authorized | in progress |
 | M2 | Cross-language models/interfaces | not started; M0 gate enforced | pending |
 | M3 | Enrollment and interop | not started; M0 gate enforced | pending |
 | M4 | Credentials/storage/lifecycle | not started; M0 gate enforced | pending |
@@ -38,3 +40,5 @@
 This file must be expanded with test names, CI run identifiers, hardware reports, and review artifacts as milestones proceed. A blank or narrative claim is not conformance evidence.
 
 ACP Lightweight production release requires successful Pico-class HIL qualification. Deferred status must never be converted to PASS by completion of shared schemas, models, simulations, or later milestones.
+
+A platform may not claim ACP Trust production qualification until its required provider/platform qualification suite passes. iOS production release requires physical-device qualification for every hardware-dependent behavior used by ACP; Secure Enclave use requires separate physical-device qualification.

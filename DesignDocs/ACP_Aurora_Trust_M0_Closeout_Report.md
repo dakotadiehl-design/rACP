@@ -3,7 +3,7 @@
 **Date:** 2026-08-21  
 **Normative baseline:** Candidate Freeze 2.1.1  
 **Directive result:** Work Items 1–4 complete  
-**Milestone result:** BLOCKED — M1 remains closed because non-hardware Full-platform probes remain `NOT_RUN`
+**Milestone result:** CONDITIONALLY CLOSED — M1 shared protocol development authorized; deferred platform/hardware gates remain unqualified
 
 ## 1. Security golden vectors — PASS
 
@@ -125,6 +125,9 @@ qualification. Desktop/provider simulation and shared M1 models cannot satisfy
 or automatically clear this permanent release gate.
 
 Candidate Freeze 2.1.1 is frozen and independently reviewed, and closeout Work
-Items 1–4 are complete on the available host. The missing Full-platform evidence
-is a non-hardware gate, so the conditional-close directive does not authorize
-deferring it alongside Pico HIL. M0 remains blocked and M1 remains closed.
+Items 1–4 are complete. By project-owner directive, missing platform-specific
+release evidence is deferred without being converted to PASS. The incomplete
+iOS Simulator identity-policy and authenticated-network matrices are moved into
+M1 as mandatory exit criteria because they require the M1 adapter. M0 is
+conditionally closed for development and M1 is authorized; no production or
+Lightweight conformance claim follows.
