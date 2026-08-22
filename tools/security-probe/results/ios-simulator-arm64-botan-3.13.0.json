@@ -1,0 +1,100 @@
+{
+  "freeze": "2.1.1",
+  "generated_at": "2026-08-21T21:03:36.901824+00:00",
+  "host": {
+    "machine": "arm64",
+    "release": "25.5.0",
+    "swift": "6.3.3",
+    "system": "Darwin",
+    "xcode": "26.6 (17F113)"
+  },
+  "ios_physical_device_full_profile": "NOT_RUN",
+  "ios_simulator_full_profile_functional_qualified": false,
+  "probes": [
+    {
+      "detail": "{\"spake2p\":true,\"sha256\":true,\"hmac_sha256\":true,\"hkdf_sha256\":true,\"rfc9383_appendix_c\":true,\"share_size\":65,\"verifier_message_size\":97,\"confirm_size\":32,\"shared_size\":32,\"pre_confirmation_rejected\":true,\"bad_confirmation_rejected\":true}",
+      "id": "botan.spake_hash_kdf",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.mutual_auth",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.peer_evidence",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.exporter",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.no_resumption_0rtt",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "17 sets; 31 artifact hashes; Freeze 2.1.1",
+      "id": "vectors.security",
+      "status": "PASS"
+    },
+    {
+      "detail": "generate/sign/verify/wrong-key; 65-byte uncompressed public point and DER signature",
+      "id": "cryptokit.p256",
+      "status": "PASS"
+    },
+    {
+      "detail": "generic-password create failed OSStatus=-34018; spawn-only harness lacks an application entitlement context",
+      "id": "keychain.functional",
+      "status": "FAIL"
+    },
+    {
+      "detail": "Simulator Botan TLS validates the isolated chain; complete SAN/domain/node/EKU/time/revocation adapter is not implemented before M1",
+      "id": "x509.acp_identity_policy",
+      "mandatory": true,
+      "status": "NOT_RUN"
+    },
+    {
+      "detail": "wrong-CA/domain/node/credential network adapter cases are not implemented before M1",
+      "id": "network.negative_tls",
+      "mandatory": true,
+      "status": "NOT_RUN"
+    },
+    {
+      "detail": "no app-hosted Bonjour qualification target; existing discovery contract remains unauthenticated",
+      "id": "bonjour.trust_metadata",
+      "mandatory": false,
+      "status": "NOT_RUN"
+    },
+    {
+      "detail": "physical-device-only; Simulator software behavior is not evidence",
+      "id": "secure_enclave.hardware",
+      "mandatory": false,
+      "status": "NOT_RUN"
+    }
+  ],
+  "provider": {
+    "linkage": "static",
+    "name": "Botan",
+    "sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk",
+    "target": "arm64-apple-ios16.0-simulator",
+    "version": "3.13.0"
+  },
+  "schema_version": 1,
+  "secure_enclave_hardware": "NOT_RUN",
+  "target": {
+    "architecture": "arm64",
+    "device": "iPhone 17 Pro",
+    "environment": "iOS Simulator",
+    "runtime": "iOS 26.5",
+    "udid": "77ECEA1C-12A5-44CF-9AF7-3575B2AF692A"
+  }
+}

@@ -2,12 +2,12 @@
 
 **Review:** `ACP_Aurora_Trust_M0_Independent_Review.md`
 **Reviewed candidate:** Candidate Freeze 1
-**Remediated candidate:** `docs/SECURITY.md` Candidate Freeze 2.1
-**Status:** Freeze 2 received CONDITIONAL GO; Freeze 2.1 addresses its residual findings and awaits independent confirmation
+**Remediated candidate:** `docs/SECURITY.md` Candidate Freeze 2.1.1
+**Status:** Freeze 2.1.1 received independent document-level GO; external M0 evidence remains outstanding
 
 This record tracks disposition of the supplied NO-GO review. A documentation change is not proof that the construction is secure or supported on target hardware.
 
-| Finding | Disposition carried into Candidate Freeze 2.1 |
+| Finding | Disposition carried into Candidate Freeze 2.1.1 |
 |---|---|
 | AT-M0-001 | Fixed uncompressed 65-byte SEC1 shares and RFC transcript point encoding. |
 | AT-M0-002 | Defined binary-safe registration bytes, both identities, UUID order, salt, output split/reduction, and context exclusion from registration. |
@@ -41,13 +41,12 @@ This record tracks disposition of the supplied NO-GO review. A documentation cha
 | AT-M0-030 | Unified confirmation/transcript/tag failures behind one external authentication error. |
 | AT-M0-031 | Reduced backdating to two minutes, fixed total skew, required monotonic enrollment deadlines, and allowed only protected commissioner time to initialize a checkpoint. |
 
-## Remaining evidence before GO
+## Remaining evidence before M0 completion
 
-1. Independent confirmation must issue GO with no BLOCKER/HIGH findings against Candidate Freeze 2.1.
-2. ACP golden vectors must prove registration, RFC shares, transcript, key schedule, AEAD, identifiers, credentials, revocation, and Lightweight finished binding.
-3. Provider probes must pass on every supported Full platform.
-4. Representative Pico-class HIL must prove the Lightweight provider, entropy, RPK, bounds, timing, and transactional storage.
-5. Project owner must approve provider licenses and the ongoing security-update policy.
+1. ACP golden vectors must prove registration, RFC shares, transcript, key schedule, AEAD, identifiers, credentials, revocation, and Lightweight finished binding.
+2. Provider probes must pass on every supported Full platform.
+3. Representative Pico-class HIL must prove the Lightweight provider, entropy, RPK, bounds, timing, and transactional storage.
+4. Project owner must approve provider licenses and the ongoing security-update policy.
 
 M1 remains closed until the M0 execution contract's exit gate is satisfied. Vector format/tooling may be reviewed as M0 evidence, but production schemas and SDK Trust behavior must not begin early.
 
@@ -65,3 +64,20 @@ M1 remains closed until the M0 execution contract's exit gate is satisfied. Vect
 | AT-M0-039 | Replaced the stale 24-character display example with a 26-character example. |
 | AT-M0-040 | Assigned candidate/commissioner confirmation keys to the install result and terminal receipt; prohibited ad hoc reuse. |
 | AT-M0-041 | Required Lightweight to advertise RAW128 only. |
+
+## Freeze 2.1 CONDITIONAL GO dispositions
+
+| Finding | Freeze 2.1.1 disposition |
+|---|---|
+| AT-M0-042 | Defined the exact install-result map and storage-posture submap, fixed HMAC omission semantics, and prohibited a commissioner receipt in version 1. |
+| AT-M0-043 | Fixed compact format literal, uint64 serial, and role-constraint uniqueness/sort/bounds. |
+| AT-M0-044 | Clarified that state-specific LightweightBinding legality overrides the global pre-Established list. |
+
+## Freeze 2.1.1 independent confirmation
+
+`ACP_Aurora_Trust_M0_Independent_Review_Freeze211.md` issued document-level GO, closed AT-M0-042 through AT-M0-044, and found no new BLOCKER or HIGH issue. It recorded two non-blocking LOW follow-ups:
+
+| Finding | Disposition |
+|---|---|
+| AT-M0-045 | Preserve for M4 policy: production rejects `ephemeral`; implementations must prevent contradictory hardware-backed posture claims. |
+| AT-M0-046 | Preserve for M1 schema work: compact-extension keys must be pinned to dotted numeric OIDs. |

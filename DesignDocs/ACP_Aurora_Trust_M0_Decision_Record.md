@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-21
 **Milestone:** M0 — Security profile freeze
-**Status:** BLOCKED at exit gate; Candidate Freeze 2.1 remediates supplied CONDITIONAL GO findings and awaits independent confirmation plus provider/hardware proof
+**Status:** BLOCKED at exit gate; Candidate Freeze 2.1.1, vectors, current-host provider probes, owner approval, and Rust MSRV proof pass, but required non-hardware platform adapters and Lightweight hardware proof remain open
 
 ## 1. Work completed
 
@@ -14,7 +14,7 @@
 - Proposed a bounded Lightweight construction using TLS 1.3 mutual Raw Public Keys plus signed compact credentials.
 - Fixed a signed deterministic-CBOR revocation snapshot/delta model, explicit offline policy, clock states, and authority-recovery identity rule.
 
-Candidate Freeze 1 received an independent NO-GO in `ACP_Aurora_Trust_M0_Independent_Review.md`. Candidate Freeze 2 addressed its 31 findings and received CONDITIONAL GO in `ACP_Aurora_Trust_M0_Independent_Review_Freeze2.md`. Candidate Freeze 2.1 addresses that review's residual AT-M0-032 through AT-M0-041 findings. These decisions remain a review candidate; textual remediation is not evidence that the profile is secure or deployable.
+Candidate Freeze 1 received independent NO-GO. Freeze 2 addressed its findings and received CONDITIONAL GO. Freeze 2.1 addressed the residuals and received CONDITIONAL GO in `ACP_Aurora_Trust_M0_Independent_Review_Freeze21.md` because its confirmation-key assignment introduced AT-M0-042. Freeze 2.1.1 closes AT-M0-042 through AT-M0-044 and received independent document-level GO in `ACP_Aurora_Trust_M0_Independent_Review_Freeze211.md`, with no BLOCKER or HIGH findings. That GO establishes internal profile coherence; it is not evidence that providers or target hardware can implement the profile safely.
 
 ## 2. Provider qualification findings
 
@@ -84,19 +84,18 @@ Qualification is incomplete:
 | Secure-time policy | `docs/SECURITY.md` section 12 | candidate specified; hardware proof missing |
 | Authority recovery | `docs/SECURITY.md` section 13 | candidate specified |
 | SAS assets/mapping | Deferred from version 1; capability MUST NOT be advertised | closed by scope decision |
-| Provider versions/licenses/platform support | Sections 2–3 of this record | incomplete |
-| Provider capability probes on representative targets | Not available/implemented | failed |
-| Independent cryptographic/security review | No independent reviewer or review artifact supplied | failed |
+| Provider versions/licenses/platform support | Provider approval package and probe result | technical package complete; owner decision and remaining adapters open |
+| Provider capability probes on representative targets | `tools/security-probe/` and machine-readable macOS arm64 result | Botan crypto profile and macOS arm64 PASS; remaining Full platforms NOT_RUN |
+| Independent cryptographic/security review | `ACP_Aurora_Trust_M0_Independent_Review_Freeze211.md` | document-level GO; passed |
+| Rust 1.75 production workspace | `ACP_Aurora_Trust_M0_Rust_1.75_Qualification.md` | PASS; exact toolchain and locked graph tested |
 
 ## 5. Blocking conditions
 
 M0 cannot pass, and M1 MUST NOT begin under the approved execution contract, until all of the following occur:
 
-1. An independent cryptography/security reviewer confirms Candidate Freeze 2.1 and issues GO with no unresolved BLOCKER/HIGH findings, specifically covering AT-M0-032 through AT-M0-038 remediation and absence of newly introduced HIGH findings.
-2. A production provider is selected and pinned for each target class, with license approval and a supported security-update policy.
-3. Capability probes demonstrate RFC 9383 vector parity, P-256 signing, AES-GCM, TLS 1.3 mutual authentication, peer evidence, and exporter access on every Full target.
-4. A representative Pico-class target demonstrates CSPRNG readiness, RFC 9383 behavior, TLS 1.3 Raw Public Key mutual authentication, bounded memory/flash/time, and protected transactional storage—or the Lightweight profile is revised and reviewed.
-5. The project's Rust minimum version is reconciled with any selected Rust-native dependency.
+1. Capability probes demonstrate RFC 9383 vector parity, P-256 signing, AES-GCM, TLS 1.3 mutual authentication, peer evidence, and exporter access on every supported/shipping Full target.
+2. Every future production Trust/provider Rust feature combination is added to the MSRV matrix before it ships; the current production workspace is qualified on exact Rust 1.75.
+3. A representative Pico-class target demonstrates CSPRNG readiness, RFC 9383 behavior, TLS 1.3 Raw Public Key mutual authentication, bounded memory/flash/time, and protected transactional storage—or the Lightweight profile is revised and reviewed.
 
 ## 6. Required follow-up evidence
 
@@ -109,7 +108,7 @@ M0 cannot pass, and M1 MUST NOT begin under the approved execution contract, unt
 
 ## 7. Gate decision
 
-**Decision: M0 remains blocked.** Candidate Freeze 2 received CONDITIONAL GO and Candidate Freeze 2.1 incorporates its bounded remediation, but the milestone exit gate requires independent GO confirmation and target validation. Advancing to M1 now would violate the approved milestone-order contract.
+**Decision: M0 remains blocked.** Candidate Freeze 2.1.1, security vectors, the Botan crypto profile, the macOS arm64 adapter, bounded project-owner provider/license/update approval, and the current Rust 1.75 workspace have evidence-backed PASS results. The repository still defines Full-platform tests for iOS, Linux, Windows, Raspberry Pi architecture, and additional runtime/language combinations, while those adapters remain `NOT_RUN` or blocked. The conditional-transition directive permits deferring only physical Pico HIL, not these non-hardware Full adapters. Advancing to M1 now would violate that directive.
 
 ## 8. Regression and review evidence
 
@@ -135,8 +134,10 @@ Review covered profile consistency, cross-language determinism requirements, dow
 
 The working tree already contained unrelated user changes before this milestone. They were preserved and were not attributed to Aurora Trust M0.
 
-### Candidate Freeze 2/2.1 remediation regression
+### Candidate Freeze 2/2.1/2.1.1 remediation regression
 
 After applying the independent NO-GO findings to Candidate Freeze 2, the complete available regression set passed again: registry 93 messages; Python 142 tests at 81.41% coverage; Rust 25 unit tests plus doc tests; Swift 75 tests; both Python WebSocket interop suites; Python/Rust and Python/Swift HELLO, session, Remote, and negative framed suites in JSON and CBOR; and Rust/Swift session interop in JSON and CBOR. These results prove preservation of existing ACP behavior only. They do not prove the new cryptographic profile, provider support, or Pico behavior.
 
 After applying Candidate Freeze 2's CONDITIONAL GO findings to Freeze 2.1, the same complete available regression set passed with identical counts and coverage, including all WebSocket/framed interop suites and `git diff --check`. This remains compatibility evidence only; the required security vectors, provider probes, HIL, and independent GO confirmation are separate gates.
+
+After applying the Freeze 2.1 review dispositions to Candidate Freeze 2.1.1, the complete available regression set passed again: registry validation covered 93 messages; Python reported 142 passing tests at 81.41% coverage; Rust reported 25 passing unit tests plus documentation tests; Swift reported 75 passing tests; and every WebSocket/framed interop suite passed, including Swift remote/negative and Rust-Swift session exchange in CBOR and JSON. `git diff --check` also passed. This is regression evidence, not a substitute for the outstanding M0 security gates.

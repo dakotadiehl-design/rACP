@@ -15,7 +15,7 @@ jobs:
           python-version: "3.11"
       - name: Install and test
         run: |
-          python3 -m pip install -e './python[dev]'
+          python3 -m pip install -e './python[dev,security-vectors]'
           python3 -m ruff check --config python/pyproject.toml python scripts
           (cd python && python3 -m mypy src/acp)
           (cd python && python3 -m pytest tests --cov=acp --cov-fail-under=70)
@@ -23,6 +23,9 @@ jobs:
         run: |
           python3 scripts/check_registry.py
           python3 scripts/freeze_vectors.py
+          python3 scripts/security_vectors.py --write
+          python3 scripts/security_vectors.py
+          git diff --exit-code -- vectors/security
       - name: Localhost WebSocket HELLO
         run: python3 tests/interop/test_ws_hello.py
       - name: Localhost WebSocket Remote
@@ -62,6 +65,20 @@ jobs:
       - name: rustfmt
         working-directory: rust
         run: cargo fmt -- --check
+
+  rust-msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - name: Prove declared Rust 1.75 MSRV
+        working-directory: rust
+        run: |
+          rustc --version | grep '^rustc 1\.75\.0 '
+          cargo --version | grep '^cargo 1\.75\.0 '
+          cargo check --workspace --locked
+          cargo test --workspace --locked
+          cargo check --workspace --all-targets --locked
 
   framed-python-rust-hello:
     runs-on: ubuntu-latest

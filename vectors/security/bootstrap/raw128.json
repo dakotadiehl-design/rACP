@@ -1,0 +1,35 @@
+{
+  "accepted_transform_example": "00-0G 40R4 0M30 E209 185G R38E1W",
+  "cases": [
+    {
+      "human": "00000000000000000000000000",
+      "id": 0,
+      "raw_hex": "00000000000000000000000000000000",
+      "synthetic_secret": true
+    },
+    {
+      "human": "00ZY07Y0820C20A1G7104GM2RC",
+      "id": 1,
+      "raw_hex": "00ff807f0102030405060708090a0b0c",
+      "synthetic_secret": true
+    },
+    {
+      "human": "7ZZZZZZZZZZZZZZZZZZZZZZZZZ",
+      "id": 2,
+      "raw_hex": "ffffffffffffffffffffffffffffffff",
+      "synthetic_secret": true
+    },
+    {
+      "human": "55MPJTB9D5MPJTB9D5MPJTB9D5",
+      "id": 3,
+      "raw_hex": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5",
+      "synthetic_secret": true
+    }
+  ],
+  "rejections": [
+    "I0000000000000000000000000",
+    "O0000000000000000000000000",
+    "80000000000000000000000000",
+    "0000"
+  ]
+}

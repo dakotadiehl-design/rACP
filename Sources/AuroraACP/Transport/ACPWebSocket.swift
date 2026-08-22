@@ -144,8 +144,8 @@ public actor ACPWebSocketListener {
         params.defaultProtocolStack.applicationProtocols.insert(ws, at: 0)
         let nwPort = NWEndpoint.Port(rawValue: port)!
         if loopbackOnly {
-            // Bind 127.0.0.1 so "This Mac only" is a real local socket, not ACPLoopback.
-            params.acceptLocalOnly = true
+            // The required IPv4 loopback endpoint itself confines the listener.
+            // Combining it with acceptLocalOnly resets WebSocket upgrades on iOS Simulator.
             params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: nwPort)
             listener = try NWListener(using: params)
         } else {

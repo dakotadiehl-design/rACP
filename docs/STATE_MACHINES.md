@@ -19,7 +19,7 @@ Closed → Connecting → HelloSent → Established → GoodbyeSent → Closed
 Established → Reconnecting → HelloSent   # fresh session_id; sequence restarts at 1
 ```
 
-Only `session.hello`, `session.hello_ack`, handshake `error.report`, discovery types, and the Aurora Trust enrollment allowlist below are legal before Established. After Established, `session_id` and `sequence` are required.
+Only `session.hello`, `session.hello_ack`, handshake `error.report`, discovery types, the Aurora Trust enrollment allowlist, and the state-specific Lightweight binding message below are legal before Established. The tighter rules of `EnrollmentRestricted` and `LightweightBinding` override this global list. After Established, `session_id` and `sequence` are required.
 
 Aurora Trust adds a restricted enrollment pre-session state:
 

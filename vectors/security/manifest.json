@@ -1,0 +1,175 @@
+{
+  "files_sha256": {
+    "approval/primary.json": "3d6c36e517f7e02d10c478a0f3c185993936a4bc856430d7b064f18f8e825585",
+    "bootstrap/raw128.json": "89fd83bff8be8335d1802a3473965664bd34bf766d9edf8e49996e56b392b1e6",
+    "compact_credential/primary.cbor": "df742e543f19926ac10607c0302facaab2f3576965e244324fd37d5d2acc2168",
+    "compact_credential/primary.hex": "ad59980592c18ce1f0c39f3403649b882f883163f071e6389dd11b3d661427c8",
+    "compact_credential/primary.json": "b6918bf7bc8990551208db7c81f79eb46b28b01e51128e2331a1f0b90c265fcb",
+    "context/primary.cbor": "5236d0f7af47b5953368218918e49f65e023f548119b3b12a132d973c1e8a1c9",
+    "context/primary.hex": "ff227cdf341cb9fbc78c8b9e8c1d54007c28206a754f5ccfca28746420868b4a",
+    "context/primary.json": "3f6689923448f1be14218a00a0e427c3e160bb19aaf7ff4776ba621ec97a50fd",
+    "hello_binding/primary.cbor": "a6b1396ca5417bbd0ac7f680577ed824ad007d784a784cd156b13b0b9c0d0cb9",
+    "hello_binding/primary.hex": "4c38a95d07f6498e1218958d266669ca4fa661b95f2cf07198b56fa1c8f26e31",
+    "hello_binding/primary.json": "3f8e224ce4b897f8d12c10d82ebf724a70240ce50b4dcde9b59c79b05e85017e",
+    "identity/p256_primary.json": "4c72cfb42fc90c4e88cdf3290141efb9bee3ecd58a52fb963636f32997472dd4",
+    "identity/uuid_encodings.json": "3f6997de72d733db35d7a226ff439943738bcdcbccb84de5f2ff424abe2db842",
+    "installation/primary.cbor": "d5ad9e4d2407b7f64b5a7b2df217e8e11373d3ef4b056e7aaac648c2f26e7172",
+    "installation/primary.hex": "75e282865e7e873bd27f9549e06e525884943e2973f8f440555473e552ab0faf",
+    "installation/primary.json": "b1610ace52b8d01f3540aa7ee136fdc84ddc5a7dce386c3dcecbb0a88bfd74d3",
+    "key_schedule/primary.json": "f584252cc290f4aea8ccee1019e89fb0ae2836f2b91645d6b4f5920ace272916",
+    "negative/mutations.json": "31e32ea662234217496fbef7f1aef3f7127429ce7aac1d44afe3d8f54d34df5d",
+    "permissions/empty_v1.cbor": "c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0",
+    "permissions/empty_v1.hex": "1067d7695f0b3d77aa079a53abc12cd5bc18cb6525d88466f96b0223ce50000e",
+    "permissions/empty_v1.json": "8262770fc2ad9b53d9d9b2b6eb43ea0cae85af7122cecac188eeacf0614933f3",
+    "registration/raw128_primary.json": "20d9175b6a5ec421a8a4f9916fcc793cdeaf1cd1382597c345748f220d783edd",
+    "revocation/snapshot_epoch_7.cbor": "6e9c45270efb45353833e1b3ec1726d26823ffa9116b090fa3aba53e0132a564",
+    "revocation/snapshot_epoch_7.hex": "a3f1a481c734c176e5996014de028840718ddfe1be5f20a1ffed8b2f5622e6f3",
+    "revocation/snapshot_epoch_7.json": "4cf0037a59c1673b8ab63c648f9e0cc89d3e5ab468b411229a3402eaddf1fe8d",
+    "spake2p/acp_raw128_online.json": "3ef7726b76fa7b51a8918afc40fbe3ac6b71adf08ead1eaa389e0494be70fe3e",
+    "spake2p/rfc9383_appendix_c_p256_sha256.json": "5c9804977c3973e7e676cbf131735a013fe9abbbddea9e38906fbadc0694f30f",
+    "transcript/primary.cbor": "1713be11b1b0ef86de03b3eca4dbc6d1ae1309f4dda0b0c842b9e9b442b673ba",
+    "transcript/primary.hex": "ce7e67056e268cc44b2eff8c7c35dbf33eb07eb15dbc6a06d33d0d6a304da510",
+    "transcript/primary.json": "23b28e546723918974b07c8d7dc7de6a32771dfa21c2d475a5acc837f010e75a",
+    "x509/full_profile.json": "31c9a75c8d6a43f6da5e4bca9d880be2c6a65a627108443ee4042119455e935a"
+  },
+  "freeze": "2.1.1",
+  "normative": true,
+  "profile": "ACP-Aurora-Trust-1.0-Candidate-Freeze-2.1.1",
+  "provider_independent": true,
+  "synthetic_test_material_only": true,
+  "vectors": [
+    {
+      "category": "bootstrap",
+      "id": "bootstrap.raw128",
+      "outputs": [
+        "bootstrap/raw128.json"
+      ]
+    },
+    {
+      "category": "identity",
+      "id": "identity.uuid_encodings",
+      "outputs": [
+        "identity/uuid_encodings.json"
+      ]
+    },
+    {
+      "category": "registration",
+      "id": "registration.raw128_primary",
+      "outputs": [
+        "registration/raw128_primary.json"
+      ]
+    },
+    {
+      "category": "spake2p",
+      "id": "spake2p.acp_raw128_online",
+      "outputs": [
+        "spake2p/acp_raw128_online.json"
+      ]
+    },
+    {
+      "category": "spake2p",
+      "id": "spake2p.rfc9383_appendix_c_p256_sha256",
+      "outputs": [
+        "spake2p/rfc9383_appendix_c_p256_sha256.json"
+      ]
+    },
+    {
+      "category": "context",
+      "id": "context.primary",
+      "outputs": [
+        "context/primary.json",
+        "context/primary.cbor",
+        "context/primary.hex"
+      ]
+    },
+    {
+      "category": "permissions",
+      "id": "permissions.empty_v1",
+      "outputs": [
+        "permissions/empty_v1.json",
+        "permissions/empty_v1.cbor",
+        "permissions/empty_v1.hex"
+      ]
+    },
+    {
+      "category": "transcript",
+      "id": "transcript.primary",
+      "outputs": [
+        "transcript/primary.json",
+        "transcript/primary.cbor",
+        "transcript/primary.hex"
+      ]
+    },
+    {
+      "category": "key_schedule",
+      "id": "key_schedule.primary",
+      "outputs": [
+        "key_schedule/primary.json"
+      ]
+    },
+    {
+      "category": "approval",
+      "id": "approval.primary",
+      "outputs": [
+        "approval/primary.json"
+      ]
+    },
+    {
+      "category": "installation",
+      "id": "installation.primary",
+      "outputs": [
+        "installation/primary.json",
+        "installation/primary.cbor",
+        "installation/primary.hex"
+      ]
+    },
+    {
+      "category": "identity",
+      "id": "identity.p256_primary",
+      "outputs": [
+        "identity/p256_primary.json"
+      ]
+    },
+    {
+      "category": "x509",
+      "id": "x509.full_profile",
+      "outputs": [
+        "x509/full_profile.json"
+      ]
+    },
+    {
+      "category": "hello_binding",
+      "id": "hello_binding.primary",
+      "outputs": [
+        "hello_binding/primary.json",
+        "hello_binding/primary.cbor",
+        "hello_binding/primary.hex"
+      ]
+    },
+    {
+      "category": "compact_credential",
+      "id": "compact_credential.primary",
+      "outputs": [
+        "compact_credential/primary.json",
+        "compact_credential/primary.cbor",
+        "compact_credential/primary.hex"
+      ]
+    },
+    {
+      "category": "revocation",
+      "id": "revocation.snapshot_epoch_7",
+      "outputs": [
+        "revocation/snapshot_epoch_7.json",
+        "revocation/snapshot_epoch_7.cbor",
+        "revocation/snapshot_epoch_7.hex"
+      ]
+    },
+    {
+      "category": "negative",
+      "id": "negative.mutations",
+      "outputs": [
+        "negative/mutations.json"
+      ]
+    }
+  ]
+}

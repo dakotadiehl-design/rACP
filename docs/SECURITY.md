@@ -1,6 +1,6 @@
 # ACP 1.2 Aurora Trust Security Profile
 
-**Status:** Candidate Freeze 2.1 — CONDITIONAL GO remediation; independent confirmation and target qualification required
+**Status:** Candidate Freeze 2.1.1 — independent document-level GO; execution qualification required
 **Extension version:** 1.0
 **Source design:** `DesignDocs/ACP_Aurora_Trust_Authentication_Implementation_Design.md`
 
@@ -14,7 +14,7 @@ The authenticated device principal and current human/operator/participant assign
 
 ## 2. Mandatory algorithms
 
-| Purpose | Candidate Freeze 2.1 choice |
+| Purpose | Candidate Freeze 2.1.1 choice |
 |---|---|
 | Enrollment PAKE | RFC 9383 SPAKE2+, `P256-SHA256-HKDF-HMAC-SHA256` |
 | Identity signature | ECDSA P-256 with SHA-256 |
@@ -150,7 +150,7 @@ audit_key = HKDF-Expand(enrollment_root,
 
 `HKDF-Extract` and `HKDF-Expand` mean RFC 5869 operations. Expand uses the UTF-8 label directly as `info`, without NUL or length prefix, and `L=32`; TLS `HKDF-Expand-Label` and a second Extract are forbidden. The two ACP confirmation keys authenticate later ACP ceremony messages after RFC confirmation; they do not replace it.
 
-`candidate_confirm` authenticates the deterministic-CBOR `security.enrollment.install_result` payload excluding its `confirmation` field: `confirmation = HMAC-SHA-256(candidate_confirm, install_result_cbor_without_confirmation)`. The ECDSA proof remains mandatory. `commissioner_confirm` authenticates a terminal commissioner receipt over the same payload plus its verified disposition. Neither key may be reused for another message or an ad hoc extension.
+`candidate_confirm` authenticates the closed deterministic-CBOR `security.enrollment.install_result` payload defined in section 6, excluding its `confirmation` field: `confirmation = HMAC-SHA-256(candidate_confirm, install_result_cbor_without_confirmation)`. The ECDSA proof remains mandatory. `commissioner_confirm` is reserved for a future reviewed extension and MUST NOT authenticate or cause any wire message in version 1. There is no commissioner receipt in version 1; enrollment completes after the commissioner verifies install result, HMAC, proof of possession, and one-time attempt state. Neither key may be reused for another message or an ad hoc extension.
 
 ## 6. Protected approval
 
@@ -188,7 +188,20 @@ UUIDs in plaintext/AAD are canonical text and `transcript_hash` is a 32-byte byt
 
 Confirmation, transcript, decryption, or tag failure returns the same externally generic `security.authentication_failed`, consumes the attempt, and records a locally precise redacted audit code.
 
-`credential_id_ascii` is UTF-8 encoding of exactly `sha256:` followed by 64 lowercase hexadecimal digits. `security.enrollment.install_result` contains the installed IDs, `confirmation`, and `proof_of_possession`, a low-S DER ECDSA-P256-SHA256 signature over `SHA-256(UTF8("ACP enrollment install proof v1") || transcript_hash || credential_id_ascii)`. The commissioner verifies both confirmation and signature with the exact staged identity key and accepts it once per attempt only after the candidate durably commits and reads back the credential.
+`credential_id_ascii` is UTF-8 encoding of exactly `sha256:` followed by 64 lowercase hexadecimal digits. `security.enrollment.install_result` is a closed deterministic-CBOR map with no extra or null fields:
+
+```text
+attempt_id             canonical lowercase UUID text
+status                 literal "installed"
+credential_id          sha256 identifier
+identity_key_id        sha256 identifier
+trust_domain_id        canonical lowercase UUID text
+storage_posture        closed map described below
+proof_of_possession    byte string containing low-S strict DER ECDSA
+confirmation           32-byte HMAC byte string
+```
+
+`storage_posture` contains exactly `class`, `hardware_backed`, and `private_key_exportable`. `class` is one of `hardware_backed`, `os_protected`, `encrypted_file`, `protected_flash`, `plain_file`, or `ephemeral`; the other fields are booleans. The HMAC input is deterministic CBOR of the install-result map with `confirmation` absent, not null or empty. `proof_of_possession` is ECDSA-P256-SHA256 over `SHA-256(UTF8("ACP enrollment install proof v1") || transcript_hash || credential_id_ascii)`. The commissioner verifies HMAC and signature with the exact staged identity key and accepts the map once per attempt only after the candidate durably commits and reads back the credential. Any other status uses an externally generic authenticated failure response, not this success map.
 
 ## 7. Persistent identifiers
 
@@ -241,11 +254,11 @@ Lightweight uses TLS 1.3 mutual Raw Public Key authentication under RFC 7250 wit
 5. `binding = HMAC-SHA-256(finished_key, finished_context)`, where `finished_key` is 32-byte TLS exporter output using label `EXPORTER-Aurora-ACP-1.2-LIGHTWEIGHT-FINISHED` and context `SHA-256(finished_context)`. `finished_context` is deterministic CBOR of `[UTF8("ACP lightweight finished v1"), client_credential_bytes, server_credential_bytes, client_der_spki, server_der_spki, client_node_id, server_node_id, trust_domain_id]` in TLS client/server order. SPKIs are the canonical DER SubjectPublicKeyInfo bytes used by `identity_public_key`; IDs are canonical lowercase UUID text.
 6. Each peer verifies the HMAC in constant time and requires payload credential IDs, node IDs, trust-domain ID, compact-credential bodies, TLS RPKs, and finished-context values to agree exactly. Any mismatch is `security.authentication_failed`. Later HELLO must repeat the same node/domain/key/credential identity. Ordinary ACP messages are illegal until both finished messages succeed.
 
-The compact credential is a signed deterministic-CBOR object `{body, algorithm, signature}` with no extra or null fields. `body` is a nested closed map, not a byte string. It contains `format`, `serial`, `trust_domain_id`, `node_id`, `identity_algorithm`, `identity_public_key`, `role_constraints`, `permission_policy_id`, `issued_at`, `not_before`, `expires_at`, `issuer_key_id`, and `extensions`. `identity_public_key` is canonical DER SPKI. Times use CBOR tag 0. `extensions` is a map from text OID/name to `{critical: bool, value: bstr}`; unknown critical entries reject. Signature algorithm is `ecdsa_p256_sha256`; signature is low-S strict DER ECDSA over `SHA-256(UTF8("ACP compact credential v1") || body_cbor)`. `credential_id` hashes deterministic CDE of the complete outer object containing the nested body, algorithm, and signature.
+The compact credential is a signed deterministic-CBOR object `{body, algorithm, signature}` with no extra or null fields. `body` is a nested closed map, not a byte string. It contains `format`, `serial`, `trust_domain_id`, `node_id`, `identity_algorithm`, `identity_public_key`, `role_constraints`, `permission_policy_id`, `issued_at`, `not_before`, `expires_at`, `issuer_key_id`, and `extensions`. `format` is the literal `acp-compact-credential-v1`; `serial` is uint64; `role_constraints` is a sorted, unique array of 0..16 UTF-8 strings of 1..64 bytes, sorted by encoded UTF-8 bytes. `identity_public_key` is canonical DER SPKI. Times use CBOR tag 0. `extensions` is a map from text OID/name to `{critical: bool, value: bstr}`; unknown critical entries reject. Signature algorithm is `ecdsa_p256_sha256`; signature is low-S strict DER ECDSA over `SHA-256(UTF8("ACP compact credential v1") || body_cbor)`. `credential_id` hashes deterministic CDE of the complete outer object containing the nested body, algorithm, and signature.
 
 TLS 1.3 0-RTT and resumption are disabled. Maximum preface/credential size is 2 KiB; maximum security message is 8 KiB; nesting is 8; collection elements are 64; concurrent enrollment attempts are 1; active credentials are 2 during rotation. If Raw Public Key support or these bounds cannot be demonstrated on the target stack, that target is nonconforming and may not substitute a custom or unauthenticated channel.
 
-This byte contract remains Candidate Freeze 2.1 until representative Pico-class hardware demonstrates CSPRNG readiness, bounded RAM/flash/time, Raw Public Key mutual authentication, and transactional protected storage, and an independent reviewer approves the composition.
+This byte contract remains Candidate Freeze 2.1.1 until representative Pico-class hardware demonstrates CSPRNG readiness, bounded RAM/flash/time, Raw Public Key mutual authentication, and transactional protected storage, and an independent reviewer approves the composition.
 
 ## 11. Revocation
 

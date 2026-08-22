@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "freeze": "2.1.1",
+  "environment": {
+    "xcode": "26.6 (17F113)",
+    "swift": "6.3.3",
+    "runtime": "iOS 26.5 (23F77)",
+    "device": "iPhone 17 Pro",
+    "architecture": "arm64"
+  },
+  "provider": {
+    "name": "Botan",
+    "version": "3.13.0",
+    "target": "arm64-apple-ios16.0-simulator",
+    "linkage": "static"
+  },
+  "preserves_initial_result": "ios-simulator-arm64-botan-3.13.0.json",
+  "probes": [
+    {"id": "security_vectors", "status": "PASS", "detail": "17 sets; 31 artifact hashes"},
+    {"id": "spake_hash_hmac_hkdf", "status": "PASS", "detail": "Botan Simulator-native probe"},
+    {"id": "tls13_mutual_auth_peer_evidence_exporter", "status": "PASS", "detail": "mutual verified chains; equal 32-byte exporter"},
+    {"id": "tls13_no_resumption_0rtt", "status": "PASS", "detail": "Session_Manager_Noop; zero tickets"},
+    {"id": "cryptokit_p256", "status": "PASS", "detail": "generate/sign/verify/wrong-key"},
+    {"id": "keychain_hosted", "status": "PASS", "detail": "metadata and persistent key-reference lifecycle; duplicate/not-found/wrong-group negatives"},
+    {"id": "websocket_loopback", "status": "PASS", "detail": "76/76 package tests; original two failures pass after binding fix"},
+    {"id": "x509_complete_acp_policy", "status": "NOT_RUN", "detail": "complete production-intended iOS identity/revocation adapter is M1 work"},
+    {"id": "network_identity_negatives", "status": "NOT_RUN", "detail": "requires production-intended M1 adapter and authenticated HELLO contract"},
+    {"id": "secure_enclave_hardware", "status": "NOT_RUN", "detail": "physical-device-only"}
+  ],
+  "ios_simulator_full_profile_functional_qualified": false,
+  "ios_physical_device_full_profile": "NOT_RUN",
+  "secure_enclave_hardware": "NOT_RUN",
+  "secrets_redacted": true
+}

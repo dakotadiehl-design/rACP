@@ -1,0 +1,119 @@
+{
+  "vectors": [
+    {
+      "expected": "FAIL",
+      "id": "wrong-secret",
+      "mutation": "wrong-secret"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-node",
+      "mutation": "wrong-node"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-domain",
+      "mutation": "wrong-domain"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-role",
+      "mutation": "wrong-role"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-instance",
+      "mutation": "wrong-instance"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-key",
+      "mutation": "wrong-key"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-permission-digest",
+      "mutation": "wrong-permission-digest"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-suite",
+      "mutation": "wrong-suite"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-version",
+      "mutation": "wrong-version"
+    },
+    {
+      "expected": "FAIL",
+      "id": "malformed-point",
+      "mutation": "malformed-point"
+    },
+    {
+      "expected": "FAIL",
+      "id": "reflected-confirmation",
+      "mutation": "reflected-confirmation"
+    },
+    {
+      "expected": "FAIL",
+      "id": "replayed-approval",
+      "mutation": "replayed-approval"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-aad",
+      "mutation": "wrong-aad"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-nonce",
+      "mutation": "wrong-nonce"
+    },
+    {
+      "expected": "FAIL",
+      "id": "wrong-tag",
+      "mutation": "wrong-tag"
+    },
+    {
+      "expected": "FAIL",
+      "id": "ciphertext-transplant",
+      "mutation": "ciphertext-transplant"
+    },
+    {
+      "expected": "FAIL",
+      "id": "malformed-credential",
+      "mutation": "malformed-credential"
+    },
+    {
+      "expected": "FAIL",
+      "id": "revoked-credential",
+      "mutation": "revoked-credential"
+    },
+    {
+      "expected": "FAIL",
+      "id": "future-credential",
+      "mutation": "future-credential"
+    },
+    {
+      "expected": "FAIL",
+      "id": "revocation-rollback",
+      "mutation": "revocation-rollback"
+    },
+    {
+      "expected": "FAIL",
+      "id": "invalid-base32",
+      "mutation": "invalid-base32"
+    },
+    {
+      "expected": "FAIL",
+      "id": "null-instead-of-absent",
+      "mutation": "null-instead-of-absent"
+    },
+    {
+      "expected": "FAIL",
+      "id": "unknown-context-field",
+      "mutation": "unknown-context-field"
+    }
+  ]
+}

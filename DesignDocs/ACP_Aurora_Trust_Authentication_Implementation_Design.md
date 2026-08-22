@@ -9,7 +9,7 @@
 
 > **Normative security-profile precedence:** This architecture document is
 > informative where cryptographic bytes are concerned. `docs/SECURITY.md`
-> Candidate Freeze 2.1 supersedes its suite identifiers, registration function,
+> Candidate Freeze 2.1.1 supersedes its suite identifiers, registration function,
 > point encoding, transcript framing, key labels, credential encodings, and
 > transport binding. Implementers must not infer wire bytes from examples here.
 
