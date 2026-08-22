@@ -1,7 +1,7 @@
 # ACP Aurora Trust Conformance Matrix
 
 **Status:** Active evidence index
-**Current gate:** M0 CONDITIONALLY CLOSED; M1 authorized with iOS identity-policy/network qualification as mandatory exit criteria
+**Current gate:** M0 CONDITIONALLY CLOSED; M1 COMPLETE; M2 authorized for development. Platform/hardware release gates remain separate.
 
 | Milestone | Requirement | Evidence | Status |
 |---|---|---|---|
@@ -16,8 +16,8 @@
 | M0 | Botan 3.13.0 crypto-profile probes | `tools/security-probe/results/macos-arm64-botan-3.13.0.json` | PASS — provider capability separated from adapters |
 | M0 | macOS arm64 Full adapter probes | same result artifact | PASS — mutual TLS 1.3, peer evidence, exporter equality, no resumption/tickets, X.509 and revocation |
 | M0 | iOS Simulator M0-applicable functional qualification | initial/remediation results and reports | PASS — vectors/provider/TLS/exporter/P-256/Keychain/WebSocket; 76/76 package tests |
-| M1 | iOS Simulator full ACP X.509 policy matrix | remediation report | M1-DEPENDENT QUALIFICATION — mandatory M1 exit criterion |
-| M1 | iOS Simulator authenticated-network negative suite | remediation report | M1-DEPENDENT QUALIFICATION — mandatory M1 exit criterion |
+| M1 | iOS Simulator full ACP X.509 policy matrix | `tools/security-probe/results/ios-simulator-arm64-botan-3.13.0-m1.json` | PASS — 17 mandatory policy/negative cases |
+| M1 | iOS Simulator authenticated-network negative suite | same result artifact | PASS — 13 mandatory fail-closed cases |
 | M0 | iOS physical-device Full-profile qualification | none | DEFERRED / NOT_RUN — Simulator evidence is not device evidence |
 | M0 | Secure Enclave hardware qualification | none | DEFERRED / NOT_RUN — physical device required |
 | M0 | Other claimed Full-platform probes | same result artifact platform matrix | NOT_RUN — macOS x86_64, iOS, Linux x86_64/arm64, Windows x86_64, and Pi target unavailable |
@@ -28,7 +28,7 @@
 | M0 | Pico-class Lightweight HIL | physical hardware testing deferred by project owner; future checklist retained in closeout report | DEFERRED — Lightweight production qualification NOT QUALIFIED; release/conformance claim BLOCKED |
 | M0 | Independent security review | Freeze 2.1.1 confirmation | document-level gate passed |
 | M0 | Existing ACP regression compatibility | M0 decision record section 8 | passed twice |
-| M1 | Schema/registry/vectors | M0 conditionally closed; implementation authorized | in progress |
+| M1 | Schema/registry/vectors | 109-message registry; 109 JSON/CBOR vectors; 17-set/31-artifact security corpus | PASS |
 | M2 | Cross-language models/interfaces | not started; M0 gate enforced | pending |
 | M3 | Enrollment and interop | not started; M0 gate enforced | pending |
 | M4 | Credentials/storage/lifecycle | not started; M0 gate enforced | pending |

@@ -1,0 +1,282 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.invalid/acp/schema/security/messages.schema.json",
+  "title": "ACP Aurora Trust 1.0 payloads",
+  "$defs": {
+    "enrollment_status": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enrollment_id", "state", "expires_at", "supported_suites", "methods", "attempts_remaining"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/defs.schema.json#/$defs/enrollment_id" },
+        "state": { "$ref": "../common/defs.schema.json#/$defs/enrollment_state" },
+        "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "supported_suites": { "type": "array", "minItems": 1, "maxItems": 8, "uniqueItems": true, "items": { "$ref": "../common/defs.schema.json#/$defs/security_suite" } },
+        "methods": { "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true, "items": { "$ref": "../common/defs.schema.json#/$defs/enrollment_method" } },
+        "attempts_remaining": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    },
+    "enrollment_begin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enrollment_id", "attempt_id", "candidate_node_id", "commissioner_node_id", "commissioner_instance_id", "trust_domain_id", "suite", "requested_role", "requested_permissions_digest"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/defs.schema.json#/$defs/enrollment_id" },
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "candidate_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "commissioner_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "commissioner_instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "suite": { "$ref": "../common/defs.schema.json#/$defs/security_suite" },
+        "requested_role": { "$ref": "../common/defs.schema.json#/$defs/role" },
+        "requested_permissions_digest": { "const": "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0" }
+      }
+    },
+    "identity_public_key": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "public_key"],
+      "properties": {
+        "algorithm": { "const": "ecdsa_p256_sha256" },
+        "public_key": { "$ref": "../common/defs.schema.json#/$defs/public_crypto_bytes" }
+      }
+    },
+    "approval_plaintext": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trust_domain_id", "trust_domain_name", "credential", "credential_format", "authority_key_id", "trust_anchor", "role_constraints", "policy_id", "policy_revision", "not_before", "expires_at", "rotation_deadline", "commissioner_node_id", "transcript_hash"],
+      "properties": {
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "trust_domain_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "credential": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "credential_format": { "$ref": "../common/defs.schema.json#/$defs/credential_format" },
+        "authority_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+        "trust_anchor": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "role_constraints": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
+        "policy_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "policy_revision": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "not_before": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "rotation_deadline": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "commissioner_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "transcript_hash": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "compact_credential": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body", "algorithm", "signature"],
+      "properties": {
+        "body": { "$ref": "#/$defs/compact_credential_body" },
+        "algorithm": { "const": "ecdsa_p256_sha256" },
+        "signature": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "compact_credential_body": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "serial", "trust_domain_id", "node_id", "identity_algorithm", "identity_public_key", "role_constraints", "permission_policy_id", "issued_at", "not_before", "expires_at", "issuer_key_id", "extensions"],
+      "properties": {
+        "format": { "const": "acp-compact-credential-v1" },
+        "serial": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "identity_algorithm": { "const": "ecdsa_p256_sha256" },
+        "identity_public_key": { "$ref": "../common/defs.schema.json#/$defs/public_crypto_bytes" },
+        "role_constraints": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 64 } },
+        "permission_policy_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "issued_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "not_before": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "issuer_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+        "extensions": { "type": "object", "maxProperties": 16, "additionalProperties": { "$ref": "#/$defs/compact_extension" } }
+      }
+    },
+    "compact_extension": {
+      "type": "object", "additionalProperties": false,
+      "required": ["critical", "value"],
+      "properties": { "critical": { "type": "boolean" }, "value": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" } }
+    },
+    "enrollment_challenge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enrollment_id", "attempt_id", "candidate_node_id", "candidate_instance_id", "commissioner_node_id", "commissioner_instance_id", "trust_domain_id", "suite", "requested_role", "requested_permissions_digest", "identity_algorithm", "identity_key_id", "identity_public_key", "shareP"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/defs.schema.json#/$defs/enrollment_id" },
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "candidate_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "candidate_instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "commissioner_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "commissioner_instance_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "suite": { "$ref": "../common/defs.schema.json#/$defs/security_suite" },
+        "requested_role": { "$ref": "../common/defs.schema.json#/$defs/role" },
+        "requested_permissions_digest": { "const": "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0" },
+        "identity_algorithm": { "const": "ecdsa_p256_sha256" },
+        "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+        "identity_public_key": { "$ref": "../common/defs.schema.json#/$defs/public_crypto_bytes" },
+        "shareP": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "enrollment_response": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_id", "shareV", "confirmV"],
+      "properties": {
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "shareV": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "confirmV": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "enrollment_confirm": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_id", "confirmP"],
+      "properties": {
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "confirmP": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "enrollment_approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_id", "enrollment_id", "nonce", "ciphertext"],
+      "properties": {
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "enrollment_id": { "$ref": "../common/defs.schema.json#/$defs/enrollment_id" },
+        "nonce": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "ciphertext": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "enrollment_install_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attempt_id", "status", "credential_id", "identity_key_id", "trust_domain_id", "storage_posture", "proof_of_possession", "confirmation"],
+      "properties": {
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "status": { "const": "installed" },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "storage_posture": { "$ref": "../common/defs.schema.json#/$defs/storage_posture" },
+        "proof_of_possession": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "confirmation": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "enrollment_cancel": {
+      "type": "object", "additionalProperties": false,
+      "required": ["enrollment_id", "attempt_id", "reason"],
+      "properties": {
+        "enrollment_id": { "$ref": "../common/defs.schema.json#/$defs/enrollment_id" },
+        "attempt_id": { "$ref": "../common/defs.schema.json#/$defs/attempt_id" },
+        "reason": { "type": "string", "enum": ["operator_cancelled", "denied", "expired", "protocol_error", "storage_failed"] }
+      }
+    },
+    "credential_renew": {
+      "type": "object", "additionalProperties": false,
+      "required": ["credential_id", "identity_key_id", "rotation", "requested_public_key", "possession_proof"],
+      "properties": {
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+        "rotation": { "type": "boolean" },
+        "requested_public_key": { "$ref": "#/$defs/identity_public_key" },
+        "possession_proof": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "credential_result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "credential_id", "credential_format", "credential", "activation_state"],
+      "properties": {
+        "status": { "enum": ["issued", "denied", "failed"] },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "credential_format": { "$ref": "../common/defs.schema.json#/$defs/credential_format" },
+        "credential": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+        "activation_state": { "$ref": "../common/defs.schema.json#/$defs/credential_status" },
+        "replaces_credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" }
+      }
+    },
+    "credential_revoke": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trust_domain_id", "credential_id", "node_id", "reason", "effective_at"],
+      "properties": {
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "reason": { "enum": ["compromised", "superseded", "retired", "policy", "operator_request"] },
+        "effective_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "replacement_credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" }
+      }
+    },
+    "credential_status": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trust_domain_id", "credential_id", "status", "revocation_epoch"],
+      "properties": {
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "status": { "$ref": "../common/defs.schema.json#/$defs/credential_status" },
+        "revocation_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "not_before": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "expires_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" }
+      }
+    },
+    "revocation_update": {
+      "type": "object", "additionalProperties": false,
+      "required": ["body", "algorithm", "signature"],
+      "properties": {
+        "body": { "$ref": "#/$defs/revocation_body" },
+        "algorithm": { "const": "ecdsa_p256_sha256" },
+        "signature": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "revocation_body": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "trust_domain_id", "epoch", "issued_at", "next_update", "entries", "issuer_key_id"],
+      "properties": {
+        "format": { "enum": ["acp-revocation-snapshot-v1", "acp-revocation-delta-v1"] },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "base_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "issued_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "next_update": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "entries": { "type": "array", "maxItems": 4096, "items": { "$ref": "#/$defs/revocation_entry" } },
+        "previous_snapshot_hash": { "$ref": "../common/defs.schema.json#/$defs/digest_id" },
+        "issuer_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" }
+      }
+    },
+    "revocation_entry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["credential_id", "node_id", "revoked_at", "reason"],
+      "properties": {
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "revoked_at": { "$ref": "../common/defs.schema.json#/$defs/timestamp_utc" },
+        "reason": { "enum": ["key_compromise", "superseded", "retired", "policy", "operator_request"] },
+        "replacement_credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" }
+      }
+    },
+    "lightweight_finished": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sender_credential_id", "receiver_credential_id", "sender_node_id", "receiver_node_id", "trust_domain_id", "binding"],
+      "properties": {
+        "sender_credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "receiver_credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "sender_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "receiver_node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "binding": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "identity_reset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["trust_domain_id", "node_id", "credential_id", "confirmation"],
+      "properties": {
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "node_id": { "$ref": "../common/defs.schema.json#/$defs/uuid" },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "confirmation": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" }
+      }
+    },
+    "security_state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["principal_state", "auth_mode", "profile", "downgrade_allowed"],
+      "properties": {
+        "principal_state": { "$ref": "../common/defs.schema.json#/$defs/authenticated_principal_state" },
+        "auth_mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" },
+        "profile": { "$ref": "../common/defs.schema.json#/$defs/security_profile" },
+        "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+        "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+        "revocation_epoch": { "$ref": "../common/defs.schema.json#/$defs/uint64" },
+        "downgrade_allowed": { "type": "boolean" }
+      }
+    }
+  }
+}

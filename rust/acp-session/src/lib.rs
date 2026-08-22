@@ -6,6 +6,7 @@
 pub mod negotiate;
 pub mod registry;
 pub mod remote;
+pub mod security;
 pub mod session;
 
 pub use acp_model::{Capability, NodeIdentity, Role};

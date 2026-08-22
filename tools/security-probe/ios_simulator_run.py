@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import platform
 import subprocess
@@ -14,11 +15,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
+from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = Path(__file__).resolve().parent
-RESULT = TOOL / "results/ios-simulator-arm64-botan-3.13.0.json"
+RESULT = TOOL / "results/ios-simulator-arm64-botan-3.13.0-m1.json"
 SDK = Path(
     "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk"
 )
@@ -131,6 +133,40 @@ def main() -> int:
             resume_pass = payload.get("session_manager") == "noop" and payload.get("tickets_issued") == 0
             probes.append(probe("tls13.no_resumption_0rtt", "PASS" if resume_pass else "FAIL", detail))
 
+        x509_policy = temp / "botan-x509-policy-probe"
+        x509_compile = compile_cpp(TOOL / "botan_x509_policy_probe.cpp", x509_policy, include, library)
+        if x509_compile.returncode:
+            probes.append(probe("x509.acp_identity_policy", "FAIL", x509_compile.stderr[-1000:]))
+        else:
+            san = x509_vector["san_uri"].split(":")
+            parsed_leaf = x509.load_der_x509_certificate(leaf.read_bytes())
+            spki = parsed_leaf.public_key().public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            x509_run = run([
+                "xcrun", "simctl", "spawn", args.device, str(x509_policy), str(leaf), str(root),
+                san[-2], san[-1], x509_vector["leaf_credential_id"], "sha256:" + hashlib.sha256(spki).hexdigest(),
+            ])
+            try:
+                probes.extend(json.loads(x509_run.stdout))
+            except json.JSONDecodeError:
+                probes.append(probe("x509.acp_identity_policy", "FAIL", x509_run.stdout.strip() or x509_run.stderr.strip()))
+
+        auth_negative = temp / "auth-negative-probe"
+        auth_compile = run([
+            "xcrun", "swiftc", "-target", TARGET, "-sdk", str(SDK),
+            str(ROOT / "Sources/AuroraACP/Session/ACPSecurity.swift"),
+            str(TOOL / "ios_simulator_auth_negative_probe.swift"), "-o", str(auth_negative),
+        ])
+        if auth_compile.returncode:
+            probes.append(probe("network.negative_tls", "FAIL", auth_compile.stderr[-1000:]))
+        else:
+            auth_run = run(["xcrun", "simctl", "spawn", args.device, str(auth_negative)])
+            try:
+                probes.extend(json.loads(auth_run.stdout))
+            except json.JSONDecodeError:
+                probes.append(probe("network.negative_tls", "FAIL", auth_run.stdout.strip() or auth_run.stderr.strip()))
+
         swift = temp / "platform-probe"
         swift_compile = run(
             [
@@ -150,24 +186,29 @@ def main() -> int:
         else:
             swift_run = run(["xcrun", "simctl", "spawn", args.device, str(swift), str(ROOT / "vectors/security")])
             try:
-                probes.extend(json.loads(swift_run.stdout))
+                platform_probes = json.loads(swift_run.stdout)
+                for item in platform_probes:
+                    if item["id"] == "keychain.functional":
+                        item["mandatory"] = False
+                        item["detail"] += "; spawn-only result is non-applicable, hosted test is authoritative"
+                probes.extend(platform_probes)
             except json.JSONDecodeError:
                 probes.append(probe("ios.platform", "FAIL", swift_run.stdout.strip() or swift_run.stderr.strip()))
 
-    # These require production adapter code or physical hardware and must stay explicit.
+        hosted = run([
+            "xcodebuild", "-project", str(TOOL / "ios-host/ACPiOSQualificationHost.xcodeproj"),
+            "-scheme", "ACPiOSQualificationHost", "-destination", f"platform=iOS Simulator,id={args.device}",
+            "-derivedDataPath", str(temp / "ios-host-derived"), "test",
+        ])
+        probes.append(probe(
+            "keychain.hosted", "PASS" if hosted.returncode == 0 else "FAIL",
+            "ACP-only hosted Keychain metadata and opaque P-256 key lifecycle" if hosted.returncode == 0
+            else (hosted.stdout + hosted.stderr)[-1200:],
+        ))
+
+    # Physical-hardware and optional app-hosted discovery evidence stay explicit.
     probes.extend(
         [
-        probe(
-            "x509.acp_identity_policy",
-            "NOT_RUN",
-            "Simulator Botan TLS validates the isolated chain; complete SAN/domain/node/EKU/time/revocation "
-            "adapter is not implemented before M1",
-        ),
-            probe(
-                "network.negative_tls",
-                "NOT_RUN",
-                "wrong-CA/domain/node/credential network adapter cases are not implemented before M1",
-            ),
             probe(
                 "bonjour.trust_metadata",
                 "NOT_RUN",

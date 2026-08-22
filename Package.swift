@@ -17,6 +17,7 @@ let package = Package(
             resources: [
                 .copy("Codec/schema_pack.json"),
                 .copy("Session/registry.json"),
+                .copy("Security/constants.json"),
             ]
         ),
         .executableTarget(

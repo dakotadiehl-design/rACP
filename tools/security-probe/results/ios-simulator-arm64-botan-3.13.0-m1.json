@@ -1,0 +1,275 @@
+{
+  "freeze": "2.1.1",
+  "generated_at": "2026-08-22T03:03:22.137668+00:00",
+  "host": {
+    "machine": "arm64",
+    "release": "25.5.0",
+    "swift": "6.3.3",
+    "system": "Darwin",
+    "xcode": "26.6 (17F113)"
+  },
+  "ios_physical_device_full_profile": "NOT_RUN",
+  "ios_simulator_full_profile_functional_qualified": true,
+  "probes": [
+    {
+      "detail": "{\"spake2p\":true,\"sha256\":true,\"hmac_sha256\":true,\"hkdf_sha256\":true,\"rfc9383_appendix_c\":true,\"share_size\":65,\"verifier_message_size\":97,\"confirm_size\":32,\"shared_size\":32,\"pre_confirmation_rejected\":true,\"bad_confirmation_rejected\":true}",
+      "id": "botan.spake_hash_kdf",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.mutual_auth",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.peer_evidence",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.exporter",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "{\"tls13\":true,\"client_peer_certificates\":1,\"server_peer_certificates\":1,\"client_summary_peer_certificates\":1,\"server_summary_peer_certificates\":1,\"client_verified_certificates\":1,\"server_verified_certificates\":1,\"exporter_equal\":true,\"exporter_length\":32,\"policy_requires_client_auth\":true,\"session_manager\":\"noop\",\"tickets_issued\":0}",
+      "id": "tls13.no_resumption_0rtt",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "isolated ACP anchor, chain, identity, KU and EKU",
+      "id": "x509.valid_acp_chain",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "SAN domain binding",
+      "id": "x509.wrong_trust_domain",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "SAN node binding",
+      "id": "x509.wrong_node_id",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "exactly one ACP URI SAN",
+      "id": "x509.wrong_san",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "CN is not identity and CA has no ACP SAN",
+      "id": "x509.cn_only_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "both leaf EKUs mandatory",
+      "id": "x509.wrong_eku_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "leaf KU must contain only digitalSignature",
+      "id": "x509.wrong_key_usage_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "CA:TRUE cannot be a leaf",
+      "id": "x509.ca_true_leaf_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "untrusted issuer rejected",
+      "id": "x509.invalid_chain_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "future validation time rejects expired leaf",
+      "id": "x509.expired_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "past validation time rejects not-yet-valid leaf",
+      "id": "x509.future_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "malformed DER rejected without crash",
+      "id": "x509.malformed_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "verified current revocation set blocks credential",
+      "id": "x509.revoked_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "revocation epoch must increase",
+      "id": "x509.revocation_rollback_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "credential ID hashes complete DER",
+      "id": "x509.wrong_credential_id_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "identity key ID hashes canonical SPKI",
+      "id": "x509.wrong_key_id_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "no system/public root fallback",
+      "id": "x509.isolated_trust_store",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.missing_client_credential",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.wrong_ca",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: trustDomainMismatch",
+      "id": "network.wrong_trust_domain",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: identityMismatch",
+      "id": "network.wrong_node_identity",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.claimed_auth_without_evidence",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.stripped_trust_capability",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.trusted_lan_fallback",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: identityMismatch",
+      "id": "network.invalid_hello_channel_binding",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: identityMismatch",
+      "id": "network.altered_hello_node_id",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: identityMismatch",
+      "id": "network.exporter_mismatch",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "failed closed: downgradeForbidden",
+      "id": "network.revoked_credential_reconnect",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "0-RTT disabled",
+      "id": "network.zero_rtt_rejected",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "session resumption disabled",
+      "id": "network.resumption_disabled",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "17 sets; 31 artifact hashes; Freeze 2.1.1",
+      "id": "vectors.security",
+      "status": "PASS"
+    },
+    {
+      "detail": "generate/sign/verify/wrong-key; 65-byte uncompressed public point and DER signature",
+      "id": "cryptokit.p256",
+      "status": "PASS"
+    },
+    {
+      "detail": "generic-password create failed OSStatus=-34018; spawn-only harness lacks an application entitlement context; spawn-only result is non-applicable, hosted test is authoritative",
+      "id": "keychain.functional",
+      "mandatory": false,
+      "status": "FAIL"
+    },
+    {
+      "detail": "ACP-only hosted Keychain metadata and opaque P-256 key lifecycle",
+      "id": "keychain.hosted",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "no app-hosted Bonjour qualification target; existing discovery contract remains unauthenticated",
+      "id": "bonjour.trust_metadata",
+      "mandatory": false,
+      "status": "NOT_RUN"
+    },
+    {
+      "detail": "physical-device-only; Simulator software behavior is not evidence",
+      "id": "secure_enclave.hardware",
+      "mandatory": false,
+      "status": "NOT_RUN"
+    }
+  ],
+  "provider": {
+    "linkage": "static",
+    "name": "Botan",
+    "sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk",
+    "target": "arm64-apple-ios16.0-simulator",
+    "version": "3.13.0"
+  },
+  "schema_version": 1,
+  "secure_enclave_hardware": "NOT_RUN",
+  "target": {
+    "architecture": "arm64",
+    "device": "iPhone 17 Pro",
+    "environment": "iOS Simulator",
+    "runtime": "iOS 26.5",
+    "udid": "0B57DE05-A855-4CD7-B3CD-4C47EF8E9459"
+  }
+}

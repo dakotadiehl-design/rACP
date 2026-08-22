@@ -389,6 +389,43 @@ ROWS = [
      "remote/messages.schema.json#/$defs/error"),
 ]
 
+SECURITY_ROWS = [
+    # type, direction, senders, destinations, qos, response, pre-handshake,
+    # capability, permission, states, rate limit, sensitivity, terminal
+    ("security.enrollment.status", "event", ALL, ["node", "session"], "latest", None, True,
+     "security.enrollment", None, ["EnrollmentRestricted", "Established"], "enrollment_status", "public", False),
+    ("security.enrollment.begin", "request", ["conductor", "tool", "simulator"], ["node"], "reliable", "security.enrollment.challenge", True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "secret", False),
+    ("security.enrollment.challenge", "response", ALL, ["node"], "reliable", "security.enrollment.response", True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "secret", False),
+    ("security.enrollment.response", "request", ["conductor", "tool", "simulator"], ["node"], "reliable", "security.enrollment.confirm", True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "secret", False),
+    ("security.enrollment.confirm", "response", ALL, ["node"], "reliable", "security.enrollment.approval", True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "secret", False),
+    ("security.enrollment.approval", "response", ["conductor", "tool", "simulator"], ["node"], "reliable", "security.enrollment.install_result", True,
+     "security.enrollment", "security.enrollment.approve", ["EnrollmentRestricted"], "enrollment_attempt", "secret", False),
+    ("security.enrollment.install_result", "response", ALL, ["node"], "reliable", None, True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "sensitive", True),
+    ("security.enrollment.cancel", "event", ALL, ["node"], "reliable", None, True,
+     "security.enrollment", None, ["EnrollmentRestricted"], "enrollment_attempt", "sensitive", True),
+    ("security.credential.renew", "request", ALL, ["node"], "reliable", "security.credential.result", False,
+     "security.credential_rotation", "security.credential.renew", ["EstablishedAuthenticated"], "security_management", "secret", False),
+    ("security.credential.result", "response", ["conductor", "tool", "simulator"], ["node"], "reliable", None, False,
+     "security.credential_rotation", "security.credential.issue", ["EstablishedAuthenticated"], "security_management", "secret", True),
+    ("security.credential.revoke", "request", ["conductor", "tool"], ["node"], "reliable", "security.credential.status", False,
+     "security.revocation", "security.credential.revoke", ["EstablishedAuthenticated"], "security_management", "sensitive", False),
+    ("security.credential.status", "response", ["conductor", "tool", "simulator"], ["node", "session"], "reliable", None, False,
+     "security.revocation", None, ["EstablishedAuthenticated"], "security_status", "public", True),
+    ("security.revocation.update", "event", ["conductor", "tool", "simulator"], ["session"], "reliable", None, False,
+     "security.revocation", "security.revocation.publish", ["EstablishedAuthenticated"], "security_status", "sensitive", True),
+    ("security.identity.reset", "request", ["conductor", "tool"], ["node"], "reliable", None, False,
+     "security.identity", "security.identity.reset", ["EstablishedAuthenticated"], "security_management", "secret", True),
+    ("security.state", "event", ALL, ["node", "session"], "latest", None, False,
+     "security.identity", None, ["Established", "EstablishedAuthenticated"], "security_status", "public", False),
+    ("security.lightweight.finished", "event", ALL, ["node"], "reliable", None, True,
+     "security.lightweight", None, ["LightweightBinding"], "security_binding", "secret", True),
+]
+
 
 def main() -> None:
     entries = []
@@ -416,6 +453,38 @@ def main() -> None:
             "legal_before_handshake": before,
             "security_class": security,
             "schema": schema,
+        })
+    for (typ, direction, senders, dests, qos, response, before, capability,
+         permission, states, rate_limit, sensitivity, terminal) in SECURITY_ROWS:
+        entries.append({
+            "type": typ,
+            "min_protocol": "1.2",
+            "max_protocol": None,
+            "profiles": ["security"],
+            "required_capability": capability,
+            "min_capability_version": "1.0",
+            "direction": direction,
+            "valid_senders": senders,
+            "valid_destinations": dests,
+            "qos_default": qos,
+            "qos_allowed": [qos],
+            "ack": "required" if direction == "request" else "none",
+            "idempotent": direction == "request",
+            "idempotency_key": "message_id" if direction == "request" else None,
+            "response_type": response,
+            "correlation": "required" if direction in ("request", "response") else "optional",
+            "causation": "required_on_derived_state",
+            "legal_before_handshake": before,
+            "legal_session_states": states,
+            "authorization_permission": permission,
+            "rate_limit_class": rate_limit,
+            "sensitive_field_policy": sensitivity,
+            "terminal": terminal,
+            "security_class": "security",
+            "schema": "security/messages.schema.json#/$defs/" + (
+                "security_state" if typ == "security.state"
+                else typ.removeprefix("security.").replace(".", "_")
+            ),
         })
     out = ROOT / "schema" / "registry.json"
     payload = json.dumps({"version": "1.2", "messages": entries}, indent=2) + "\n"

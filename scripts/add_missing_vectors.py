@@ -25,6 +25,12 @@ TID = "0193f8d8-4c4e-7d8b-a2ab-000000000070"
 AID = "0193f8d8-4c4e-7d8b-a2ab-000000000071"
 PID = "0193f8d8-4c4e-7d8b-a2ab-000000000080"
 KEY = "0193f8d8-4c4e-7d8b-a2ab-000000000099"
+DOMAIN = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
+ENROLLMENT = "0193f8d8-4c4e-7d8b-a2ab-000000000091"
+ATTEMPT = "0193f8d8-4c4e-7d8b-a2ab-000000000092"
+DIGEST = "sha256:" + SHA
+EMPTY_PERMISSIONS_DIGEST = "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0"
+B64URL = "AQIDBA"
 ASSET = {
     "asset_id": AID,
     "asset_type": "lyric.chart",
@@ -93,6 +99,81 @@ def payloads() -> dict[str, dict]:
         "reason": "explicit_assignment",
     }
     return {
+        "security.enrollment.status": {
+            "enrollment_id": ENROLLMENT, "state": "open", "expires_at": TS,
+            "supported_suites": ["ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1"],
+            "methods": ["manual_code"], "attempts_remaining": 5,
+        },
+        "security.enrollment.begin": {
+            "enrollment_id": ENROLLMENT, "attempt_id": ATTEMPT, "candidate_node_id": DST,
+            "commissioner_node_id": SRC, "commissioner_instance_id": SID,
+            "trust_domain_id": DOMAIN, "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1",
+            "requested_role": "bridge", "requested_permissions_digest": EMPTY_PERMISSIONS_DIGEST,
+        },
+        "security.enrollment.challenge": {
+            "enrollment_id": ENROLLMENT, "attempt_id": ATTEMPT, "candidate_node_id": DST,
+            "candidate_instance_id": AID, "commissioner_node_id": SRC, "commissioner_instance_id": SID,
+            "trust_domain_id": DOMAIN, "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1",
+            "requested_role": "bridge", "requested_permissions_digest": EMPTY_PERMISSIONS_DIGEST,
+            "identity_algorithm": "ecdsa_p256_sha256", "identity_key_id": DIGEST,
+            "identity_public_key": B64URL, "shareP": B64URL,
+        },
+        "security.enrollment.response": {
+            "attempt_id": ATTEMPT, "shareV": B64URL, "confirmV": B64URL,
+        },
+        "security.enrollment.confirm": {
+            "attempt_id": ATTEMPT, "confirmP": B64URL,
+        },
+        "security.enrollment.approval": {
+            "attempt_id": ATTEMPT, "enrollment_id": ENROLLMENT, "nonce": B64URL,
+            "ciphertext": B64URL,
+        },
+        "security.enrollment.install_result": {
+            "attempt_id": ATTEMPT, "status": "installed", "credential_id": DIGEST,
+            "identity_key_id": DIGEST, "trust_domain_id": DOMAIN,
+            "storage_posture": {"class": "os_protected", "hardware_backed": False, "private_key_exportable": False},
+            "proof_of_possession": B64URL, "confirmation": B64URL,
+        },
+        "security.enrollment.cancel": {
+            "enrollment_id": ENROLLMENT, "attempt_id": ATTEMPT, "reason": "operator_cancelled",
+        },
+        "security.credential.renew": {
+            "credential_id": DIGEST, "identity_key_id": DIGEST, "rotation": True,
+            "requested_public_key": {"algorithm": "ecdsa_p256_sha256", "public_key": B64URL},
+            "possession_proof": B64URL,
+        },
+        "security.credential.result": {
+            "status": "issued", "credential_id": DIGEST, "credential_format": "x509_der",
+            "credential": B64URL, "activation_state": "staged",
+        },
+        "security.credential.revoke": {
+            "trust_domain_id": DOMAIN, "credential_id": DIGEST, "node_id": DST,
+            "reason": "operator_request", "effective_at": TS,
+        },
+        "security.credential.status": {
+            "trust_domain_id": DOMAIN, "credential_id": DIGEST, "status": "active", "revocation_epoch": 7,
+        },
+        "security.revocation.update": {
+            "body": {"format": "acp-revocation-snapshot-v1", "trust_domain_id": DOMAIN,
+                     "epoch": 7, "issued_at": TS, "next_update": TS,
+                     "entries": [{"credential_id": DIGEST, "node_id": DST,
+                                  "revoked_at": TS, "reason": "key_compromise"}],
+                     "issuer_key_id": DIGEST},
+            "algorithm": "ecdsa_p256_sha256", "signature": B64URL,
+        },
+        "security.identity.reset": {
+            "trust_domain_id": DOMAIN, "node_id": DST, "credential_id": DIGEST, "confirmation": B64URL,
+        },
+        "security.state": {
+            "principal_state": "authenticated", "auth_mode": "aurora_trust", "profile": "full",
+            "trust_domain_id": DOMAIN, "credential_id": DIGEST, "revocation_epoch": 7,
+            "downgrade_allowed": False,
+        },
+        "security.lightweight.finished": {
+            "sender_credential_id": DIGEST, "receiver_credential_id": "sha256:" + "b" * 64,
+            "sender_node_id": SRC, "receiver_node_id": DST, "trust_domain_id": DOMAIN,
+            "binding": B64URL,
+        },
         "session.goodbye": {"reason": "shutdown"},
         "discovery.query": {"role_filter": ["bridge"]},
         "state.snapshot": {
@@ -205,7 +286,7 @@ def main() -> int:
     manifest_path = ROOT / "vectors" / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     known = {item["id"] for item in manifest["vectors"]}
-    missing = [typ for typ in by_type if typ not in known]
+    missing = [typ for typ in by_type if typ not in known or typ.startswith("security.")]
     bodies = payloads()
     next_n = 100
     for typ in missing:
@@ -231,11 +312,12 @@ def main() -> int:
         env_obj = Envelope.from_dict(data)
         (ROOT / "vectors" / "json" / f"{typ}.json").write_text(json.dumps(data, indent=2) + "\n")
         (ROOT / "vectors" / "cbor" / f"{typ}.cbor").write_bytes(encode_cbor(env_obj))
-        manifest["vectors"].append({
-            "id": typ,
-            "json": f"json/{typ}.json",
-            "cbor": f"cbor/{typ}.cbor",
-        })
+        if typ not in known:
+            manifest["vectors"].append({
+                "id": typ,
+                "json": f"json/{typ}.json",
+                "cbor": f"cbor/{typ}.cbor",
+            })
         next_n += 1
         print("added", typ)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")

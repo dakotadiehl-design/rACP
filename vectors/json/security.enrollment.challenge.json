@@ -1,0 +1,32 @@
+{
+  "acp": "1.2",
+  "message_id": "0193f8d8-4c4e-7d8b-a2ab-000000000102",
+  "type": "security.enrollment.challenge",
+  "source": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001"
+  },
+  "timestamp_utc": "2026-08-17T16:42:15.231Z",
+  "qos": "reliable",
+  "flags": [],
+  "payload": {
+    "enrollment_id": "0193f8d8-4c4e-7d8b-a2ab-000000000091",
+    "attempt_id": "0193f8d8-4c4e-7d8b-a2ab-000000000092",
+    "candidate_node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002",
+    "candidate_instance_id": "0193f8d8-4c4e-7d8b-a2ab-000000000071",
+    "commissioner_node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001",
+    "commissioner_instance_id": "0193f8d8-4c4e-7d8b-a2ab-000000000013",
+    "trust_domain_id": "0193f8d8-4c4e-7d8b-a2ab-000000000090",
+    "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1",
+    "requested_role": "bridge",
+    "requested_permissions_digest": "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0",
+    "identity_algorithm": "ecdsa_p256_sha256",
+    "identity_key_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "identity_public_key": "AQIDBA",
+    "shareP": "AQIDBA"
+  },
+  "destination": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002"
+  },
+  "session_id": "0193f8d8-4c4e-7d8b-a2ab-000000000013",
+  "sequence": 1
+}

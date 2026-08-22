@@ -44,6 +44,14 @@ local f_remote_perm = ProtoField.string("acp.remote.permission", "Remote permiss
 local f_remote_ready = ProtoField.string("acp.remote.readiness", "Remote readiness")
 local f_remote_lease = ProtoField.string("acp.remote.momentary.lease_id", "Momentary lease ID")
 local f_remote_exp = ProtoField.uint64("acp.remote.momentary.expires_ms", "Momentary expires ms")
+local f_security_mode = ProtoField.string("acp.security.auth_mode", "Authentication mode")
+local f_security_state = ProtoField.string("acp.security.state", "Principal/enrollment state")
+local f_security_domain = ProtoField.string("acp.security.trust_domain_id", "Trust domain ID")
+local f_security_credential = ProtoField.string("acp.security.credential_id", "Credential ID")
+local f_security_key = ProtoField.string("acp.security.identity_key_id", "Identity key ID")
+local f_security_enrollment = ProtoField.string("acp.security.enrollment_id", "Enrollment ID")
+local f_security_attempt = ProtoField.string("acp.security.attempt_id", "Enrollment attempt ID")
+local f_security_suite = ProtoField.string("acp.security.suite", "Security suite")
 
 acp.fields = {
   f_magic, f_dver, f_enc, f_version, f_type, f_message_id, f_correlation_id,
@@ -52,7 +60,9 @@ acp.fields = {
   f_error, f_show_id, f_show_rev, f_asset_id, f_asset_status, f_participant,
   f_xfer, f_blackout, f_remote_id, f_remote_device, f_remote_part, f_remote_layout,
   f_remote_layout_rev, f_remote_control, f_remote_ctype, f_remote_ix, f_remote_inv,
-  f_remote_value, f_remote_perm, f_remote_ready, f_remote_lease, f_remote_exp
+  f_remote_value, f_remote_perm, f_remote_ready, f_remote_lease, f_remote_exp,
+  f_security_mode, f_security_state, f_security_domain, f_security_credential,
+  f_security_key, f_security_enrollment, f_security_attempt, f_security_suite
 }
 
 local udp_port = DissectorTable.get("udp.port")
@@ -76,6 +86,23 @@ local function add_json_fields(tree, buf, json)
   end
   local p = json.payload
   if type(p) == "table" then
+    -- Deliberately expose only public identifiers/state. Never add PAKE shares,
+    -- confirmations, bindings, ciphertext, signatures, credentials, or key bytes.
+    if p.auth_mode then tree:add(f_security_mode, p.auth_mode) end
+    if type(p.auth) == "table" then
+      if p.auth.mode then tree:add(f_security_mode, p.auth.mode) end
+      if p.auth.trust_domain_id then tree:add(f_security_domain, p.auth.trust_domain_id) end
+      if p.auth.credential_id then tree:add(f_security_credential, p.auth.credential_id) end
+      if p.auth.identity_key_id then tree:add(f_security_key, p.auth.identity_key_id) end
+    end
+    if p.principal_state then tree:add(f_security_state, p.principal_state) end
+    if p.state and json.type and string.find(json.type, "security.", 1, true) then tree:add(f_security_state, p.state) end
+    if p.trust_domain_id then tree:add(f_security_domain, p.trust_domain_id) end
+    if p.credential_id then tree:add(f_security_credential, p.credential_id) end
+    if p.identity_key_id then tree:add(f_security_key, p.identity_key_id) end
+    if p.enrollment_id then tree:add(f_security_enrollment, p.enrollment_id) end
+    if p.attempt_id then tree:add(f_security_attempt, p.attempt_id) end
+    if p.suite then tree:add(f_security_suite, p.suite) end
     if p.status and json.type == "command.ack" then tree:add(f_cmd_status, p.status) end
     if p.resource then tree:add(f_state_res, p.resource) end
     if p.revision then tree:add(f_state_rev, p.revision) end

@@ -3085,6 +3085,665 @@
       "legal_before_handshake": false,
       "security_class": "control",
       "schema": "remote/messages.schema.json#/$defs/error"
+    },
+    {
+      "type": "security.enrollment.status",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "optional",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted",
+        "Established"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_status",
+      "sensitive_field_policy": "public",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_status"
+    },
+    {
+      "type": "security.enrollment.begin",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "message_id",
+      "response_type": "security.enrollment.challenge",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_begin"
+    },
+    {
+      "type": "security.enrollment.challenge",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "security.enrollment.response",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_challenge"
+    },
+    {
+      "type": "security.enrollment.response",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "message_id",
+      "response_type": "security.enrollment.confirm",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_response"
+    },
+    {
+      "type": "security.enrollment.confirm",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "security.enrollment.approval",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_confirm"
+    },
+    {
+      "type": "security.enrollment.approval",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": "security.enrollment.install_result",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": "security.enrollment.approve",
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_approval"
+    },
+    {
+      "type": "security.enrollment.install_result",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "sensitive",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_install_result"
+    },
+    {
+      "type": "security.enrollment.cancel",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.enrollment",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "optional",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "EnrollmentRestricted"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "enrollment_attempt",
+      "sensitive_field_policy": "sensitive",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/enrollment_cancel"
+    },
+    {
+      "type": "security.credential.renew",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.credential_rotation",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "message_id",
+      "response_type": "security.credential.result",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": "security.credential.renew",
+      "rate_limit_class": "security_management",
+      "sensitive_field_policy": "secret",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/credential_renew"
+    },
+    {
+      "type": "security.credential.result",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.credential_rotation",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": "security.credential.issue",
+      "rate_limit_class": "security_management",
+      "sensitive_field_policy": "secret",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/credential_result"
+    },
+    {
+      "type": "security.credential.revoke",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.revocation",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "message_id",
+      "response_type": "security.credential.status",
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": "security.credential.revoke",
+      "rate_limit_class": "security_management",
+      "sensitive_field_policy": "sensitive",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/credential_revoke"
+    },
+    {
+      "type": "security.credential.status",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.revocation",
+      "min_capability_version": "1.0",
+      "direction": "response",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "security_status",
+      "sensitive_field_policy": "public",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/credential_status"
+    },
+    {
+      "type": "security.revocation.update",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.revocation",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "tool",
+        "simulator"
+      ],
+      "valid_destinations": [
+        "session"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "optional",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": "security.revocation.publish",
+      "rate_limit_class": "security_status",
+      "sensitive_field_policy": "sensitive",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/revocation_update"
+    },
+    {
+      "type": "security.identity.reset",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.identity",
+      "min_capability_version": "1.0",
+      "direction": "request",
+      "valid_senders": [
+        "conductor",
+        "tool"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "required",
+      "idempotent": true,
+      "idempotency_key": "message_id",
+      "response_type": null,
+      "correlation": "required",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": "security.identity.reset",
+      "rate_limit_class": "security_management",
+      "sensitive_field_policy": "secret",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/identity_reset"
+    },
+    {
+      "type": "security.state",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.identity",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node",
+        "session"
+      ],
+      "qos_default": "latest",
+      "qos_allowed": [
+        "latest"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "optional",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": false,
+      "legal_session_states": [
+        "Established",
+        "EstablishedAuthenticated"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "security_status",
+      "sensitive_field_policy": "public",
+      "terminal": false,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/security_state"
+    },
+    {
+      "type": "security.lightweight.finished",
+      "min_protocol": "1.2",
+      "max_protocol": null,
+      "profiles": [
+        "security"
+      ],
+      "required_capability": "security.lightweight",
+      "min_capability_version": "1.0",
+      "direction": "event",
+      "valid_senders": [
+        "conductor",
+        "prism",
+        "lyric",
+        "bridge",
+        "tool",
+        "simulator",
+        "remote"
+      ],
+      "valid_destinations": [
+        "node"
+      ],
+      "qos_default": "reliable",
+      "qos_allowed": [
+        "reliable"
+      ],
+      "ack": "none",
+      "idempotent": false,
+      "idempotency_key": null,
+      "response_type": null,
+      "correlation": "optional",
+      "causation": "required_on_derived_state",
+      "legal_before_handshake": true,
+      "legal_session_states": [
+        "LightweightBinding"
+      ],
+      "authorization_permission": null,
+      "rate_limit_class": "security_binding",
+      "sensitive_field_policy": "secret",
+      "terminal": true,
+      "security_class": "security",
+      "schema": "security/messages.schema.json#/$defs/lightweight_finished"
     }
   ]
 }

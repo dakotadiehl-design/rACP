@@ -12,6 +12,10 @@ pub struct RegistryRow {
     pub legal_before_handshake: bool,
     pub response_type: Option<String>,
     pub min_capability_version: Option<String>,
+    pub legal_session_states: Vec<String>,
+    pub authorization_permission: Option<String>,
+    pub rate_limit_class: Option<String>,
+    pub sensitive_field_policy: Option<String>,
 }
 
 fn table() -> &'static HashMap<String, RegistryRow> {
@@ -51,6 +55,22 @@ fn table() -> &'static HashMap<String, RegistryRow> {
                     min_capability_version: msg["min_capability_version"]
                         .as_str()
                         .map(str::to_string),
+                    legal_session_states: msg["legal_session_states"]
+                        .as_array()
+                        .map(|values| {
+                            values
+                                .iter()
+                                .filter_map(|x| x.as_str().map(str::to_string))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    authorization_permission: msg["authorization_permission"]
+                        .as_str()
+                        .map(str::to_string),
+                    rate_limit_class: msg["rate_limit_class"].as_str().map(str::to_string),
+                    sensitive_field_policy: msg["sensitive_field_policy"]
+                        .as_str()
+                        .map(str::to_string),
                 },
             );
         }
@@ -71,6 +91,28 @@ pub fn allowed(
     envelope_version: Option<&str>,
     negotiated_versions: Option<&HashMap<String, String>>,
 ) -> Option<&'static str> {
+    allowed_in_state(
+        message_type,
+        sender_role,
+        negotiated,
+        handshake_complete,
+        qos,
+        envelope_version,
+        negotiated_versions,
+        None,
+    )
+}
+
+pub fn allowed_in_state(
+    message_type: &str,
+    sender_role: &str,
+    negotiated: &[String],
+    handshake_complete: bool,
+    qos: Option<&str>,
+    envelope_version: Option<&str>,
+    negotiated_versions: Option<&HashMap<String, String>>,
+    session_state: Option<&str>,
+) -> Option<&'static str> {
     let Some(row) = lookup(message_type) else {
         return if handshake_complete {
             Some("unsupported_message")
@@ -80,6 +122,16 @@ pub fn allowed(
     };
     if !handshake_complete && !row.legal_before_handshake {
         return Some("malformed_envelope");
+    }
+    if !row.legal_session_states.is_empty() {
+        let actual = session_state.unwrap_or(if handshake_complete {
+            "Established"
+        } else {
+            "PreHello"
+        });
+        if !row.legal_session_states.iter().any(|state| state == actual) {
+            return Some("security.permission_denied");
+        }
     }
     if handshake_complete {
         let ver = envelope_version.unwrap_or("1.2");

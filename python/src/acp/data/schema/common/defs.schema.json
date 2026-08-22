@@ -249,7 +249,7 @@
     },
     "error_category": {
       "type": "string",
-      "enum": ["protocol", "validation", "authorization", "not_found", "conflict", "unavailable", "timeout", "internal"]
+      "enum": ["protocol", "validation", "authentication", "authorization", "not_found", "conflict", "unavailable", "timeout", "internal"]
     },
     "error_severity": {
       "type": "string",
@@ -273,7 +273,86 @@
     },
     "auth_mode": {
       "type": "string",
-      "enum": ["trusted_lan", "tls", "mutual_tls"]
+      "enum": ["trusted_lan", "tls", "aurora_trust", "enrollment_spake2plus"]
+    },
+    "security_profile": {
+      "type": "string",
+      "enum": ["full", "lightweight"]
+    },
+    "security_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "trust_domain_id": { "$ref": "#/$defs/uuid" },
+    "enrollment_id": { "$ref": "#/$defs/uuid" },
+    "attempt_id": { "$ref": "#/$defs/uuid" },
+    "digest_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "credential_id": { "$ref": "#/$defs/digest_id" },
+    "identity_key_id": { "$ref": "#/$defs/digest_id" },
+    "security_algorithm": {
+      "type": "string",
+      "enum": ["ecdsa_p256_sha256", "sha256", "hmac_sha256", "hkdf_sha256", "aes_256_gcm"]
+    },
+    "security_suite": {
+      "type": "string",
+      "enum": ["ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1", "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-PBKDF2-100K-v1"]
+    },
+    "enrollment_state": {
+      "type": "string",
+      "enum": ["closed", "open", "candidate_selected", "secret_acquired", "negotiating", "key_confirmed", "awaiting_operator_approval", "issuing_credential", "awaiting_install_receipt", "complete", "cancelled", "expired", "locked"]
+    },
+    "enrollment_method": {
+      "type": "string",
+      "enum": ["manual_code", "qr", "provisioning_file"]
+    },
+    "credential_status": {
+      "type": "string",
+      "enum": ["staged", "active", "expired", "revoked", "superseded", "invalid", "unknown"]
+    },
+    "credential_format": {
+      "type": "string",
+      "enum": ["x509_der", "acp-compact-credential-v1"]
+    },
+    "storage_posture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "hardware_backed", "private_key_exportable"],
+      "properties": {
+        "class": { "type": "string", "enum": ["hardware_backed", "os_protected", "encrypted_file", "protected_flash", "plain_file", "ephemeral"] },
+        "hardware_backed": { "type": "boolean" },
+        "private_key_exportable": { "type": "boolean" }
+      }
+    },
+    "authenticated_principal_state": {
+      "type": "string",
+      "enum": ["unauthenticated", "authenticated", "revoked", "expired", "identity_conflict", "invalid"]
+    },
+    "security_error_code": {
+      "type": "string",
+      "enum": [
+        "security.enrollment_closed", "security.enrollment_expired", "security.enrollment_locked",
+        "security.enrollment_replayed", "security.no_common_suite", "security.authentication_failed", "security.key_confirmation_failed",
+        "security.transcript_mismatch", "security.identity_mismatch", "security.trust_domain_mismatch",
+        "security.credential_expired", "security.credential_revoked", "security.credential_invalid",
+        "security.permission_denied", "security.downgrade_forbidden", "security.storage_failed",
+        "security.resource_limit", "security.clock_untrusted"
+      ]
+    },
+    "crypto_bytes": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "x-acp-cbor-type": "byte-string",
+      "x-acp-sensitive": true,
+      "x-acp-log-policy": "never"
+    },
+    "public_crypto_bytes": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "x-acp-cbor-type": "byte-string",
+      "x-acp-log-policy": "public"
     },
     "encoding": {
       "type": "string",

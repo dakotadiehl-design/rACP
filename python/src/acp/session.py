@@ -173,7 +173,7 @@ class Session:
         return Endpoint(node_id=self.local.node_id)
 
     def _require_auth_mode(self, mode: str) -> None:
-        implemented = {"trusted_lan", "tls", "mutual_tls"}
+        implemented = {"trusted_lan", "tls", "aurora_trust"}
         if mode not in implemented:
             raise SessionError("authentication", f"auth mode {mode!r} is not implemented")
         if mode == "trusted_lan" and not self.allow_plaintext:
@@ -181,7 +181,7 @@ class Session:
                 "authentication",
                 "trusted_lan is unauthenticated plaintext; set allow_plaintext=True to opt in",
             )
-        if mode in {"tls", "mutual_tls"} and not self.transport_identity:
+        if mode in {"tls", "aurora_trust"} and not self.transport_identity:
             raise SessionError("authentication", f"{mode} requires a TLS transport identity")
 
     async def start_receiver(self) -> None:

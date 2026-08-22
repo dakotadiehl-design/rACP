@@ -76,6 +76,46 @@
   "blackout": {
     "clear_on_disconnect_default": false
   },
+  "security": {
+    "version": "1.0",
+    "profiles": ["full", "lightweight"],
+    "auth_modes": ["trusted_lan", "tls", "aurora_trust", "enrollment_spake2plus"],
+    "suites": ["ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1", "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-PBKDF2-100K-v1"],
+    "capabilities": {
+      "security.identity": "1.0",
+      "security.enrollment": "1.0",
+      "security.credential_rotation": "1.0",
+      "security.revocation": "1.0",
+      "security.authenticated_session": "1.0",
+      "security.lightweight": "1.0"
+    },
+    "errors": {
+      "security.enrollment_closed": {"category": "authorization", "retryable": false},
+      "security.enrollment_expired": {"category": "timeout", "retryable": true},
+      "security.enrollment_locked": {"category": "authorization", "retryable": false},
+      "security.enrollment_replayed": {"category": "conflict", "retryable": false},
+      "security.no_common_suite": {"category": "protocol", "retryable": false},
+      "security.authentication_failed": {"category": "authentication", "retryable": false},
+      "security.key_confirmation_failed": {"category": "authentication", "retryable": false, "external_code": "security.credential_invalid"},
+      "security.transcript_mismatch": {"category": "authentication", "retryable": false, "external_code": "security.credential_invalid"},
+      "security.identity_mismatch": {"category": "authentication", "retryable": false},
+      "security.trust_domain_mismatch": {"category": "authentication", "retryable": false},
+      "security.credential_expired": {"category": "authentication", "retryable": true},
+      "security.credential_revoked": {"category": "authentication", "retryable": false},
+      "security.credential_invalid": {"category": "authentication", "retryable": false},
+      "security.permission_denied": {"category": "authorization", "retryable": false},
+      "security.downgrade_forbidden": {"category": "authentication", "retryable": false},
+      "security.storage_failed": {"category": "internal", "retryable": true},
+      "security.resource_limit": {"category": "unavailable", "retryable": true},
+      "security.clock_untrusted": {"category": "unavailable", "retryable": true}
+    },
+    "limits": {
+      "full": {"concurrent_attempts": 2, "attempts_per_enrollment": 5, "attempt_timeout_ms": 60000, "enrollment_window_ms": 600000, "max_security_message_bytes": 65536, "max_credential_bytes": 8192, "max_nesting_depth": 16, "max_collection_length": 4096, "max_revocation_entries": 4096, "max_trust_domains": null, "active_credentials_per_domain": 2},
+      "lightweight": {"concurrent_attempts": 1, "attempts_per_enrollment": 5, "attempt_timeout_ms": 60000, "enrollment_window_ms": 600000, "max_security_message_bytes": 8192, "max_credential_bytes": 2048, "max_nesting_depth": 8, "max_collection_length": 64, "max_revocation_entries": 128, "max_trust_domains": 1, "active_credentials_per_domain": 2}
+    },
+    "downgrade_policy": {"hardened_allows_trusted_lan_fallback": false},
+    "sensitive_annotations": {"value": "x-acp-sensitive", "log_policy": "x-acp-log-policy", "never": "never"}
+  },
   "remote": {
     "profile": "remote",
     "profiles": ["aurora.remote.prism.v1"],

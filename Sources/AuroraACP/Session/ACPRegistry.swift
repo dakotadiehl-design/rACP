@@ -9,6 +9,10 @@ public struct ACPRegistryRow: Sendable {
     public var qosAllowed: [String]
     public var legalBeforeHandshake: Bool
     public var responseType: String?
+    public var legalSessionStates: [String]
+    public var authorizationPermission: String?
+    public var rateLimitClass: String?
+    public var sensitiveFieldPolicy: String?
 }
 
 public enum ACPRegistry {
@@ -36,7 +40,11 @@ public enum ACPRegistry {
                     validSenders: msg["valid_senders"] as? [String] ?? [],
                     qosAllowed: msg["qos_allowed"] as? [String] ?? [],
                     legalBeforeHandshake: msg["legal_before_handshake"] as? Bool ?? false,
-                    responseType: msg["response_type"] as? String
+                    responseType: msg["response_type"] as? String,
+                    legalSessionStates: msg["legal_session_states"] as? [String] ?? [],
+                    authorizationPermission: msg["authorization_permission"] as? String,
+                    rateLimitClass: msg["rate_limit_class"] as? String,
+                    sensitiveFieldPolicy: msg["sensitive_field_policy"] as? String
                 )
             }
             return map
@@ -55,12 +63,17 @@ public enum ACPRegistry {
         handshakeComplete: Bool,
         qos: String?,
         envelopeVersion: String?,
-        negotiatedVersions: [String: String]
+        negotiatedVersions: [String: String],
+        sessionState: String? = nil
     ) -> String? {
         guard let row = lookup(type) else {
             return handshakeComplete ? "unsupported_message" : "malformed_envelope"
         }
         if !handshakeComplete && !row.legalBeforeHandshake { return "malformed_envelope" }
+        if !row.legalSessionStates.isEmpty {
+            let actual = sessionState ?? (handshakeComplete ? "Established" : "PreHello")
+            if !row.legalSessionStates.contains(actual) { return "security.permission_denied" }
+        }
         if handshakeComplete {
             let ver = envelopeVersion ?? "1.2"
             if !ACPNegotiate.versionAtLeast(ver, row.minProtocol) { return "unsupported_message" }

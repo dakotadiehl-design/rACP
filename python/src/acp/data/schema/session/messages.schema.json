@@ -25,11 +25,23 @@
         },
         "auth": {
           "type": "object",
-          "additionalProperties": true,
+          "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" }
-          }
+            "mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" },
+            "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+            "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+            "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+            "channel_binding": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+            "security_capabilities": {
+              "type": "array", "maxItems": 16, "uniqueItems": true,
+              "items": { "$ref": "../common/defs.schema.json#/$defs/capability" }
+            }
+          },
+          "allOf": [{
+            "if": { "properties": { "mode": { "const": "aurora_trust" } }, "required": ["mode"] },
+            "then": { "required": ["trust_domain_id", "credential_id", "identity_key_id", "channel_binding", "security_capabilities"] }
+          }]
         }
       }
     },
@@ -55,7 +67,21 @@
             "max_message_bytes": { "$ref": "../common/defs.schema.json#/$defs/uint64" }
           }
         },
-        "error": { "$ref": "../common/defs.schema.json#/$defs/error_body" }
+        "error": { "$ref": "../common/defs.schema.json#/$defs/error_body" },
+        "authenticated_session": {
+          "type": "object", "additionalProperties": false,
+          "required": ["principal_state", "auth_mode", "channel_binding_verified", "downgraded"],
+          "properties": {
+            "principal_state": { "$ref": "../common/defs.schema.json#/$defs/authenticated_principal_state" },
+            "auth_mode": { "$ref": "../common/defs.schema.json#/$defs/auth_mode" },
+            "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
+            "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
+            "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
+            "credential_format": { "$ref": "../common/defs.schema.json#/$defs/credential_format" },
+            "channel_binding_verified": { "type": "boolean" },
+            "downgraded": { "type": "boolean" }
+          }
+        }
       }
     },
     "goodbye": {

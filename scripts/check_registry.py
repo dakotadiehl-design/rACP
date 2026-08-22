@@ -200,6 +200,7 @@ def _packaged_data_drift() -> list[str]:
         (SCHEMA / "constants.json", packaged / "constants.json", "packaged constants.json"),
         (REGISTRY, packaged / "registry.json", "packaged registry.json"),
         (REGISTRY, ROOT / "Sources" / "AuroraACP" / "Session" / "registry.json", "Swift registry.json"),
+        (SCHEMA / "constants.json", ROOT / "Sources" / "AuroraACP" / "Security" / "constants.json", "Swift constants.json"),
     ]
     for src, dst, label in pairs:
         if not dst.is_file():

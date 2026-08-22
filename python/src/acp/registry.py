@@ -26,6 +26,7 @@ def allowed_to_send(
     negotiated_capabilities: set[str],
     handshake_complete: bool,
     negotiated_versions: dict[str, str] | None = None,
+    session_state: str | None = None,
 ) -> str | None:
     return _check(
         message_type,
@@ -35,6 +36,7 @@ def allowed_to_send(
         handshake_complete=handshake_complete,
         qos=None,
         negotiated_versions=negotiated_versions,
+        session_state=session_state,
     )
 
 
@@ -48,6 +50,7 @@ def allowed_to_receive(
     qos: str | None = None,
     envelope_version: str | None = None,
     negotiated_versions: dict[str, str] | None = None,
+    session_state: str | None = None,
 ) -> str | None:
     return _check(
         message_type,
@@ -59,6 +62,7 @@ def allowed_to_receive(
         unknown_is_error=True,
         envelope_version=envelope_version,
         negotiated_versions=negotiated_versions,
+        session_state=session_state,
     )
 
 
@@ -73,12 +77,18 @@ def _check(
     unknown_is_error: bool = False,
     envelope_version: str | None = None,
     negotiated_versions: dict[str, str] | None = None,
+    session_state: str | None = None,
 ) -> str | None:
     row = lookup(message_type)
     if row is None:
         return "unsupported_message" if unknown_is_error or handshake_complete else None
     if not handshake_complete and not row["legal_before_handshake"]:
         return "malformed_envelope"
+    legal_states = row.get("legal_session_states")
+    if legal_states:
+        actual_state = session_state or ("Established" if handshake_complete else "PreHello")
+        if actual_state not in legal_states:
+            return "security.permission_denied"
     check_ver = envelope_version or session_version
     if handshake_complete and not version_at_least(check_ver, row["min_protocol"]):
         return "unsupported_message"

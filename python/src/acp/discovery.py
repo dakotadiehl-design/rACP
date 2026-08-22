@@ -12,7 +12,7 @@ from .cbor_cde import encode as cbor_encode
 from .constants import discovery as disc_const
 from .types import NodeIdentity, ProtocolRange
 
-ALLOWED_SECURITY = frozenset({"trusted_lan", "tls", "mutual_tls"})
+ALLOWED_SECURITY = frozenset({"trusted_lan", "tls", "aurora_trust", "enrollment_spake2plus"})
 
 
 MAGIC = b"ACP0"

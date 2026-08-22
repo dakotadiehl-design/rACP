@@ -1,0 +1,30 @@
+{
+  "acp": "1.2",
+  "message_id": "0193f8d8-4c4e-7d8b-a2ab-000000000106",
+  "type": "security.enrollment.install_result",
+  "source": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001"
+  },
+  "timestamp_utc": "2026-08-17T16:42:15.231Z",
+  "qos": "reliable",
+  "flags": [],
+  "payload": {
+    "attempt_id": "0193f8d8-4c4e-7d8b-a2ab-000000000092",
+    "status": "installed",
+    "credential_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "identity_key_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "trust_domain_id": "0193f8d8-4c4e-7d8b-a2ab-000000000090",
+    "storage_posture": {
+      "class": "os_protected",
+      "hardware_backed": false,
+      "private_key_exportable": false
+    },
+    "proof_of_possession": "AQIDBA",
+    "confirmation": "AQIDBA"
+  },
+  "destination": {
+    "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002"
+  },
+  "session_id": "0193f8d8-4c4e-7d8b-a2ab-000000000013",
+  "sequence": 1
+}

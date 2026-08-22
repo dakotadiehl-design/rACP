@@ -14,6 +14,24 @@ from .testkit import identity
 from .types import Endpoint, Role
 from .ws import connect_ws, serve_ws
 
+_SECURITY_REDACT_KEYS = frozenset({
+    "bootstrap_secret", "manual_code", "shareP", "shareV", "confirmP", "confirmV",
+    "pake_message", "candidate_confirmation", "commissioner_confirmation", "channel_binding",
+    "binding", "ciphertext", "tag", "credential", "trust_anchor", "identity_public_key",
+    "public_key", "signature", "proof_of_possession", "possession_proof", "confirmation",
+    "private_key", "key_material",
+})
+
+
+def redact_security(value, key: str = ""):
+    if key in _SECURITY_REDACT_KEYS:
+        return "<redacted>"
+    if isinstance(value, dict):
+        return {name: redact_security(item, name) for name, item in value.items()}
+    if isinstance(value, list):
+        return [redact_security(item) for item in value]
+    return value
+
 
 def inspect(path: Path) -> int:
     raw = path.read_bytes()
@@ -21,7 +39,7 @@ def inspect(path: Path) -> int:
         env = decode_json(raw)
     else:
         env = decode_cbor(raw)
-    print(json.dumps(env.to_dict(), indent=2))
+    print(json.dumps(redact_security(env.to_dict()), indent=2))
     return 0
 
 
