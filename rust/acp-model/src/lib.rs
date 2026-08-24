@@ -333,10 +333,20 @@ pub mod remote {
 
     pub fn action_delivery(action: &str) -> &'static str {
         match action {
-            "cue.go" | "nav.go" | "look.take" | "show.section.next" | "show.section.previous"
-            | "show.section.restart" | "busk.fog.output" | "busk.blinder" => "live_ephemeral",
-            "show.song.select" | "output.blackout.set" | "output.grand_master.set"
-            | "busk.work_lights" | "show.progression.hold" | "bridge.blackout"
+            "cue.go"
+            | "nav.go"
+            | "look.take"
+            | "show.section.next"
+            | "show.section.previous"
+            | "show.section.restart"
+            | "busk.fog.output"
+            | "busk.blinder" => "live_ephemeral",
+            "show.song.select"
+            | "output.blackout.set"
+            | "output.grand_master.set"
+            | "busk.work_lights"
+            | "show.progression.hold"
+            | "bridge.blackout"
             | "nav.song.select" => "stateful",
             _ => "impulse",
         }
@@ -420,7 +430,10 @@ mod tests {
         assert!(remote::EXECUTABLE_SURFACE_KEYS.contains(&"expression"));
         assert!(remote::STATE_NAMESPACES.contains(&"show.current_section"));
         assert_eq!(remote::action_delivery("cue.go"), "live_ephemeral");
-        assert_eq!(remote::action_delivery("output.grand_master.set"), "stateful");
+        assert_eq!(
+            remote::action_delivery("output.grand_master.set"),
+            "stateful"
+        );
         assert!(remote::NEVER_COALESCE_ACTIONS.contains(&"nav.go"));
         let bad = Json::object(vec![("expression", Json::String("x+1".into()))]);
         assert!(remote::reject_executable(&bad).is_err());

@@ -19,6 +19,7 @@ public enum ACPCredentialState: String, Codable, Sendable {
 
 public struct ACPTransportEvidence: Sendable, Equatable {
     public let mode: ACPAuthenticationMode
+    public let profile: ACPSecurityProfile
     public let trustDomainID: String?
     public let nodeID: String?
     public let credentialID: String?
@@ -32,14 +33,15 @@ public struct ACPTransportEvidence: Sendable, Equatable {
     public let resumptionUsed: Bool
 
     public init(
-        mode: ACPAuthenticationMode, trustDomainID: String? = nil, nodeID: String? = nil,
+        mode: ACPAuthenticationMode, profile: ACPSecurityProfile = .full,
+        trustDomainID: String? = nil, nodeID: String? = nil,
         credentialID: String? = nil, identityKeyID: String? = nil,
         credentialFormat: String? = nil, channelBinding: String? = nil,
         roleConstraints: Set<String> = [], credentialState: ACPCredentialState = .invalid,
         channelBindingVerified: Bool = false, zeroRTTUsed: Bool = false,
         resumptionUsed: Bool = false
     ) {
-        self.mode = mode; self.trustDomainID = trustDomainID; self.nodeID = nodeID
+        self.mode = mode; self.profile = profile; self.trustDomainID = trustDomainID; self.nodeID = nodeID
         self.credentialID = credentialID; self.identityKeyID = identityKeyID
         self.credentialFormat = credentialFormat; self.channelBinding = channelBinding
         self.roleConstraints = roleConstraints
@@ -51,6 +53,7 @@ public struct ACPTransportEvidence: Sendable, Equatable {
 public struct ACPAuthenticatedPrincipal: Sendable, Equatable {
     public let state: ACPPrincipalState
     public let mode: ACPAuthenticationMode
+    public let profile: ACPSecurityProfile?
     public let trustDomainID: String?
     public let nodeID: String?
     public let credentialID: String?
@@ -82,7 +85,7 @@ public enum ACPSecurityAdmission {
         }
         guard let evidence else {
             if mode == .trustedLAN && !hardened {
-                return .init(state: .unauthenticated, mode: mode, trustDomainID: nil, nodeID: nil,
+                return .init(state: .unauthenticated, mode: mode, profile: nil, trustDomainID: nil, nodeID: nil,
                              credentialID: nil, identityKeyID: nil, credentialFormat: nil, roleConstraints: [])
             }
             if hardened { throw ACPSecurityAdmissionError.downgradeForbidden }
@@ -91,7 +94,7 @@ public enum ACPSecurityAdmission {
         guard mode == evidence.mode else { throw ACPSecurityAdmissionError.downgradeForbidden }
         guard mode == .auroraTrust else {
             if hardened { throw ACPSecurityAdmissionError.downgradeForbidden }
-            return .init(state: .unauthenticated, mode: mode, trustDomainID: nil, nodeID: nil,
+            return .init(state: .unauthenticated, mode: mode, profile: nil, trustDomainID: nil, nodeID: nil,
                          credentialID: nil, identityKeyID: nil, credentialFormat: nil, roleConstraints: [])
         }
         if evidence.zeroRTTUsed || evidence.resumptionUsed {
@@ -119,7 +122,8 @@ public enum ACPSecurityAdmission {
               auth["identity_key_id"] == evidence.identityKeyID,
               auth["channel_binding"] == evidence.channelBinding
         else { throw ACPSecurityAdmissionError.identityMismatch }
-        return .init(state: .authenticated, mode: mode, trustDomainID: evidence.trustDomainID,
+        return .init(state: .authenticated, mode: mode, profile: evidence.profile,
+                     trustDomainID: evidence.trustDomainID,
                      nodeID: evidence.nodeID, credentialID: evidence.credentialID,
                      identityKeyID: evidence.identityKeyID, credentialFormat: evidence.credentialFormat,
                      roleConstraints: evidence.roleConstraints)

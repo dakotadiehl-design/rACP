@@ -5,7 +5,9 @@ import json
 
 import pytest
 
-from acp.cbor_cde import decode as decode_cbor_value, encode as encode_cbor_value
+from acp.__main__ import redact_security
+from acp.cbor_cde import decode as decode_cbor_value
+from acp.cbor_cde import encode as encode_cbor_value
 from acp.codec import CodecError, decode_cbor, decode_json, encode_cbor
 from acp.constants import load
 from acp.registry import allowed_to_receive, lookup
@@ -20,8 +22,6 @@ from acp.security import (
     profile_limits,
 )
 from acp.validate import ValidationError, validate_message
-from acp.__main__ import redact_security
-
 
 ROOT_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
 NODE_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000002"
@@ -32,38 +32,57 @@ BINDING = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 def authenticated_auth() -> dict[str, object]:
     return {
         "mode": "aurora_trust",
-        "trust_domain_id": ROOT_ID, "credential_id": DIGEST, "identity_key_id": DIGEST,
-        "channel_binding": BINDING, "security_capabilities": [{"id": "aurora-trust", "version": "1.0"}],
+        "trust_domain_id": ROOT_ID,
+        "credential_id": DIGEST,
+        "identity_key_id": DIGEST,
+        "channel_binding": BINDING,
+        "security_capabilities": [{"id": "aurora-trust", "version": "1.0"}],
     }
 
 
 def evidence() -> TransportEvidence:
     return TransportEvidence(
-        AuthenticationMode.AURORA_TRUST, ROOT_ID, NODE_ID, DIGEST, DIGEST, "x509_der", BINDING,
-        credential_state=CredentialState.ACTIVE, channel_binding_verified=True,
+        AuthenticationMode.AURORA_TRUST,
+        ROOT_ID,
+        NODE_ID,
+        DIGEST,
+        DIGEST,
+        "x509_der",
+        BINDING,
+        credential_state=CredentialState.ACTIVE,
+        channel_binding_verified=True,
     )
 
 
 def test_authenticated_hello_is_bound_to_transport_evidence() -> None:
     principal = bind_hello_auth(
-        NODE_ID, authenticated_auth(), evidence(), hardened=True,
+        NODE_ID,
+        authenticated_auth(),
+        evidence(),
+        hardened=True,
         security_capabilities=(("aurora-trust", "1.0"),),
     )
     assert principal.state is PrincipalState.AUTHENTICATED
     assert principal.node_id == NODE_ID
 
 
-@pytest.mark.parametrize("mutation,code", [
-    ({"trust_domain_id": "0193f8d8-4c4e-7d8b-a2ab-000000000099"}, "security.trust_domain_mismatch"),
-    ({"credential_id": "sha256:" + "b" * 64}, "security.identity_mismatch"),
-    ({"channel_binding": "altered"}, "security.identity_mismatch"),
-    ({"mode": "trusted_lan"}, "security.downgrade_forbidden"),
-])
+@pytest.mark.parametrize(
+    "mutation,code",
+    [
+        ({"trust_domain_id": "0193f8d8-4c4e-7d8b-a2ab-000000000099"}, "security.trust_domain_mismatch"),
+        ({"credential_id": "sha256:" + "b" * 64}, "security.identity_mismatch"),
+        ({"channel_binding": "altered"}, "security.identity_mismatch"),
+        ({"mode": "trusted_lan"}, "security.downgrade_forbidden"),
+    ],
+)
 def test_authenticated_hello_rejects_binding_mutations(mutation: dict[str, object], code: str) -> None:
     auth = authenticated_auth() | mutation
     with pytest.raises(SecurityAdmissionError, match=code.replace(".", r"\.")):
         bind_hello_auth(
-            NODE_ID, auth, evidence(), hardened=True,
+            NODE_ID,
+            auth,
+            evidence(),
+            hardened=True,
             security_capabilities=(("aurora-trust", "1.0"),),
         )
 
@@ -73,31 +92,41 @@ def test_claimed_authentication_without_transport_evidence_fails_closed() -> Non
         bind_hello_auth(NODE_ID, authenticated_auth(), None, hardened=True)
 
 
-@pytest.mark.parametrize(("change", "code"), [
-    ({"credential_state": CredentialState.REVOKED}, "security.credential_revoked"),
-    ({"credential_state": CredentialState.EXPIRED}, "security.credential_expired"),
-    ({"channel_binding_verified": False}, "security.authentication_failed"),
-    ({"zero_rtt_used": True}, "security.downgrade_forbidden"),
-    ({"resumption_used": True}, "security.downgrade_forbidden"),
-])
+@pytest.mark.parametrize(
+    ("change", "code"),
+    [
+        ({"credential_state": CredentialState.REVOKED}, "security.credential_revoked"),
+        ({"credential_state": CredentialState.EXPIRED}, "security.credential_expired"),
+        ({"channel_binding_verified": False}, "security.authentication_failed"),
+        ({"zero_rtt_used": True}, "security.downgrade_forbidden"),
+        ({"resumption_used": True}, "security.downgrade_forbidden"),
+    ],
+)
 def test_invalid_transport_security_state_fails_closed(change: dict[str, object], code: str) -> None:
     from dataclasses import replace
 
     with pytest.raises(SecurityAdmissionError, match=code.replace(".", r"\.")):
         bind_hello_auth(
-            NODE_ID, authenticated_auth(), replace(evidence(), **change), hardened=True,
+            NODE_ID,
+            authenticated_auth(),
+            replace(evidence(), **change),
+            hardened=True,
             security_capabilities=(("aurora-trust", "1.0"),),
         )
 
 
-@pytest.mark.parametrize("capabilities", [(), (("security.identity", "1.0"),),
-                                            (("aurora-trust", "1.0"), ("aurora-trust", "1.0"))])
+@pytest.mark.parametrize(
+    "capabilities", [(), (("security.identity", "1.0"),), (("aurora-trust", "1.0"), ("aurora-trust", "1.0"))]
+)
 def test_missing_wrong_or_duplicate_trust_capability_fails_closed(
     capabilities: tuple[tuple[str, str], ...],
 ) -> None:
     with pytest.raises(SecurityAdmissionError):
         bind_hello_auth(
-            NODE_ID, authenticated_auth(), evidence(), hardened=True,
+            NODE_ID,
+            authenticated_auth(),
+            evidence(),
+            hardened=True,
             security_capabilities=capabilities,
         )
 
@@ -185,8 +214,11 @@ def test_rotation_and_credential_result_conditionals_are_unambiguous() -> None:
     denied["payload"] = {
         "status": "denied",
         "error": {
-            "code": "security.permission_denied", "category": "authorization",
-            "severity": "error", "message": "denied", "retryable": False,
+            "code": "security.permission_denied",
+            "category": "authorization",
+            "severity": "error",
+            "message": "denied",
+            "retryable": False,
         },
     }
     validate_message(denied)
@@ -197,16 +229,32 @@ def test_rotation_and_credential_result_conditionals_are_unambiguous() -> None:
 
 def test_enrollment_router_is_restricted_by_explicit_state() -> None:
     versions = {"security.enrollment": "1.0"}
-    assert allowed_to_receive(
-        "security.enrollment.begin", session_version="1.2", sender_role="conductor",
-        negotiated_capabilities={"security.enrollment"}, negotiated_versions=versions,
-        handshake_complete=False, qos="reliable", session_state="EnrollmentRestricted",
-    ) is None
-    assert allowed_to_receive(
-        "security.enrollment.begin", session_version="1.2", sender_role="conductor",
-        negotiated_capabilities={"security.enrollment"}, negotiated_versions=versions,
-        handshake_complete=True, qos="reliable", session_state="Established",
-    ) == "security.permission_denied"
+    assert (
+        allowed_to_receive(
+            "security.enrollment.begin",
+            session_version="1.2",
+            sender_role="conductor",
+            negotiated_capabilities={"security.enrollment"},
+            negotiated_versions=versions,
+            handshake_complete=False,
+            qos="reliable",
+            session_state="EnrollmentRestricted",
+        )
+        is None
+    )
+    assert (
+        allowed_to_receive(
+            "security.enrollment.begin",
+            session_version="1.2",
+            sender_role="conductor",
+            negotiated_capabilities={"security.enrollment"},
+            negotiated_versions=versions,
+            handshake_complete=True,
+            qos="reliable",
+            session_state="Established",
+        )
+        == "security.permission_denied"
+    )
     assert lookup("remote.control.invoke")["legal_before_handshake"] is False
 
 
@@ -225,10 +273,14 @@ def test_sensitive_annotations_survive_packaging_and_registry_generation() -> No
 
 
 def test_inspector_redacts_security_material_but_keeps_public_ids() -> None:
-    value = redact_security({
-        "trust_domain_id": ROOT_ID, "credential_id": DIGEST,
-        "shareP": "secret-share", "nested": {"channel_binding": "secret-binding"},
-    })
+    value = redact_security(
+        {
+            "trust_domain_id": ROOT_ID,
+            "credential_id": DIGEST,
+            "shareP": "secret-share",
+            "nested": {"channel_binding": "secret-binding"},
+        }
+    )
     assert value["trust_domain_id"] == ROOT_ID
     assert value["credential_id"] == DIGEST
     assert value["shareP"] == "<redacted>"

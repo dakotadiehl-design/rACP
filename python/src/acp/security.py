@@ -1,26 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, FrozenSet, Mapping
+from typing import Any
 
 from .constants import load
-
-
-class AuthenticationMode(str, Enum):
-    TRUSTED_LAN = "trusted_lan"
-    TLS = "tls"
-    AURORA_TRUST = "aurora_trust"
-    ENROLLMENT_SPAKE2PLUS = "enrollment_spake2plus"
-
-
-class PrincipalState(str, Enum):
-    UNAUTHENTICATED = "unauthenticated"
-    AUTHENTICATED = "authenticated"
-    REVOKED = "revoked"
-    EXPIRED = "expired"
-    IDENTITY_CONFLICT = "identity_conflict"
-    INVALID = "invalid"
+from .security_models import AuthenticationMode, PrincipalState, SecurityProfile
 
 
 class CredentialState(str, Enum):
@@ -39,11 +25,12 @@ class TransportEvidence:
     identity_key_id: str | None = None
     credential_format: str | None = None
     channel_binding: str | None = None
-    role_constraints: FrozenSet[str] = frozenset()
+    role_constraints: frozenset[str] = frozenset()
     credential_state: CredentialState = CredentialState.INVALID
     channel_binding_verified: bool = False
     zero_rtt_used: bool = False
     resumption_used: bool = False
+    profile: SecurityProfile = SecurityProfile.FULL
 
 
 @dataclass(frozen=True)
@@ -55,7 +42,8 @@ class AuthenticatedPrincipal:
     credential_id: str | None
     identity_key_id: str | None
     credential_format: str | None
-    role_constraints: FrozenSet[str]
+    role_constraints: frozenset[str]
+    profile: SecurityProfile | None = None
 
 
 class SecurityAdmissionError(ValueError):
@@ -83,9 +71,7 @@ def bind_hello_auth(
             return AuthenticatedPrincipal(
                 PrincipalState.UNAUTHENTICATED, claimed_mode, None, None, None, None, None, frozenset()
             )
-        raise SecurityAdmissionError(
-            "security.downgrade_forbidden" if hardened else "security.credential_invalid"
-        )
+        raise SecurityAdmissionError("security.downgrade_forbidden" if hardened else "security.credential_invalid")
     if claimed_mode is not evidence.mode:
         raise SecurityAdmissionError("security.downgrade_forbidden")
     if claimed_mode is not AuthenticationMode.AURORA_TRUST:
@@ -140,6 +126,7 @@ def bind_hello_auth(
         evidence.identity_key_id,
         evidence.credential_format,
         evidence.role_constraints,
+        profile=evidence.profile,
     )
 
 

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "acp-model",
     "acp-codec",
+    "acp-security",
     "acp-session",
 ]
 

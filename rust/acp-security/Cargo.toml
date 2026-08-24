@@ -1,0 +1,16 @@
+[package]
+name = "acp-security"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "ACP Aurora Trust typed security and provider boundaries"
+rust-version.workspace = true
+
+[dependencies]
+acp-model = { path = "../acp-model" }
+acp-codec = { path = "../acp-codec" }
+hmac = "0.12"
+sha2 = "0.10"
+
+[lints]
+workspace = true

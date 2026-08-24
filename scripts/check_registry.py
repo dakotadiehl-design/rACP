@@ -35,7 +35,10 @@ def resolve_schema(ref: str) -> Path:
 
 def main() -> int:
     if not REGISTRY.exists():
-        print("missing schema/registry.json — run scripts/gen_registry.py", file=sys.stderr)
+        print(
+            "missing schema/registry.json — run scripts/gen_registry.py",
+            file=sys.stderr,
+        )
         return 1
     data = json.loads(REGISTRY.read_text())
     messages = data["messages"]
@@ -117,7 +120,9 @@ def _schema_ref_closure(roots: set[str]) -> set[str]:
             if not target:
                 continue
             if target.startswith("../"):
-                target = str((path.parent / target).resolve().relative_to(SCHEMA.resolve()))
+                target = str(
+                    (path.parent / target).resolve().relative_to(SCHEMA.resolve())
+                )
             elif "/" not in target and not target.startswith("http"):
                 target = f"{path.parent.relative_to(SCHEMA).as_posix()}/{target}"
             if target.endswith(".json") and target not in found and target not in roots:
@@ -153,7 +158,9 @@ def _compile_and_validate_vectors(messages: list[dict]) -> list[str]:
     for path in SCHEMA.rglob("*.schema.json"):
         doc = json.loads(path.read_text())
         uri = doc.get("$id") or path.resolve().as_uri()
-        registry = registry.with_resource(uri, Resource.from_contents(doc, default_specification=DRAFT202012))
+        registry = registry.with_resource(
+            uri, Resource.from_contents(doc, default_specification=DRAFT202012)
+        )
         cls = validator_for(doc)
         cls.check_schema(doc)
 
@@ -175,8 +182,11 @@ def _compile_and_validate_vectors(messages: list[dict]) -> list[str]:
                 decoded = again.to_dict()
                 payload = decoded.get("payload")
                 data = payload.get("data") if isinstance(payload, dict) else None
-                if again.type == "resource.chunk" and isinstance(data, (bytes, bytearray)):
+                if again.type == "resource.chunk" and isinstance(
+                    data, (bytes, bytearray)
+                ):
                     import base64
+
                     payload = dict(payload)
                     payload["data"] = base64.b64encode(bytes(data)).decode("ascii")
                     decoded["payload"] = payload
@@ -197,10 +207,22 @@ def _packaged_data_drift() -> list[str]:
     errors: list[str] = []
     packaged = ROOT / "python" / "src" / "acp" / "data"
     pairs = [
-        (SCHEMA / "constants.json", packaged / "constants.json", "packaged constants.json"),
+        (
+            SCHEMA / "constants.json",
+            packaged / "constants.json",
+            "packaged constants.json",
+        ),
         (REGISTRY, packaged / "registry.json", "packaged registry.json"),
-        (REGISTRY, ROOT / "Sources" / "AuroraACP" / "Session" / "registry.json", "Swift registry.json"),
-        (SCHEMA / "constants.json", ROOT / "Sources" / "AuroraACP" / "Security" / "constants.json", "Swift constants.json"),
+        (
+            REGISTRY,
+            ROOT / "Sources" / "AuroraACP" / "Session" / "registry.json",
+            "Swift registry.json",
+        ),
+        (
+            SCHEMA / "constants.json",
+            ROOT / "Sources" / "AuroraACP" / "Security" / "constants.json",
+            "Swift constants.json",
+        ),
     ]
     for src, dst, label in pairs:
         if not dst.is_file():
@@ -225,8 +247,14 @@ def _schema_pack_drift() -> list[str]:
     for path in sorted(SCHEMA.rglob("*.schema.json")):
         rel = path.relative_to(SCHEMA).as_posix()
         docs[rel] = json.loads(path.read_text())
-    messages = {row["type"]: row["schema"] for row in json.loads(REGISTRY.read_text())["messages"]}
-    expected = json.dumps({"docs": docs, "messages": messages}, indent=2, sort_keys=True) + "\n"
+    messages = {
+        row["type"]: row["schema"]
+        for row in json.loads(REGISTRY.read_text())["messages"]
+    }
+    expected = (
+        json.dumps({"docs": docs, "messages": messages}, indent=2, sort_keys=True)
+        + "\n"
+    )
     errors: list[str] = []
     for dest in (
         SCHEMA / "schema_pack.json",
@@ -236,7 +264,9 @@ def _schema_pack_drift() -> list[str]:
         if not dest.is_file():
             errors.append(f"schema pack missing {dest}")
         elif dest.read_text() != expected:
-            errors.append(f"schema pack out of date: {dest} (run scripts/pack_schemas.py)")
+            errors.append(
+                f"schema pack out of date: {dest} (run scripts/pack_schemas.py)"
+            )
     return errors
 
 

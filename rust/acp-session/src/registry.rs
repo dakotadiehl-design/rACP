@@ -103,6 +103,9 @@ pub fn allowed(
     )
 }
 
+// This mirrors the registry's independent admission dimensions. Keeping them explicit avoids
+// constructing a partially populated context that could accidentally default an authority input.
+#[allow(clippy::too_many_arguments)]
 pub fn allowed_in_state(
     message_type: &str,
     sender_role: &str,
