@@ -31,6 +31,9 @@ ATTEMPT = "0193f8d8-4c4e-7d8b-a2ab-000000000092"
 DIGEST = "sha256:" + SHA
 EMPTY_PERMISSIONS_DIGEST = "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0"
 B64URL = "AQIDBA"
+B64URL_12 = base64.urlsafe_b64encode(bytes(range(12))).decode("ascii").rstrip("=")
+B64URL_32 = base64.urlsafe_b64encode(bytes(range(32))).decode("ascii").rstrip("=")
+B64URL_65 = base64.urlsafe_b64encode(bytes([4]) + bytes(range(64))).decode("ascii").rstrip("=")
 ASSET = {
     "asset_id": AID,
     "asset_type": "lyric.chart",
@@ -116,23 +119,23 @@ def payloads() -> dict[str, dict]:
             "trust_domain_id": DOMAIN, "suite": "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1",
             "requested_role": "bridge", "requested_permissions_digest": EMPTY_PERMISSIONS_DIGEST,
             "identity_algorithm": "ecdsa_p256_sha256", "identity_key_id": DIGEST,
-            "identity_public_key": B64URL, "shareP": B64URL,
+            "identity_public_key": B64URL_65, "shareP": B64URL_65,
         },
         "security.enrollment.response": {
-            "attempt_id": ATTEMPT, "shareV": B64URL, "confirmV": B64URL,
+            "attempt_id": ATTEMPT, "shareV": B64URL_65, "confirmV": B64URL_32,
         },
         "security.enrollment.confirm": {
-            "attempt_id": ATTEMPT, "confirmP": B64URL,
+            "attempt_id": ATTEMPT, "confirmP": B64URL_32,
         },
         "security.enrollment.approval": {
-            "attempt_id": ATTEMPT, "enrollment_id": ENROLLMENT, "nonce": B64URL,
+            "attempt_id": ATTEMPT, "enrollment_id": ENROLLMENT, "nonce": B64URL_12,
             "ciphertext": B64URL,
         },
         "security.enrollment.install_result": {
             "attempt_id": ATTEMPT, "status": "installed", "credential_id": DIGEST,
             "identity_key_id": DIGEST, "trust_domain_id": DOMAIN,
             "storage_posture": {"class": "os_protected", "hardware_backed": False, "private_key_exportable": False},
-            "proof_of_possession": B64URL, "confirmation": B64URL,
+            "proof_of_possession": B64URL, "confirmation": B64URL_32,
         },
         "security.enrollment.cancel": {
             "enrollment_id": ENROLLMENT, "attempt_id": ATTEMPT, "reason": "operator_cancelled",
@@ -162,7 +165,7 @@ def payloads() -> dict[str, dict]:
             "algorithm": "ecdsa_p256_sha256", "signature": B64URL,
         },
         "security.identity.reset": {
-            "trust_domain_id": DOMAIN, "node_id": DST, "credential_id": DIGEST, "confirmation": B64URL,
+            "trust_domain_id": DOMAIN, "node_id": DST, "credential_id": DIGEST, "confirmation": B64URL_32,
         },
         "security.state": {
             "principal_state": "authenticated", "auth_mode": "aurora_trust", "profile": "full",
@@ -172,7 +175,7 @@ def payloads() -> dict[str, dict]:
         "security.lightweight.finished": {
             "sender_credential_id": DIGEST, "receiver_credential_id": "sha256:" + "b" * 64,
             "sender_node_id": SRC, "receiver_node_id": DST, "trust_domain_id": DOMAIN,
-            "binding": B64URL,
+            "binding": B64URL_32,
         },
         "session.goodbye": {"reason": "shutdown"},
         "discovery.query": {"role_filter": ["bridge"]},

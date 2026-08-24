@@ -32,7 +32,7 @@
             "trust_domain_id": { "$ref": "../common/defs.schema.json#/$defs/trust_domain_id" },
             "credential_id": { "$ref": "../common/defs.schema.json#/$defs/credential_id" },
             "identity_key_id": { "$ref": "../common/defs.schema.json#/$defs/identity_key_id" },
-            "channel_binding": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes" },
+            "channel_binding": { "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32" },
             "security_capabilities": {
               "type": "array", "maxItems": 16, "uniqueItems": true,
               "items": { "$ref": "../common/defs.schema.json#/$defs/capability" }
@@ -40,7 +40,13 @@
           },
           "allOf": [{
             "if": { "properties": { "mode": { "const": "aurora_trust" } }, "required": ["mode"] },
-            "then": { "required": ["trust_domain_id", "credential_id", "identity_key_id", "channel_binding", "security_capabilities"] }
+            "then": {
+              "required": ["trust_domain_id", "credential_id", "identity_key_id", "channel_binding", "security_capabilities"],
+              "properties": { "security_capabilities": { "contains": {
+                "type": "object", "required": ["id", "version"],
+                "properties": { "id": { "const": "aurora-trust" }, "version": { "const": "1.0" } }
+              } } }
+            }
           }]
         }
       }

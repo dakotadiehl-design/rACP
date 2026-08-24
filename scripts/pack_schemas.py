@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +12,12 @@ SCHEMA = ROOT / "schema"
 OUT = SCHEMA / "schema_pack.json"
 PYTHON_OUT = ROOT / "python" / "src" / "acp" / "data" / "schema" / "schema_pack.json"
 SWIFT_OUT = ROOT / "Sources" / "AuroraACP" / "Codec" / "schema_pack.json"
+PYTHON_SCHEMA_OUT = ROOT / "python" / "src" / "acp" / "data" / "schema"
+CONSTANT_OUTPUTS = (
+    ROOT / "python" / "src" / "acp" / "data" / "constants.json",
+    PYTHON_SCHEMA_OUT / "constants.json",
+    ROOT / "Sources" / "AuroraACP" / "Security" / "constants.json",
+)
 
 
 def main() -> int:
@@ -25,6 +32,13 @@ def main() -> int:
     for dest in (OUT, PYTHON_OUT, SWIFT_OUT):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
+    for path in sorted(SCHEMA.rglob("*.schema.json")):
+        destination = PYTHON_SCHEMA_OUT / path.relative_to(SCHEMA)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, destination)
+    for destination in CONSTANT_OUTPUTS:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(SCHEMA / "constants.json", destination)
     print(f"packed {len(docs)} schemas, {len(messages)} messages")
     return 0
 

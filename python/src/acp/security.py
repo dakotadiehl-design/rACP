@@ -23,6 +23,13 @@ class PrincipalState(str, Enum):
     INVALID = "invalid"
 
 
+class CredentialState(str, Enum):
+    ACTIVE = "active"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
+    INVALID = "invalid"
+
+
 @dataclass(frozen=True)
 class TransportEvidence:
     mode: AuthenticationMode
@@ -33,6 +40,10 @@ class TransportEvidence:
     credential_format: str | None = None
     channel_binding: str | None = None
     role_constraints: FrozenSet[str] = frozenset()
+    credential_state: CredentialState = CredentialState.INVALID
+    channel_binding_verified: bool = False
+    zero_rtt_used: bool = False
+    resumption_used: bool = False
 
 
 @dataclass(frozen=True)
@@ -59,6 +70,7 @@ def bind_hello_auth(
     evidence: TransportEvidence | None,
     *,
     hardened: bool,
+    security_capabilities: tuple[tuple[str, str], ...] = (),
 ) -> AuthenticatedPrincipal:
     """Bind HELLO claims to verified transport evidence; claims never create authority."""
     try:
@@ -82,6 +94,30 @@ def bind_hello_auth(
         return AuthenticatedPrincipal(
             PrincipalState.UNAUTHENTICATED, claimed_mode, None, None, None, None, None, frozenset()
         )
+    if evidence.zero_rtt_used or evidence.resumption_used:
+        raise SecurityAdmissionError("security.downgrade_forbidden")
+    if evidence.credential_state is CredentialState.REVOKED:
+        raise SecurityAdmissionError("security.credential_revoked")
+    if evidence.credential_state is CredentialState.EXPIRED:
+        raise SecurityAdmissionError("security.credential_expired")
+    if evidence.credential_state is not CredentialState.ACTIVE:
+        raise SecurityAdmissionError("security.credential_invalid")
+    if not evidence.channel_binding_verified:
+        raise SecurityAdmissionError("security.authentication_failed")
+    if len({item[0] for item in security_capabilities}) != len(security_capabilities):
+        raise SecurityAdmissionError("security.credential_invalid")
+    if ("aurora-trust", "1.0") not in security_capabilities:
+        raise SecurityAdmissionError("security.downgrade_forbidden")
+    if not all(
+        (
+            evidence.node_id,
+            evidence.trust_domain_id,
+            evidence.credential_id,
+            evidence.identity_key_id,
+            evidence.channel_binding,
+        )
+    ):
+        raise SecurityAdmissionError("security.credential_invalid")
     bindings = {
         "trust_domain_id": evidence.trust_domain_id,
         "credential_id": evidence.credential_id,

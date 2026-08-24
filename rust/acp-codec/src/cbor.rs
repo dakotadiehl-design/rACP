@@ -17,6 +17,20 @@ const MAX_DEPTH: usize = 16;
 const MAX_ITEMS: u64 = 1_048_576;
 const MAX_BYTES: u64 = 8 * 1024 * 1024;
 
+fn requires_tag0(key: &str) -> bool {
+    matches!(
+        key,
+        "timestamp_utc"
+            | "effective_at"
+            | "expires_at"
+            | "issued_at"
+            | "next_update"
+            | "not_before"
+            | "revoked_at"
+            | "rotation_deadline"
+    )
+}
+
 fn err(msg: impl Into<String>) -> CborError {
     CborError(msg.into())
 }
@@ -96,6 +110,12 @@ fn write_value(out: &mut Vec<u8>, value: &Json) -> Result<(), CborError> {
                 let mut kb = Vec::new();
                 write_value(&mut kb, &Json::String(k.clone()))?;
                 let mut vb = Vec::new();
+                if requires_tag0(k) {
+                    if !matches!(v, Json::String(_)) {
+                        return Err(err("tag 0 timestamp must be text"));
+                    }
+                    vb.push(0xc0);
+                }
                 write_value(&mut vb, v)?;
                 encoded.push((kb, vb));
             }
@@ -236,6 +256,9 @@ fn read_value(data: &[u8], mut offset: usize, depth: usize) -> Result<(Json, usi
                 let Json::String(k) = key else {
                     return Err(err("map keys must be text"));
                 };
+                if requires_tag0(&k) && data.get(off) != Some(&0xc0) {
+                    return Err(err("timestamp must use CBOR tag 0"));
+                }
                 let (val, next) = read_value(data, off, depth + 1)?;
                 off = next;
                 pairs.push((k, val));

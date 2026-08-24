@@ -27,7 +27,13 @@ final class ACPEncodingTests: XCTestCase {
                 print("WROTE \(tmp.path) swift-\(id).cbor")
             }
             XCTAssertEqual(encoded, pinned, "cbor mismatch \(id)")
-            let again = try ACPEncoding.decodeCBOR(pinned)
+            let again: ACPEnvelope
+            do {
+                again = try ACPEncoding.decodeCBOR(pinned)
+            } catch {
+                XCTFail("CBOR decode failed for \(id): \(error)")
+                continue
+            }
             XCTAssertEqual(again, env, "decoded envelope mismatch \(id)")
             let jsonAgain = try ACPEncoding.encodeJSON(again)
             let viaJSON = try ACPEncoding.decodeJSON(jsonAgain)

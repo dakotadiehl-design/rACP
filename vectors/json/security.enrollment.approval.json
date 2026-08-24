@@ -11,7 +11,7 @@
   "payload": {
     "attempt_id": "0193f8d8-4c4e-7d8b-a2ab-000000000092",
     "enrollment_id": "0193f8d8-4c4e-7d8b-a2ab-000000000091",
-    "nonce": "AQIDBA",
+    "nonce": "AAECAwQFBgcICQoL",
     "ciphertext": "AQIDBA"
   },
   "destination": {

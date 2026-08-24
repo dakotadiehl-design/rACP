@@ -563,7 +563,7 @@
       "id": "security.enrollment.status",
       "json": "json/security.enrollment.status.json",
       "cbor": "cbor/security.enrollment.status.cbor",
-      "sha256": "af3ff3a93ec72dd2d05eacb25029cd64cc205a5e44ab4d77d88b6bd8e98ff817"
+      "sha256": "ef686342cae65e82f72c6fca27867198eb09f9e31cc1012932de6b8ecfba6fb4"
     },
     {
       "id": "security.enrollment.begin",
@@ -575,31 +575,31 @@
       "id": "security.enrollment.challenge",
       "json": "json/security.enrollment.challenge.json",
       "cbor": "cbor/security.enrollment.challenge.cbor",
-      "sha256": "39183aedac7dbd5fade294e7e42709508ead4a1fd100e79049d97b0df6fbc3af"
+      "sha256": "0783fe6a7cebcfd911729c6f77aa28b2af61dfca1e4f83d938063f3a19d2ecc8"
     },
     {
       "id": "security.enrollment.response",
       "json": "json/security.enrollment.response.json",
       "cbor": "cbor/security.enrollment.response.cbor",
-      "sha256": "e302f1892ce7f7ef9fe062ac6f3cf78a858ac6d915e8b2fc12557685c36eed32"
+      "sha256": "46929bbba9fb4fc704d584374c5cd60a1735fbd0dd375856a77dc4baead92d7d"
     },
     {
       "id": "security.enrollment.confirm",
       "json": "json/security.enrollment.confirm.json",
       "cbor": "cbor/security.enrollment.confirm.cbor",
-      "sha256": "3dd79ce2afd115eb654550c0a339c5d39b82c5190ec2e36e8c0985e79cde18f7"
+      "sha256": "ee934be9f42c818eb9a8df24dce43a62094d194693445c6943ee93d5a10849c7"
     },
     {
       "id": "security.enrollment.approval",
       "json": "json/security.enrollment.approval.json",
       "cbor": "cbor/security.enrollment.approval.cbor",
-      "sha256": "f65c85f9f9f4961bce37439b8125aabd56bdc7e855caca7481b70ecf4a4c2604"
+      "sha256": "5961223ca3704875f2553b32e8cdda9b37315a3a4b30acb0c3edc3cfc7dbc19c"
     },
     {
       "id": "security.enrollment.install_result",
       "json": "json/security.enrollment.install_result.json",
       "cbor": "cbor/security.enrollment.install_result.cbor",
-      "sha256": "2d8fd0eae8d8dbfb3285657d24d8c382f702b1460bd1c9816bbe335fde46a4e7"
+      "sha256": "4309164fc2c04c77cc00870e3cc7e671cce0b6a010bf304a982c0fcf3d55c516"
     },
     {
       "id": "security.enrollment.cancel",
@@ -611,19 +611,19 @@
       "id": "security.credential.renew",
       "json": "json/security.credential.renew.json",
       "cbor": "cbor/security.credential.renew.cbor",
-      "sha256": "e16fa53e78ac65ff81788e8939ac828394761f58afcd01364df016dac3eab44c"
+      "sha256": "13c4fce4969367d0c7d0a640892aff784e3c3b8a3d8f8f6dfda5351218ee60b5"
     },
     {
       "id": "security.credential.result",
       "json": "json/security.credential.result.json",
       "cbor": "cbor/security.credential.result.cbor",
-      "sha256": "f2210eb5e69e3ed3ace6b6ec1e887ec6dcee22978f988aa886930ba6f6a190a0"
+      "sha256": "217d3a7ade5336c9b83879024dff88d91d87e87a06b9d5ca3ebbceabcbf6c13d"
     },
     {
       "id": "security.credential.revoke",
       "json": "json/security.credential.revoke.json",
       "cbor": "cbor/security.credential.revoke.cbor",
-      "sha256": "a40432974eb189179bcbfb9f82b9a93b0fab32c539f89685b696266b00974421"
+      "sha256": "5c1090f4a3343d78f077a46e023500b5acc31e17988a4198d6a17c178bae39b8"
     },
     {
       "id": "security.credential.status",
@@ -635,13 +635,13 @@
       "id": "security.revocation.update",
       "json": "json/security.revocation.update.json",
       "cbor": "cbor/security.revocation.update.cbor",
-      "sha256": "cb7d676b3dec209eccc9c5207a75832e7bf8a64d9637069f5eeb46c899bba605"
+      "sha256": "3cf08d58b5d3824a06c8301872e227caea3f65c6d50dee928fda225bd4363efb"
     },
     {
       "id": "security.identity.reset",
       "json": "json/security.identity.reset.json",
       "cbor": "cbor/security.identity.reset.cbor",
-      "sha256": "27648035aa963a724bfa12eec83f804c851aa04f8d20d01097acbfcfedc01046"
+      "sha256": "1ef8f38ac71e3f510757e4fa20c55529726ed2368cdda8f1b16b8b80fc8b2a70"
     },
     {
       "id": "security.state",
@@ -653,7 +653,7 @@
       "id": "security.lightweight.finished",
       "json": "json/security.lightweight.finished.json",
       "cbor": "cbor/security.lightweight.finished.cbor",
-      "sha256": "fc92017f5f2c66dc64b95b28951886aff7a66f36cb124405d1c3d2dde2e08de1"
+      "sha256": "2ba17159858410bf6001a5745b1057fea759efcd4681526c4775c5a9707a001e"
     }
   ]
 }

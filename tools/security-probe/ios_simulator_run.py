@@ -11,12 +11,13 @@ import platform
 import subprocess
 import sys
 import tempfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = Path(__file__).resolve().parent
@@ -26,6 +27,80 @@ SDK = Path(
 )
 TARGET = "arm64-apple-ios16.0-simulator"
 SCALAR = 0x123456789ABCDEF123456789ABCDEF123456789ABCDEF123456789ABCDEF
+
+
+def make_x509_policy_fixtures(directory: Path, domain: str, node: str) -> tuple[Path, Path]:
+    """Create distinct deterministic-profile fixtures; no negative case reuses a CA as a leaf."""
+    now = datetime.now(UTC)
+    root_key = ec.derive_private_key(SCALAR + 1, ec.SECP256R1())
+    other_root_key = ec.derive_private_key(SCALAR + 2, ec.SECP256R1())
+
+    def root(name: str, key: ec.EllipticCurvePrivateKey) -> x509.Certificate:
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])
+        return (
+            x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=3650))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .sign(key, hashes.SHA256())
+        )
+
+    trusted_root = root("ACP test root", root_key)
+    other_root = root("Other test root", other_root_key)
+    uri = f"urn:aurora:acp:node:{domain}:{node}"
+
+    def leaf(
+        name: str, *, san_uri: str | None = uri, client_eku: bool = True,
+        server_eku: bool = True, digital_signature: bool = True, key_encipherment: bool = False,
+        ca: bool = False, issuer: x509.Certificate = trusted_root,
+        issuer_key: ec.EllipticCurvePrivateKey = root_key,
+        not_before: datetime = now - timedelta(hours=1),
+        not_after: datetime = now + timedelta(days=30),
+    ) -> Path:
+        key = ec.derive_private_key(SCALAR + 100 + len(list(directory.glob("*.der"))), ec.SECP256R1())
+        builder = (
+            x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)]))
+            .issuer_name(issuer.subject).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(not_before).not_valid_after(not_after)
+            .add_extension(x509.BasicConstraints(ca=ca, path_length=0 if ca else None), critical=True)
+            .add_extension(
+                x509.KeyUsage(digital_signature, False, key_encipherment, False, False, ca, ca, False, False),
+                critical=True,
+            )
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()), critical=False)
+        )
+        if san_uri is not None:
+            builder = builder.add_extension(x509.SubjectAlternativeName([x509.UniformResourceIdentifier(san_uri)]), False)
+        usages = []
+        if client_eku:
+            usages.append(ExtendedKeyUsageOID.CLIENT_AUTH)
+        if server_eku:
+            usages.append(ExtendedKeyUsageOID.SERVER_AUTH)
+        if usages:
+            builder = builder.add_extension(x509.ExtendedKeyUsage(usages), critical=False)
+        path = directory / f"{name}.der"
+        path.write_bytes(builder.sign(issuer_key, hashes.SHA256()).public_bytes(serialization.Encoding.DER))
+        return path
+
+    root_path = directory / "root.der"
+    root_path.write_bytes(trusted_root.public_bytes(serialization.Encoding.DER))
+    (directory / "other_root.der").write_bytes(other_root.public_bytes(serialization.Encoding.DER))
+    valid_path = leaf("valid")
+    leaf("wrong_domain", san_uri=f"urn:aurora:acp:node:00000000-0000-4000-8000-000000000000:{node}")
+    leaf("wrong_node", san_uri=f"urn:aurora:acp:node:{domain}:00000000-0000-4000-8000-000000000000")
+    leaf("wrong_san", san_uri="urn:not-aurora:node")
+    leaf("cn_only", san_uri=None)
+    leaf("wrong_eku", server_eku=False)
+    leaf("wrong_ku", digital_signature=False, key_encipherment=True)
+    leaf("ca_true", ca=True)
+    leaf("invalid_chain", issuer=other_root, issuer_key=other_root_key)
+    leaf("expired", not_before=now - timedelta(days=30), not_after=now - timedelta(days=1))
+    leaf("future", not_before=now + timedelta(days=1), not_after=now + timedelta(days=30))
+    return valid_path, root_path
 
 
 def run(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
@@ -139,13 +214,17 @@ def main() -> int:
             probes.append(probe("x509.acp_identity_policy", "FAIL", x509_compile.stderr[-1000:]))
         else:
             san = x509_vector["san_uri"].split(":")
-            parsed_leaf = x509.load_der_x509_certificate(leaf.read_bytes())
+            fixture_dir = temp / "x509-policy"
+            fixture_dir.mkdir()
+            policy_leaf, policy_root = make_x509_policy_fixtures(fixture_dir, san[-2], san[-1])
+            parsed_leaf = x509.load_der_x509_certificate(policy_leaf.read_bytes())
             spki = parsed_leaf.public_key().public_bytes(
                 serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo
             )
             x509_run = run([
-                "xcrun", "simctl", "spawn", args.device, str(x509_policy), str(leaf), str(root),
-                san[-2], san[-1], x509_vector["leaf_credential_id"], "sha256:" + hashlib.sha256(spki).hexdigest(),
+                "xcrun", "simctl", "spawn", args.device, str(x509_policy), str(fixture_dir),
+                san[-2], san[-1], "sha256:" + hashlib.sha256(policy_leaf.read_bytes()).hexdigest(),
+                "sha256:" + hashlib.sha256(spki).hexdigest(),
             ])
             try:
                 probes.extend(json.loads(x509_run.stdout))

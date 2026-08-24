@@ -10,7 +10,7 @@ from typing import Any
 from .cbor_cde import CborError, CborTag
 from .cbor_cde import decode as cbor_decode
 from .cbor_cde import encode as cbor_encode
-from .constants import limits
+from .constants import limits, load
 from .envelope import Envelope
 from .types import parse_ts
 from .validate import ValidationError, filter_payload, validate_message
@@ -39,6 +39,73 @@ def _prep_for_cbor(value: Any) -> Any:
     if isinstance(value, (bytes, bytearray)):
         return bytes(value)
     return value
+
+
+def _security_binary_paths(message_type: str) -> list[str]:
+    return list(load().get("security", {}).get("binary_fields", {}).get(message_type, []))
+
+
+def _base64url_decode(value: str) -> bytes:
+    if not value or "=" in value:
+        raise CodecError("security byte strings require unpadded base64url")
+    try:
+        raw = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
+    except Exception as exc:  # noqa: BLE001
+        raise CodecError("invalid security base64url") from exc
+    if base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii") != value:
+        raise CodecError("non-canonical security base64url")
+    return raw
+
+
+def _transform_path(payload: dict[str, Any], path: str, *, to_cbor: bool) -> None:
+    parts = path.split(".")
+    node: Any = payload
+    for part in parts[:-1]:
+        if not isinstance(node, dict) or part not in node:
+            return
+        node = node[part]
+    if not isinstance(node, dict) or parts[-1] not in node:
+        return
+    value = node[parts[-1]]
+    if to_cbor:
+        if not isinstance(value, str):
+            raise CodecError(f"{path} must be base64url text before CBOR encoding")
+        node[parts[-1]] = _base64url_decode(value)
+    else:
+        if not isinstance(value, (bytes, bytearray)):
+            raise CodecError(f"{path} must be a CBOR byte string")
+        node[parts[-1]] = base64.urlsafe_b64encode(bytes(value)).rstrip(b"=").decode("ascii")
+
+
+def _normalize_security_bytes(payload: dict[str, Any], message_type: str, *, to_cbor: bool) -> dict[str, Any]:
+    if not _security_binary_paths(message_type):
+        return payload
+    import copy
+    converted = copy.deepcopy(payload)
+    for path in _security_binary_paths(message_type):
+        _transform_path(converted, path, to_cbor=to_cbor)
+    return converted
+
+
+def _normalize_security_timestamps(value: Any, *, to_cbor: bool) -> Any:
+    timestamp_fields = set(load().get("security", {}).get("timestamp_fields", []))
+    if isinstance(value, list):
+        return [_normalize_security_timestamps(item, to_cbor=to_cbor) for item in value]
+    if not isinstance(value, dict):
+        return value
+    converted: dict[str, Any] = {}
+    for key, item in value.items():
+        if key in timestamp_fields:
+            if to_cbor:
+                if not isinstance(item, str):
+                    raise CodecError(f"{key} must be RFC3339 text before CBOR encoding")
+                parse_ts(item)
+                converted[key] = CborTag(0, item)
+            else:
+                converted[key] = _unwrap_ts(item)
+        else:
+            converted[key] = _normalize_security_timestamps(item, to_cbor=to_cbor)
+    return converted
 
 
 def _restore_chunk_bytes(payload: dict[str, Any], message_type: str) -> dict[str, Any]:
@@ -127,6 +194,11 @@ def encode_cbor(envelope: Envelope) -> bytes:
         if isinstance(raw, str):
             chunk["data"] = base64.b64decode(raw)
         data["payload"] = chunk
+    elif isinstance(payload, dict):
+        payload = _normalize_security_bytes(payload, envelope.type, to_cbor=True)
+        if envelope.type.startswith("security."):
+            payload = _normalize_security_timestamps(payload, to_cbor=True)
+        data["payload"] = payload
     encoded = cbor_encode(_prep_for_cbor(data))
     if len(encoded) > limits()["max_message_bytes"]:
         raise CodecError("envelope exceeds max_message_bytes")
@@ -175,6 +247,10 @@ def decode_cbor(raw: bytes) -> Envelope:
         payload = dict(data["payload"])
         if str(data.get("type", "")) == "resource.chunk" and isinstance(payload.get("data"), str):
             payload["data"] = base64.b64decode(payload["data"])
+        elif _security_binary_paths(str(data.get("type", ""))):
+            payload = _normalize_security_bytes(payload, str(data.get("type", "")), to_cbor=False)
+        if str(data.get("type", "")).startswith("security."):
+            payload = _normalize_security_timestamps(payload, to_cbor=False)
         data["payload"] = payload
     return _envelope_from_object(data)
 

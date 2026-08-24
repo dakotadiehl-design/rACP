@@ -5,10 +5,13 @@ import json
 
 import pytest
 
+from acp.cbor_cde import decode as decode_cbor_value, encode as encode_cbor_value
+from acp.codec import CodecError, decode_cbor, decode_json, encode_cbor
 from acp.constants import load
 from acp.registry import allowed_to_receive, lookup
 from acp.security import (
     AuthenticationMode,
+    CredentialState,
     PrincipalState,
     SecurityAdmissionError,
     TransportEvidence,
@@ -23,22 +26,29 @@ from acp.__main__ import redact_security
 ROOT_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
 NODE_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000002"
 DIGEST = "sha256:" + "a" * 64
+BINDING = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
 
 
 def authenticated_auth() -> dict[str, object]:
     return {
         "mode": "aurora_trust",
         "trust_domain_id": ROOT_ID, "credential_id": DIGEST, "identity_key_id": DIGEST,
-        "channel_binding": "AQIDBA", "security_capabilities": [{"id": "security.identity", "version": "1.0"}],
+        "channel_binding": BINDING, "security_capabilities": [{"id": "aurora-trust", "version": "1.0"}],
     }
 
 
 def evidence() -> TransportEvidence:
-    return TransportEvidence(AuthenticationMode.AURORA_TRUST, ROOT_ID, NODE_ID, DIGEST, DIGEST, "x509_der", "AQIDBA")
+    return TransportEvidence(
+        AuthenticationMode.AURORA_TRUST, ROOT_ID, NODE_ID, DIGEST, DIGEST, "x509_der", BINDING,
+        credential_state=CredentialState.ACTIVE, channel_binding_verified=True,
+    )
 
 
 def test_authenticated_hello_is_bound_to_transport_evidence() -> None:
-    principal = bind_hello_auth(NODE_ID, authenticated_auth(), evidence(), hardened=True)
+    principal = bind_hello_auth(
+        NODE_ID, authenticated_auth(), evidence(), hardened=True,
+        security_capabilities=(("aurora-trust", "1.0"),),
+    )
     assert principal.state is PrincipalState.AUTHENTICATED
     assert principal.node_id == NODE_ID
 
@@ -52,12 +62,44 @@ def test_authenticated_hello_is_bound_to_transport_evidence() -> None:
 def test_authenticated_hello_rejects_binding_mutations(mutation: dict[str, object], code: str) -> None:
     auth = authenticated_auth() | mutation
     with pytest.raises(SecurityAdmissionError, match=code.replace(".", r"\.")):
-        bind_hello_auth(NODE_ID, auth, evidence(), hardened=True)
+        bind_hello_auth(
+            NODE_ID, auth, evidence(), hardened=True,
+            security_capabilities=(("aurora-trust", "1.0"),),
+        )
 
 
 def test_claimed_authentication_without_transport_evidence_fails_closed() -> None:
     with pytest.raises(SecurityAdmissionError, match="downgrade_forbidden"):
         bind_hello_auth(NODE_ID, authenticated_auth(), None, hardened=True)
+
+
+@pytest.mark.parametrize(("change", "code"), [
+    ({"credential_state": CredentialState.REVOKED}, "security.credential_revoked"),
+    ({"credential_state": CredentialState.EXPIRED}, "security.credential_expired"),
+    ({"channel_binding_verified": False}, "security.authentication_failed"),
+    ({"zero_rtt_used": True}, "security.downgrade_forbidden"),
+    ({"resumption_used": True}, "security.downgrade_forbidden"),
+])
+def test_invalid_transport_security_state_fails_closed(change: dict[str, object], code: str) -> None:
+    from dataclasses import replace
+
+    with pytest.raises(SecurityAdmissionError, match=code.replace(".", r"\.")):
+        bind_hello_auth(
+            NODE_ID, authenticated_auth(), replace(evidence(), **change), hardened=True,
+            security_capabilities=(("aurora-trust", "1.0"),),
+        )
+
+
+@pytest.mark.parametrize("capabilities", [(), (("security.identity", "1.0"),),
+                                            (("aurora-trust", "1.0"), ("aurora-trust", "1.0"))])
+def test_missing_wrong_or_duplicate_trust_capability_fails_closed(
+    capabilities: tuple[tuple[str, str], ...],
+) -> None:
+    with pytest.raises(SecurityAdmissionError):
+        bind_hello_auth(
+            NODE_ID, authenticated_auth(), evidence(), hardened=True,
+            security_capabilities=capabilities,
+        )
 
 
 def test_trusted_lan_never_creates_authenticated_principal() -> None:
@@ -93,6 +135,29 @@ def test_security_crypto_structures_reject_unknown_fields() -> None:
         validate_message(altered)
 
 
+def test_security_cbor_uses_byte_strings_and_rejects_text_substitution() -> None:
+    path = __import__("pathlib").Path(__file__).parents[2] / "vectors/json/security.enrollment.challenge.json"
+    envelope = decode_json(path.read_bytes())
+    encoded = encode_cbor(envelope)
+    raw = decode_cbor_value(encoded)
+    assert isinstance(raw["payload"]["identity_public_key"], bytes)
+    assert isinstance(raw["payload"]["shareP"], bytes)
+    raw["payload"]["shareP"] = envelope.payload["shareP"]
+    with pytest.raises(CodecError, match="CBOR byte string"):
+        decode_cbor(encode_cbor_value(raw))
+
+
+def test_security_cbor_uses_tag_zero_for_nested_timestamps() -> None:
+    path = __import__("pathlib").Path(__file__).parents[2] / "vectors/json/security.enrollment.status.json"
+    envelope = decode_json(path.read_bytes())
+    raw = decode_cbor_value(encode_cbor(envelope))
+    tagged = raw["payload"]["expires_at"]
+    assert getattr(tagged, "tag", None) == 0
+    raw["payload"]["expires_at"] = envelope.payload["expires_at"]
+    with pytest.raises(CodecError, match="CBOR tag 0"):
+        decode_cbor(encode_cbor_value(raw))
+
+
 def test_aurora_trust_hello_requires_all_frozen_binding_fields() -> None:
     path = __import__("pathlib").Path(__file__).parents[2] / "vectors/json/session.hello.json"
     message = json.loads(path.read_text())
@@ -101,6 +166,33 @@ def test_aurora_trust_hello_requires_all_frozen_binding_fields() -> None:
     del message["payload"]["auth"]["channel_binding"]
     with pytest.raises(ValidationError):
         validate_message(message)
+
+
+def test_rotation_and_credential_result_conditionals_are_unambiguous() -> None:
+    root = __import__("pathlib").Path(__file__).parents[2]
+    renew = json.loads((root / "vectors/json/security.credential.renew.json").read_text())
+    validate_message(renew)
+    no_rotation = copy.deepcopy(renew)
+    no_rotation["payload"]["rotation"] = False
+    del no_rotation["payload"]["requested_public_key"]
+    validate_message(no_rotation)
+    no_rotation["payload"]["requested_public_key"] = renew["payload"]["requested_public_key"]
+    with pytest.raises(ValidationError):
+        validate_message(no_rotation)
+
+    result = json.loads((root / "vectors/json/security.credential.result.json").read_text())
+    denied = copy.deepcopy(result)
+    denied["payload"] = {
+        "status": "denied",
+        "error": {
+            "code": "security.permission_denied", "category": "authorization",
+            "severity": "error", "message": "denied", "retryable": False,
+        },
+    }
+    validate_message(denied)
+    denied["payload"]["credential"] = "AQIDBA"
+    with pytest.raises(ValidationError):
+        validate_message(denied)
 
 
 def test_enrollment_router_is_restricted_by_explicit_state() -> None:

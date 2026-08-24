@@ -21,8 +21,8 @@
     "requested_permissions_digest": "sha256:c19a797fa1fd590cd2e5b42d1cf5f246e29b91684e2f87404b81dc345c7a56a0",
     "identity_algorithm": "ecdsa_p256_sha256",
     "identity_key_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "identity_public_key": "AQIDBA",
-    "shareP": "AQIDBA"
+    "identity_public_key": "BAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8",
+    "shareP": "BAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8"
   },
   "destination": {
     "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002"

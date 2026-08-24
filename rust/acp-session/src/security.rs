@@ -38,12 +38,24 @@ pub struct TransportEvidence {
     pub credential_format: Option<String>,
     pub channel_binding: Option<String>,
     pub role_constraints: HashSet<String>,
+    pub credential_state: CredentialState,
+    pub channel_binding_verified: bool,
+    pub zero_rtt_used: bool,
+    pub resumption_used: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrincipalState {
     Unauthenticated,
     Authenticated,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CredentialState {
+    Active,
+    Expired,
+    Revoked,
+    Invalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +75,7 @@ pub fn bind_hello_auth(
     auth: &HashMap<String, String>,
     evidence: Option<&TransportEvidence>,
     hardened: bool,
+    security_capabilities: &[(&str, &str)],
 ) -> Result<AuthenticatedPrincipal, &'static str> {
     let mode = auth
         .get("mode")
@@ -87,6 +100,36 @@ pub fn bind_hello_auth(
         } else {
             Ok(unauthenticated(mode))
         };
+    }
+    if evidence.zero_rtt_used || evidence.resumption_used {
+        return Err("security.downgrade_forbidden");
+    }
+    match evidence.credential_state {
+        CredentialState::Active => {}
+        CredentialState::Revoked => return Err("security.credential_revoked"),
+        CredentialState::Expired => return Err("security.credential_expired"),
+        CredentialState::Invalid => return Err("security.credential_invalid"),
+    }
+    if !evidence.channel_binding_verified {
+        return Err("security.authentication_failed");
+    }
+    let ids: HashSet<&str> = security_capabilities.iter().map(|(id, _)| *id).collect();
+    if ids.len() != security_capabilities.len() {
+        return Err("security.credential_invalid");
+    }
+    if !security_capabilities
+        .iter()
+        .any(|(id, version)| *id == "aurora-trust" && *version == "1.0")
+    {
+        return Err("security.downgrade_forbidden");
+    }
+    if evidence.node_id.is_none()
+        || evidence.trust_domain_id.is_none()
+        || evidence.credential_id.is_none()
+        || evidence.identity_key_id.is_none()
+        || evidence.channel_binding.is_none()
+    {
+        return Err("security.credential_invalid");
     }
     if evidence.node_id.as_deref() != Some(claimed_node_id) {
         return Err("security.identity_mismatch");
@@ -145,12 +188,122 @@ pub fn effective_permissions(
 mod tests {
     use super::*;
 
+    fn valid_auth() -> HashMap<String, String> {
+        HashMap::from([
+            ("mode".into(), "aurora_trust".into()),
+            ("trust_domain_id".into(), "domain".into()),
+            ("credential_id".into(), "credential".into()),
+            ("identity_key_id".into(), "key".into()),
+            ("channel_binding".into(), "binding".into()),
+        ])
+    }
+
+    fn valid_evidence() -> TransportEvidence {
+        TransportEvidence {
+            mode: AuthenticationMode::AuroraTrust,
+            trust_domain_id: Some("domain".into()),
+            node_id: Some("node".into()),
+            credential_id: Some("credential".into()),
+            identity_key_id: Some("key".into()),
+            credential_format: Some("x509_der".into()),
+            channel_binding: Some("binding".into()),
+            role_constraints: HashSet::new(),
+            credential_state: CredentialState::Active,
+            channel_binding_verified: true,
+            zero_rtt_used: false,
+            resumption_used: false,
+        }
+    }
+
     #[test]
     fn claimed_aurora_trust_without_evidence_fails_closed() {
         let auth = HashMap::from([("mode".into(), "aurora_trust".into())]);
         assert_eq!(
-            bind_hello_auth("node", &auth, None, true),
+            bind_hello_auth("node", &auth, None, true, &[]),
             Err("security.downgrade_forbidden")
+        );
+    }
+
+    #[test]
+    fn verified_active_transport_and_frozen_capability_are_required() {
+        let auth = valid_auth();
+        let valid = valid_evidence();
+        assert!(bind_hello_auth(
+            "node",
+            &auth,
+            Some(&valid),
+            true,
+            &[("aurora-trust", "1.0")]
+        )
+        .is_ok());
+
+        let cases = [
+            (
+                CredentialState::Revoked,
+                false,
+                false,
+                false,
+                "security.credential_revoked",
+            ),
+            (
+                CredentialState::Expired,
+                false,
+                false,
+                false,
+                "security.credential_expired",
+            ),
+            (
+                CredentialState::Active,
+                true,
+                false,
+                false,
+                "security.authentication_failed",
+            ),
+            (
+                CredentialState::Active,
+                false,
+                true,
+                false,
+                "security.downgrade_forbidden",
+            ),
+            (
+                CredentialState::Active,
+                false,
+                false,
+                true,
+                "security.downgrade_forbidden",
+            ),
+        ];
+        for (state, unverified, zero_rtt, resumed, expected) in cases {
+            let mut evidence = valid.clone();
+            evidence.credential_state = state;
+            evidence.channel_binding_verified = !unverified;
+            evidence.zero_rtt_used = zero_rtt;
+            evidence.resumption_used = resumed;
+            assert_eq!(
+                bind_hello_auth(
+                    "node",
+                    &auth,
+                    Some(&evidence),
+                    true,
+                    &[("aurora-trust", "1.0")]
+                ),
+                Err(expected)
+            );
+        }
+        assert_eq!(
+            bind_hello_auth("node", &auth, Some(&valid), true, &[]),
+            Err("security.downgrade_forbidden")
+        );
+        assert_eq!(
+            bind_hello_auth(
+                "node",
+                &auth,
+                Some(&valid),
+                true,
+                &[("aurora-trust", "1.0"), ("aurora-trust", "1.0")]
+            ),
+            Err("security.credential_invalid")
         );
     }
 

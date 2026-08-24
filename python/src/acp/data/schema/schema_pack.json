@@ -789,6 +789,27 @@
           "x-acp-log-policy": "never",
           "x-acp-sensitive": true
         },
+        "crypto_bytes_12": {
+          "pattern": "^[A-Za-z0-9_-]{16}$",
+          "type": "string",
+          "x-acp-cbor-type": "byte-string",
+          "x-acp-log-policy": "never",
+          "x-acp-sensitive": true
+        },
+        "crypto_bytes_32": {
+          "pattern": "^[A-Za-z0-9_-]{43}$",
+          "type": "string",
+          "x-acp-cbor-type": "byte-string",
+          "x-acp-log-policy": "never",
+          "x-acp-sensitive": true
+        },
+        "crypto_bytes_65": {
+          "pattern": "^[A-Za-z0-9_-]{87}$",
+          "type": "string",
+          "x-acp-cbor-type": "byte-string",
+          "x-acp-log-policy": "never",
+          "x-acp-sensitive": true
+        },
         "delivery_policy": {
           "enum": [
             "in_order",
@@ -1294,6 +1315,11 @@
             "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-PBKDF2-100K-v1"
           ],
           "type": "string"
+        },
+        "security_timestamp": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+          "type": "string",
+          "x-acp-cbor-tag": 0
         },
         "security_version": {
           "const": "1.0",
@@ -3393,10 +3419,10 @@
               "$ref": "../common/defs.schema.json#/$defs/credential_format"
             },
             "expires_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "not_before": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "policy_id": {
               "maxLength": 128,
@@ -3417,7 +3443,7 @@
               "uniqueItems": true
             },
             "rotation_deadline": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "transcript_hash": {
               "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
@@ -3476,7 +3502,7 @@
           "additionalProperties": false,
           "properties": {
             "expires_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "extensions": {
               "additionalProperties": {
@@ -3495,7 +3521,7 @@
               "$ref": "../common/defs.schema.json#/$defs/public_crypto_bytes"
             },
             "issued_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "issuer_key_id": {
               "$ref": "../common/defs.schema.json#/$defs/identity_key_id"
@@ -3504,7 +3530,7 @@
               "$ref": "../common/defs.schema.json#/$defs/uuid"
             },
             "not_before": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "permission_policy_id": {
               "maxLength": 128,
@@ -3563,6 +3589,32 @@
         },
         "credential_renew": {
           "additionalProperties": false,
+          "allOf": [
+            {
+              "else": {
+                "not": {
+                  "required": [
+                    "requested_public_key"
+                  ]
+                }
+              },
+              "if": {
+                "properties": {
+                  "rotation": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "rotation"
+                ]
+              },
+              "then": {
+                "required": [
+                  "requested_public_key"
+                ]
+              }
+            }
+          ],
           "properties": {
             "credential_id": {
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
@@ -3584,13 +3636,73 @@
             "credential_id",
             "identity_key_id",
             "rotation",
-            "requested_public_key",
             "possession_proof"
           ],
           "type": "object"
         },
         "credential_result": {
           "additionalProperties": false,
+          "allOf": [
+            {
+              "else": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "credential_id"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "credential_format"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "credential"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "activation_state"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "replaces_credential_id"
+                      ]
+                    }
+                  ]
+                },
+                "required": [
+                  "error"
+                ]
+              },
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "issued"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "error"
+                  ]
+                },
+                "required": [
+                  "credential_id",
+                  "credential_format",
+                  "credential",
+                  "activation_state"
+                ]
+              }
+            }
+          ],
           "properties": {
             "activation_state": {
               "$ref": "../common/defs.schema.json#/$defs/credential_status"
@@ -3604,6 +3716,9 @@
             "credential_id": {
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
             },
+            "error": {
+              "$ref": "../common/defs.schema.json#/$defs/error_body"
+            },
             "replaces_credential_id": {
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
             },
@@ -3616,11 +3731,7 @@
             }
           },
           "required": [
-            "status",
-            "credential_id",
-            "credential_format",
-            "credential",
-            "activation_state"
+            "status"
           ],
           "type": "object"
         },
@@ -3631,7 +3742,7 @@
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
             },
             "effective_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "node_id": {
               "$ref": "../common/defs.schema.json#/$defs/uuid"
@@ -3668,10 +3779,10 @@
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
             },
             "expires_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "not_before": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "revocation_epoch": {
               "$ref": "../common/defs.schema.json#/$defs/uint64"
@@ -3704,7 +3815,7 @@
               "$ref": "../common/defs.schema.json#/$defs/enrollment_id"
             },
             "nonce": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_12"
             }
           },
           "required": [
@@ -3823,7 +3934,7 @@
               "$ref": "../common/defs.schema.json#/$defs/role"
             },
             "shareP": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_65"
             },
             "suite": {
               "$ref": "../common/defs.schema.json#/$defs/security_suite"
@@ -3857,7 +3968,7 @@
               "$ref": "../common/defs.schema.json#/$defs/attempt_id"
             },
             "confirmP": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32"
             }
           },
           "required": [
@@ -3873,7 +3984,7 @@
               "$ref": "../common/defs.schema.json#/$defs/attempt_id"
             },
             "confirmation": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32"
             },
             "credential_id": {
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
@@ -3913,10 +4024,10 @@
               "$ref": "../common/defs.schema.json#/$defs/attempt_id"
             },
             "confirmV": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32"
             },
             "shareV": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_65"
             }
           },
           "required": [
@@ -3938,7 +4049,7 @@
               "$ref": "../common/defs.schema.json#/$defs/enrollment_id"
             },
             "expires_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "methods": {
               "items": {
@@ -4016,7 +4127,7 @@
           "additionalProperties": false,
           "properties": {
             "binding": {
-              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+              "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32"
             },
             "receiver_credential_id": {
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
@@ -4067,13 +4178,13 @@
               ]
             },
             "issued_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "issuer_key_id": {
               "$ref": "../common/defs.schema.json#/$defs/identity_key_id"
             },
             "next_update": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             },
             "previous_snapshot_hash": {
               "$ref": "../common/defs.schema.json#/$defs/digest_id"
@@ -4115,7 +4226,7 @@
               "$ref": "../common/defs.schema.json#/$defs/credential_id"
             },
             "revoked_at": {
-              "$ref": "../common/defs.schema.json#/$defs/timestamp_utc"
+              "$ref": "../common/defs.schema.json#/$defs/security_timestamp"
             }
           },
           "required": [
@@ -4213,6 +4324,25 @@
                     ]
                   },
                   "then": {
+                    "properties": {
+                      "security_capabilities": {
+                        "contains": {
+                          "properties": {
+                            "id": {
+                              "const": "aurora-trust"
+                            },
+                            "version": {
+                              "const": "1.0"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "version"
+                          ],
+                          "type": "object"
+                        }
+                      }
+                    },
                     "required": [
                       "trust_domain_id",
                       "credential_id",
@@ -4225,7 +4355,7 @@
               ],
               "properties": {
                 "channel_binding": {
-                  "$ref": "../common/defs.schema.json#/$defs/crypto_bytes"
+                  "$ref": "../common/defs.schema.json#/$defs/crypto_bytes_32"
                 },
                 "credential_id": {
                   "$ref": "../common/defs.schema.json#/$defs/credential_id"

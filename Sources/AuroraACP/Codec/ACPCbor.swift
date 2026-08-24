@@ -6,6 +6,13 @@ enum CborValue {
 }
 
 extension ACPEncoding {
+    static func requiresTag0(_ key: String) -> Bool {
+        [
+            "timestamp_utc", "effective_at", "expires_at", "issued_at", "next_update",
+            "not_before", "revoked_at", "rotation_deadline",
+        ].contains(key)
+    }
+
     static func cborReady(_ value: AnySendable) -> CborValue {
         guard case .object = value else { return .plain(value) }
         return .plain(value)
@@ -59,7 +66,10 @@ extension ACPEncoding {
         for (k, v) in o {
             let key = try encodePlain(.string(k))
             let val: Data
-            if tagTimestamp, k == "timestamp_utc", case .string(let s) = v {
+            if (tagTimestamp && k == "timestamp_utc") || requiresTag0(k) {
+                guard case .string(let s) = v else {
+                    throw ACPCodecError.malformed("tag 0 timestamp must be text")
+                }
                 val = Data([0xC0]) + (try encodePlain(.string(s)))
             } else {
                 val = try encodePlain(v)
@@ -164,6 +174,11 @@ extension ACPEncoding {
                 }
                 lastKey = encoded
                 if obj[k] != nil { throw ACPCodecError.malformed("duplicate key") }
+                if requiresTag0(k) {
+                    guard offset < data.count, data[offset] == 0xC0 else {
+                        throw ACPCodecError.malformed("timestamp must use CBOR tag 0")
+                    }
+                }
                 obj[k] = try readValue(data, &offset, depth: depth + 1)
             }
             return .object(obj)

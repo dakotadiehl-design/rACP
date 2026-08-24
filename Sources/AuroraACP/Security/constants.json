@@ -82,6 +82,7 @@
     "auth_modes": ["trusted_lan", "tls", "aurora_trust", "enrollment_spake2plus"],
     "suites": ["ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1", "ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-PBKDF2-100K-v1"],
     "capabilities": {
+      "aurora-trust": "1.0",
       "security.identity": "1.0",
       "security.enrollment": "1.0",
       "security.credential_rotation": "1.0",
@@ -114,7 +115,21 @@
       "lightweight": {"concurrent_attempts": 1, "attempts_per_enrollment": 5, "attempt_timeout_ms": 60000, "enrollment_window_ms": 600000, "max_security_message_bytes": 8192, "max_credential_bytes": 2048, "max_nesting_depth": 8, "max_collection_length": 64, "max_revocation_entries": 128, "max_trust_domains": 1, "active_credentials_per_domain": 2}
     },
     "downgrade_policy": {"hardened_allows_trusted_lan_fallback": false},
-    "sensitive_annotations": {"value": "x-acp-sensitive", "log_policy": "x-acp-log-policy", "never": "never"}
+    "sensitive_annotations": {"value": "x-acp-sensitive", "log_policy": "x-acp-log-policy", "never": "never"},
+    "binary_fields": {
+      "session.hello": ["auth.channel_binding"],
+      "security.enrollment.challenge": ["identity_public_key", "shareP"],
+      "security.enrollment.response": ["shareV", "confirmV"],
+      "security.enrollment.confirm": ["confirmP"],
+      "security.enrollment.approval": ["nonce", "ciphertext"],
+      "security.enrollment.install_result": ["proof_of_possession", "confirmation"],
+      "security.credential.renew": ["requested_public_key.public_key", "possession_proof"],
+      "security.credential.result": ["credential"],
+      "security.revocation.update": ["signature"],
+      "security.identity.reset": ["confirmation"],
+      "security.lightweight.finished": ["binding"]
+    },
+    "timestamp_fields": ["effective_at", "expires_at", "issued_at", "next_update", "not_before", "revoked_at", "rotation_deadline"]
   },
   "remote": {
     "profile": "remote",

@@ -16,18 +16,19 @@ public enum ACPEncoding {
             throw ACPCodecError.malformed("envelope")
         }
         try ACPSchema.validateEnvelopeObject(dict)
-        return try envelope(from: fromNS(dict))
+        return try envelope(from: fromNS(dict), securityBytesFromCBOR: false)
     }
 
     public static func encodeCBOR(_ env: ACPEnvelope) throws -> Data {
         var env = env
         env.payload = try normalizeChunk(type: env.type, payload: env.payload)
+        env.payload = try normalizeSecurityBytes(type: env.type, payload: env.payload, toCBOR: true)
         return try encodeValue(cborReady(envelopeObject(env)))
     }
 
     public static func decodeCBOR(_ data: Data) throws -> ACPEnvelope {
         let value = try decodeValue(data)
-        let env = try envelope(from: value)
+        let env = try envelope(from: value, securityBytesFromCBOR: true)
         guard let dict = ns(envelopeObject(env)) as? [String: Any] else {
             throw ACPCodecError.malformed("envelope")
         }
@@ -60,7 +61,7 @@ public enum ACPEncoding {
         return .object(o)
     }
 
-    static func envelope(from value: AnySendable) throws -> ACPEnvelope {
+    static func envelope(from value: AnySendable, securityBytesFromCBOR: Bool) throws -> ACPEnvelope {
         guard case .object(let o) = value else { throw ACPCodecError.malformed("object") }
         func str(_ k: String) throws -> String {
             if case .string(let s) = o[k] { return s }
@@ -84,7 +85,11 @@ public enum ACPEncoding {
         if o["destination"] != nil { dest = try ep("destination") }
         var payload: [String: AnySendable] = [:]
         if case .object(let p) = o["payload"] { payload = p }
-        payload = try normalizeChunk(type: try str("type"), payload: payload)
+        let messageType = try str("type")
+        payload = try normalizeChunk(type: messageType, payload: payload)
+        if securityBytesFromCBOR {
+            payload = try normalizeSecurityBytes(type: messageType, payload: payload, toCBOR: false)
+        }
         return ACPEnvelope(
             acp: try str("acp"),
             messageID: try str("message_id"),
@@ -126,5 +131,48 @@ public enum ACPEncoding {
         }
         payload["data"] = .bytes(bytes)
         return payload
+    }
+
+    static func normalizeSecurityBytes(
+        type: String, payload: [String: AnySendable], toCBOR: Bool
+    ) throws -> [String: AnySendable] {
+        var payload = payload
+        for path in ACPSecurityCatalog.binaryFields(messageType: type) {
+            try transformSecurityPath(&payload, parts: path.split(separator: ".").map(String.init), toCBOR: toCBOR)
+        }
+        return payload
+    }
+
+    static func transformSecurityPath(
+        _ object: inout [String: AnySendable], parts: [String], toCBOR: Bool
+    ) throws {
+        guard let first = parts.first, let value = object[first] else { return }
+        if parts.count > 1 {
+            guard case .object(var nested) = value else { throw ACPCodecError.malformed(first) }
+            try transformSecurityPath(&nested, parts: Array(parts.dropFirst()), toCBOR: toCBOR)
+            object[first] = .object(nested)
+            return
+        }
+        if toCBOR {
+            guard case .string(let text) = value, !text.isEmpty, !text.contains("=") else {
+                throw ACPCodecError.malformed("security bytes require unpadded base64url")
+            }
+            var standard = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            standard += String(repeating: "=", count: (4 - standard.count % 4) % 4)
+            guard let data = Data(base64Encoded: standard), base64url(data) == text else {
+                throw ACPCodecError.malformed("invalid security base64url")
+            }
+            object[first] = .bytes(data)
+        } else {
+            guard case .bytes(let data) = value else {
+                throw ACPCodecError.malformed("security field must be CBOR byte string")
+            }
+            object[first] = .string(base64url(data))
+        }
+    }
+
+    static func base64url(_ data: Data) -> String {
+        data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
     }
 }

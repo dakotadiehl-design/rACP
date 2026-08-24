@@ -20,4 +20,7 @@ public enum ACPSecurityCatalog {
     public static func limits(profile: String) -> [String: Any] {
         ((security["limits"] as? [String: Any])?[profile] as? [String: Any]) ?? [:]
     }
+    public static func binaryFields(messageType: String) -> [String] {
+        ((security["binary_fields"] as? [String: Any])?[messageType] as? [String]) ?? []
+    }
 }

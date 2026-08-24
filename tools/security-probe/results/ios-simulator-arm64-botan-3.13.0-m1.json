@@ -1,6 +1,6 @@
 {
   "freeze": "2.1.1",
-  "generated_at": "2026-08-22T03:03:22.137668+00:00",
+  "generated_at": "2026-08-24T16:24:16.106813+00:00",
   "host": {
     "machine": "arm64",
     "release": "25.5.0",
@@ -42,67 +42,67 @@
       "status": "PASS"
     },
     {
-      "detail": "isolated ACP anchor, chain, identity, KU and EKU",
+      "detail": "isolated ACP anchor, chain, identity, KU, EKU, SKI and AKI",
       "id": "x509.valid_acp_chain",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "SAN domain binding",
+      "detail": "distinct wrong-domain URI SAN certificate rejected",
       "id": "x509.wrong_trust_domain",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "SAN node binding",
+      "detail": "distinct wrong-node URI SAN certificate rejected",
       "id": "x509.wrong_node_id",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "exactly one ACP URI SAN",
+      "detail": "non-ACP URI SAN certificate rejected",
       "id": "x509.wrong_san",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "CN is not identity and CA has no ACP SAN",
+      "detail": "CN-only leaf certificate rejected",
       "id": "x509.cn_only_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "both leaf EKUs mandatory",
+      "detail": "leaf missing serverAuth rejected",
       "id": "x509.wrong_eku_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "leaf KU must contain only digitalSignature",
+      "detail": "leaf with keyEncipherment instead of digitalSignature rejected",
       "id": "x509.wrong_key_usage_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "CA:TRUE cannot be a leaf",
+      "detail": "CA:TRUE leaf certificate rejected",
       "id": "x509.ca_true_leaf_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "untrusted issuer rejected",
+      "detail": "certificate issued by a different root rejected",
       "id": "x509.invalid_chain_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "future validation time rejects expired leaf",
+      "detail": "actually expired certificate rejected at current time",
       "id": "x509.expired_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "past validation time rejects not-yet-valid leaf",
+      "detail": "actually not-yet-valid certificate rejected at current time",
       "id": "x509.future_rejected",
       "mandatory": true,
       "status": "PASS"
@@ -114,109 +114,103 @@
       "status": "PASS"
     },
     {
-      "detail": "verified current revocation set blocks credential",
+      "detail": "current revocation set blocks the validated credential ID",
       "id": "x509.revoked_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "revocation epoch must increase",
+      "detail": "candidate revocation epoch rejected unless strictly newer",
       "id": "x509.revocation_rollback_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "credential ID hashes complete DER",
+      "detail": "complete DER hash matches expected and a wrong credential ID does not",
       "id": "x509.wrong_credential_id_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "identity key ID hashes canonical SPKI",
+      "detail": "canonical SPKI hash matches expected and a wrong key ID does not",
       "id": "x509.wrong_key_id_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "no system/public root fallback",
+      "detail": "unrelated root is not accepted through system fallback",
       "id": "x509.isolated_trust_store",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: downgradeForbidden",
+      "detail": "rejected with security.downgrade_forbidden",
       "id": "network.missing_client_credential",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: downgradeForbidden",
-      "id": "network.wrong_ca",
-      "mandatory": true,
-      "status": "PASS"
-    },
-    {
-      "detail": "failed closed: trustDomainMismatch",
+      "detail": "rejected with security.trust_domain_mismatch",
       "id": "network.wrong_trust_domain",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: identityMismatch",
+      "detail": "rejected with security.identity_mismatch",
       "id": "network.wrong_node_identity",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: downgradeForbidden",
-      "id": "network.claimed_auth_without_evidence",
-      "mandatory": true,
-      "status": "PASS"
-    },
-    {
-      "detail": "failed closed: downgradeForbidden",
-      "id": "network.stripped_trust_capability",
-      "mandatory": true,
-      "status": "PASS"
-    },
-    {
-      "detail": "failed closed: downgradeForbidden",
-      "id": "network.trusted_lan_fallback",
-      "mandatory": true,
-      "status": "PASS"
-    },
-    {
-      "detail": "failed closed: identityMismatch",
+      "detail": "rejected with security.identity_mismatch",
       "id": "network.invalid_hello_channel_binding",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: identityMismatch",
-      "id": "network.altered_hello_node_id",
+      "detail": "rejected with security.downgrade_forbidden",
+      "id": "network.stripped_trust_capability",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: identityMismatch",
-      "id": "network.exporter_mismatch",
+      "detail": "rejected with security.credential_invalid",
+      "id": "network.duplicate_trust_capability",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "failed closed: downgradeForbidden",
+      "detail": "rejected with security.downgrade_forbidden",
+      "id": "network.trusted_lan_fallback",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "rejected with security.authentication_failed",
+      "id": "network.unverified_channel_binding",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "rejected with security.credential_revoked",
       "id": "network.revoked_credential_reconnect",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "0-RTT disabled",
+      "detail": "rejected with security.credential_expired",
+      "id": "network.expired_credential_reconnect",
+      "mandatory": true,
+      "status": "PASS"
+    },
+    {
+      "detail": "rejected with security.downgrade_forbidden",
       "id": "network.zero_rtt_rejected",
       "mandatory": true,
       "status": "PASS"
     },
     {
-      "detail": "session resumption disabled",
+      "detail": "rejected with security.downgrade_forbidden",
       "id": "network.resumption_disabled",
       "mandatory": true,
       "status": "PASS"
@@ -270,6 +264,6 @@
     "device": "iPhone 17 Pro",
     "environment": "iOS Simulator",
     "runtime": "iOS 26.5",
-    "udid": "0B57DE05-A855-4CD7-B3CD-4C47EF8E9459"
+    "udid": "77ECEA1C-12A5-44CF-9AF7-3575B2AF692A"
   }
 }

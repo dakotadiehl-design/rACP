@@ -5,6 +5,26 @@ final class ACPSecurityContractTests: XCTestCase {
     private let node = "0193f8d8-4c4e-7d8b-a2ab-000000000002"
     private let domain = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
     private let digest = "sha256:" + String(repeating: "a", count: 64)
+    private let binding = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+
+    private func evidence(
+        state: ACPCredentialState = .active, verified: Bool = true,
+        zeroRTT: Bool = false, resumed: Bool = false
+    ) -> ACPTransportEvidence {
+        ACPTransportEvidence(
+            mode: .auroraTrust, trustDomainID: domain, nodeID: node, credentialID: digest,
+            identityKeyID: digest, credentialFormat: "x509_der", channelBinding: binding,
+            credentialState: state, channelBindingVerified: verified,
+            zeroRTTUsed: zeroRTT, resumptionUsed: resumed
+        )
+    }
+
+    private func auth() -> [String: String] {
+        [
+            "mode": "aurora_trust", "trust_domain_id": domain, "credential_id": digest,
+            "identity_key_id": digest, "channel_binding": binding,
+        ]
+    }
 
     func testAuroraTrustClaimsRequireTransportEvidence() {
         XCTAssertThrowsError(try ACPSecurityAdmission.bindHello(
@@ -13,19 +33,36 @@ final class ACPSecurityContractTests: XCTestCase {
     }
 
     func testAuthenticatedHelloBindsEveryIdentityField() throws {
-        let evidence = ACPTransportEvidence(
-            mode: .auroraTrust, trustDomainID: domain, nodeID: node, credentialID: digest,
-            identityKeyID: digest, credentialFormat: "x509_der", channelBinding: "AQIDBA"
-        )
-        let auth = [
-            "mode": "aurora_trust", "trust_domain_id": domain, "credential_id": digest,
-            "identity_key_id": digest, "channel_binding": "AQIDBA",
-        ]
         let principal = try ACPSecurityAdmission.bindHello(
-            claimedNodeID: node, auth: auth, evidence: evidence, hardened: true
+            claimedNodeID: node, auth: auth(), evidence: evidence(), hardened: true,
+            securityCapabilities: [("aurora-trust", "1.0")]
         )
         XCTAssertEqual(principal.state, .authenticated)
         XCTAssertEqual(principal.nodeID, node)
+    }
+
+    func testInvalidTransportStatesAndCapabilitiesFailClosed() {
+        let cases: [(ACPTransportEvidence, ACPSecurityAdmissionError)] = [
+            (evidence(state: .revoked), .credentialRevoked),
+            (evidence(state: .expired), .credentialExpired),
+            (evidence(verified: false), .authenticationFailed),
+            (evidence(zeroRTT: true), .downgradeForbidden),
+            (evidence(resumed: true), .downgradeForbidden),
+        ]
+        for (transport, expected) in cases {
+            XCTAssertThrowsError(try ACPSecurityAdmission.bindHello(
+                claimedNodeID: node, auth: auth(), evidence: transport, hardened: true,
+                securityCapabilities: [("aurora-trust", "1.0")]
+            )) { XCTAssertEqual($0 as? ACPSecurityAdmissionError, expected) }
+        }
+        XCTAssertThrowsError(try ACPSecurityAdmission.bindHello(
+            claimedNodeID: node, auth: auth(), evidence: evidence(), hardened: true,
+            securityCapabilities: []
+        )) { XCTAssertEqual($0 as? ACPSecurityAdmissionError, .downgradeForbidden) }
+        XCTAssertThrowsError(try ACPSecurityAdmission.bindHello(
+            claimedNodeID: node, auth: auth(), evidence: evidence(), hardened: true,
+            securityCapabilities: [("aurora-trust", "1.0"), ("aurora-trust", "1.0")]
+        )) { XCTAssertEqual($0 as? ACPSecurityAdmissionError, .credentialInvalid) }
     }
 
     func testCapabilitiesCannotExpandPermissions() {

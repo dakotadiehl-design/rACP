@@ -90,6 +90,85 @@ fn b64_decode(text: &str) -> Result<Vec<u8>, CodecError> {
     Ok(out)
 }
 
+fn b64url_encode(data: &[u8]) -> String {
+    b64_encode(data)
+        .replace('+', "-")
+        .replace('/', "_")
+        .trim_end_matches('=')
+        .to_string()
+}
+
+fn b64url_decode(text: &str) -> Result<Vec<u8>, CodecError> {
+    if text.is_empty() || text.contains('=') {
+        return Err(cerr("security byte strings require unpadded base64url"));
+    }
+    let mut standard = text.replace('-', "+").replace('_', "/");
+    standard.extend(std::iter::repeat('=').take((4 - standard.len() % 4) % 4));
+    let decoded = b64_decode(&standard).map_err(|_| cerr("invalid security base64url"))?;
+    if b64url_encode(&decoded) != text {
+        return Err(cerr("non-canonical security base64url"));
+    }
+    Ok(decoded)
+}
+
+fn security_binary_paths(message_type: &str) -> Vec<String> {
+    let constants: serde_json::Value =
+        serde_json::from_str(include_str!("../../../schema/constants.json"))
+            .expect("ACP constants");
+    constants["security"]["binary_fields"][message_type]
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn transform_security_path(
+    value: &mut Json,
+    parts: &[&str],
+    to_cbor: bool,
+) -> Result<(), CodecError> {
+    if parts.is_empty() {
+        return Ok(());
+    }
+    let Json::Object(pairs) = value else {
+        return Err(cerr(format!("{} must be an object", parts[0])));
+    };
+    let Some((_, child)) = pairs.iter_mut().find(|(key, _)| key == parts[0]) else {
+        return Ok(());
+    };
+    if parts.len() > 1 {
+        return transform_security_path(child, &parts[1..], to_cbor);
+    }
+    *child = if to_cbor {
+        let Json::String(text) = child else {
+            return Err(cerr("security field must be base64url text"));
+        };
+        Json::Bytes(b64url_decode(text)?)
+    } else {
+        let Json::Bytes(bytes) = child else {
+            return Err(cerr("security field must be CBOR byte string"));
+        };
+        Json::String(b64url_encode(bytes))
+    };
+    Ok(())
+}
+
+fn normalize_security_payload(
+    message_type: &str,
+    mut payload: Json,
+    to_cbor: bool,
+) -> Result<Json, CodecError> {
+    for path in security_binary_paths(message_type) {
+        let parts: Vec<&str> = path.split('.').collect();
+        transform_security_path(&mut payload, &parts, to_cbor)?;
+    }
+    Ok(payload)
+}
+
 fn json_uint(value: &Json) -> Option<u64> {
     match value {
         Json::UInt(u) => Some(*u),
@@ -301,7 +380,9 @@ pub fn decode_json(raw: &[u8]) -> Result<Envelope, CodecError> {
 }
 
 pub fn encode_cbor(env: &Envelope) -> Result<Vec<u8>, CodecError> {
-    let map = match envelope_to_json(env) {
+    let mut env = env.clone();
+    env.payload = normalize_security_payload(&env.message_type, env.payload, true)?;
+    let map = match envelope_to_json(&env) {
         Json::Object(p) => p,
         _ => return Err(cerr("internal")),
     };
@@ -359,7 +440,26 @@ enum Prepared {
 }
 
 pub fn decode_cbor(raw: &[u8]) -> Result<Envelope, CodecError> {
-    let v = decode_cbor_value(raw).map_err(|e| cerr(e.0))?;
+    let mut v = decode_cbor_value(raw).map_err(|e| cerr(e.0))?;
+    if let Json::Object(pairs) = &mut v {
+        let message_type = pairs
+            .iter()
+            .find_map(|(k, v)| {
+                if k == "type" {
+                    if let Json::String(s) = v {
+                        Some(s.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| cerr("missing type"))?;
+        if let Some((_, payload)) = pairs.iter_mut().find(|(k, _)| k == "payload") {
+            *payload = normalize_security_payload(&message_type, payload.clone(), false)?;
+        }
+    }
     let env = envelope_from_json(&v)?;
     schema::validate_envelope(&env)?;
     Ok(env)
@@ -435,6 +535,61 @@ mod tests {
         assert!(text.contains("AAH/4A=="), "{text}");
         let bad = String::from_utf8_lossy(raw_json).replace("AAH/4A==", "!!!!");
         assert!(decode_json(bad.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn security_cbor_uses_bytes_and_rejects_text_substitution() {
+        let root = repo_root();
+        let raw_json =
+            fs::read(root.join("vectors/json/security.enrollment.challenge.json")).unwrap();
+        let env = decode_json(&raw_json).unwrap();
+        let encoded = encode_cbor(&env).unwrap();
+        let mut raw = decode_cbor_value(&encoded).unwrap();
+        let payload = match &mut raw {
+            Json::Object(fields) => {
+                &mut fields
+                    .iter_mut()
+                    .find(|(key, _)| key == "payload")
+                    .unwrap()
+                    .1
+            }
+            _ => panic!("envelope must be a map"),
+        };
+        let share = match payload {
+            Json::Object(fields) => {
+                &mut fields
+                    .iter_mut()
+                    .find(|(key, _)| key == "shareP")
+                    .unwrap()
+                    .1
+            }
+            _ => panic!("payload must be a map"),
+        };
+        assert!(matches!(share, Json::Bytes(bytes) if bytes.len() == 65));
+        *share = Json::String(
+            env.payload
+                .get("shareP")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+        let malformed = encode_cbor_value(&raw).unwrap();
+        assert!(decode_cbor(&malformed).is_err());
+    }
+
+    #[test]
+    fn nested_timestamps_require_tag_zero() {
+        let value = Json::object(vec![(
+            "expires_at",
+            Json::String("2026-08-17T16:42:15.231Z".into()),
+        )]);
+        let encoded = encode_cbor_value(&value).unwrap();
+        let tag = encoded.iter().position(|byte| *byte == 0xc0).unwrap();
+        assert_eq!(decode_cbor_value(&encoded).unwrap(), value);
+        let mut untagged = encoded;
+        untagged.remove(tag);
+        assert!(decode_cbor_value(&untagged).is_err());
     }
 
     #[test]

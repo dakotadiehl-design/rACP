@@ -13,6 +13,10 @@ public enum ACPPrincipalState: String, Codable, Sendable {
     case invalid
 }
 
+public enum ACPCredentialState: String, Codable, Sendable {
+    case active, expired, revoked, invalid
+}
+
 public struct ACPTransportEvidence: Sendable, Equatable {
     public let mode: ACPAuthenticationMode
     public let trustDomainID: String?
@@ -22,17 +26,25 @@ public struct ACPTransportEvidence: Sendable, Equatable {
     public let credentialFormat: String?
     public let channelBinding: String?
     public let roleConstraints: Set<String>
+    public let credentialState: ACPCredentialState
+    public let channelBindingVerified: Bool
+    public let zeroRTTUsed: Bool
+    public let resumptionUsed: Bool
 
     public init(
         mode: ACPAuthenticationMode, trustDomainID: String? = nil, nodeID: String? = nil,
         credentialID: String? = nil, identityKeyID: String? = nil,
         credentialFormat: String? = nil, channelBinding: String? = nil,
-        roleConstraints: Set<String> = []
+        roleConstraints: Set<String> = [], credentialState: ACPCredentialState = .invalid,
+        channelBindingVerified: Bool = false, zeroRTTUsed: Bool = false,
+        resumptionUsed: Bool = false
     ) {
         self.mode = mode; self.trustDomainID = trustDomainID; self.nodeID = nodeID
         self.credentialID = credentialID; self.identityKeyID = identityKeyID
         self.credentialFormat = credentialFormat; self.channelBinding = channelBinding
         self.roleConstraints = roleConstraints
+        self.credentialState = credentialState; self.channelBindingVerified = channelBindingVerified
+        self.zeroRTTUsed = zeroRTTUsed; self.resumptionUsed = resumptionUsed
     }
 }
 
@@ -52,6 +64,9 @@ public enum ACPSecurityAdmissionError: String, Error, Sendable {
     case identityMismatch = "security.identity_mismatch"
     case trustDomainMismatch = "security.trust_domain_mismatch"
     case downgradeForbidden = "security.downgrade_forbidden"
+    case authenticationFailed = "security.authentication_failed"
+    case credentialExpired = "security.credential_expired"
+    case credentialRevoked = "security.credential_revoked"
 }
 
 public enum ACPSecurityAdmission {
@@ -59,7 +74,8 @@ public enum ACPSecurityAdmission {
         claimedNodeID: String,
         auth: [String: String],
         evidence: ACPTransportEvidence?,
-        hardened: Bool
+        hardened: Bool,
+        securityCapabilities: [(id: String, version: String)] = []
     ) throws -> ACPAuthenticatedPrincipal {
         guard let value = auth["mode"], let mode = ACPAuthenticationMode(rawValue: value) else {
             throw ACPSecurityAdmissionError.credentialInvalid
@@ -78,6 +94,25 @@ public enum ACPSecurityAdmission {
             return .init(state: .unauthenticated, mode: mode, trustDomainID: nil, nodeID: nil,
                          credentialID: nil, identityKeyID: nil, credentialFormat: nil, roleConstraints: [])
         }
+        if evidence.zeroRTTUsed || evidence.resumptionUsed {
+            throw ACPSecurityAdmissionError.downgradeForbidden
+        }
+        switch evidence.credentialState {
+        case .active: break
+        case .revoked: throw ACPSecurityAdmissionError.credentialRevoked
+        case .expired: throw ACPSecurityAdmissionError.credentialExpired
+        case .invalid: throw ACPSecurityAdmissionError.credentialInvalid
+        }
+        guard evidence.channelBindingVerified else { throw ACPSecurityAdmissionError.authenticationFailed }
+        guard Set(securityCapabilities.map(\.id)).count == securityCapabilities.count else {
+            throw ACPSecurityAdmissionError.credentialInvalid
+        }
+        guard securityCapabilities.contains(where: { $0.id == "aurora-trust" && $0.version == "1.0" }) else {
+            throw ACPSecurityAdmissionError.downgradeForbidden
+        }
+        guard evidence.nodeID != nil, evidence.trustDomainID != nil, evidence.credentialID != nil,
+              evidence.identityKeyID != nil, evidence.channelBinding != nil
+        else { throw ACPSecurityAdmissionError.credentialInvalid }
         guard claimedNodeID == evidence.nodeID else { throw ACPSecurityAdmissionError.identityMismatch }
         guard auth["trust_domain_id"] == evidence.trustDomainID else { throw ACPSecurityAdmissionError.trustDomainMismatch }
         guard auth["credential_id"] == evidence.credentialID,

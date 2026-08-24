@@ -348,6 +348,23 @@
       "x-acp-sensitive": true,
       "x-acp-log-policy": "never"
     },
+    "crypto_bytes_12": {
+      "type": "string", "pattern": "^[A-Za-z0-9_-]{16}$",
+      "x-acp-cbor-type": "byte-string", "x-acp-sensitive": true, "x-acp-log-policy": "never"
+    },
+    "crypto_bytes_32": {
+      "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$",
+      "x-acp-cbor-type": "byte-string", "x-acp-sensitive": true, "x-acp-log-policy": "never"
+    },
+    "crypto_bytes_65": {
+      "type": "string", "pattern": "^[A-Za-z0-9_-]{87}$",
+      "x-acp-cbor-type": "byte-string", "x-acp-sensitive": true, "x-acp-log-policy": "never"
+    },
+    "security_timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,9})?Z$",
+      "x-acp-cbor-tag": 0
+    },
     "public_crypto_bytes": {
       "type": "string",
       "pattern": "^[A-Za-z0-9_-]+$",
