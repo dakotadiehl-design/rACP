@@ -59,6 +59,39 @@ public enum ACPSecurityContext {
         return zip(left, right).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
     }
 
+    public static func canonicalApprovalAAD(_ values: [String: AnySendable]) throws -> Data {
+        let keys = Set([
+            "message_type", "attempt_id", "enrollment_id", "candidate_node_id", "commissioner_node_id",
+            "trust_domain_id", "acp_version", "extension_version", "suite", "identity_algorithm",
+            "identity_key_id", "transcript_hash",
+        ])
+        guard Set(values.keys) == keys, values["message_type"] == .string("security.enrollment.approval"),
+              case .bytes(let hash) = values["transcript_hash"], hash.count == 32
+        else { throw ACPSecurityContextError.malformed }
+        return try ACPEncoding.encodeValue(.plain(.object(values)))
+    }
+
+    public static func canonicalInstallResultWithoutConfirmation(_ values: [String: AnySendable]) throws -> Data {
+        let keys = Set(["attempt_id", "status", "credential_id", "identity_key_id", "trust_domain_id", "storage_posture", "proof_of_possession"])
+        guard Set(values.keys) == keys, values["status"] == .string("installed"),
+              case .object(let posture) = values["storage_posture"],
+              Set(posture.keys) == Set(["class", "hardware_backed", "private_key_exportable"]),
+              case .bytes(let proof) = values["proof_of_possession"], !proof.isEmpty
+        else { throw ACPSecurityContextError.malformed }
+        return try ACPEncoding.encodeValue(.plain(.object(values)))
+    }
+
+    public static func installConfirmation(candidateConfirmKey: Data, values: [String: AnySendable]) throws -> Data {
+        hmac(key: candidateConfirmKey, data: try canonicalInstallResultWithoutConfirmation(values))
+    }
+
+    public static func installProofDigest(transcriptHash: Data, credentialID: String) throws -> Data {
+        guard transcriptHash.count == 32,
+              credentialID.range(of: #"^sha256:[0-9a-f]{64}$"#, options: .regularExpression) != nil
+        else { throw ACPSecurityContextError.malformed }
+        return sha256(Data("ACP enrollment install proof v1".utf8) + transcriptHash + Data(credentialID.utf8))
+    }
+
     private static func hmac(key: Data, data: Data) -> Data {
         Data(HMAC<SHA256>.authenticationCode(for: data, using: SymmetricKey(data: key)))
     }

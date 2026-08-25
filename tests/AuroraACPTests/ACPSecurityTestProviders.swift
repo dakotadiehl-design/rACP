@@ -34,3 +34,18 @@ final class InMemorySecurityIdentityStore: ACPIdentityStore, @unchecked Sendable
     }
     func rollback() { staged = nil }
 }
+
+struct FixtureAEAD: ACPAEADProvider {
+    func seal(key: ACPSecretBytes, plaintext: ACPSecretBytes, nonce: Data, associatedData: Data) -> Data {
+        plaintext.withUnsafeBytes { Data($0) } + nonce + associatedData.prefix(1)
+    }
+    func open(key: ACPSecretBytes, ciphertext: Data, nonce: Data, associatedData: Data) throws -> ACPSecretBytes {
+        throw ACPSecurityErrorCode.authenticationFailed
+    }
+}
+
+struct FixtureSPAKE2Plus: ACPSPAKE2PlusOperation {
+    var valid = true
+    func receive(peerShare: Data) -> Data { peerShare }
+    func verify(confirmation: Data) -> Bool { valid && confirmation == Data("valid".utf8) }
+}

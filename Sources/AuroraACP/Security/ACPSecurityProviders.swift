@@ -14,8 +14,8 @@ public protocol ACPSPAKE2PlusOperation: Sendable {
     func verify(confirmation: Data) throws -> Bool
 }
 public protocol ACPAEADProvider: Sendable {
-    func seal(_ plaintext: ACPSecretBytes, nonce: Data, associatedData: Data) throws -> Data
-    func open(_ ciphertext: Data, nonce: Data, associatedData: Data) throws -> ACPSecretBytes
+    func seal(key: ACPSecretBytes, plaintext: ACPSecretBytes, nonce: Data, associatedData: Data) throws -> Data
+    func open(key: ACPSecretBytes, ciphertext: Data, nonce: Data, associatedData: Data) throws -> ACPSecretBytes
 }
 public protocol ACPIdentityKeyProvider: Sendable { func generate() throws -> any ACPSigningKeyHandle }
 public protocol ACPCredentialValidator: Sendable {

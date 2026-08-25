@@ -30,6 +30,33 @@ CONTEXT_KEYS = frozenset(
         "trust_domain_id",
     }
 )
+APPROVAL_AAD_KEYS = frozenset(
+    {
+        "message_type",
+        "attempt_id",
+        "enrollment_id",
+        "candidate_node_id",
+        "commissioner_node_id",
+        "trust_domain_id",
+        "acp_version",
+        "extension_version",
+        "suite",
+        "identity_algorithm",
+        "identity_key_id",
+        "transcript_hash",
+    }
+)
+INSTALL_RESULT_KEYS = frozenset(
+    {
+        "attempt_id",
+        "status",
+        "credential_id",
+        "identity_key_id",
+        "trust_domain_id",
+        "storage_posture",
+        "proof_of_possession",
+    }
+)
 
 
 def canonical_enrollment_context(values: Mapping[str, str]) -> bytes:
@@ -58,6 +85,43 @@ def transcript_hash(items: Sequence[bytes]) -> bytes:
 
 def permission_digest(permissions: Mapping[str, Any]) -> str:
     return digest_id(cbor_encode(dict(permissions)))
+
+
+def canonical_approval_aad(values: Mapping[str, Any]) -> bytes:
+    if set(values) != APPROVAL_AAD_KEYS or values.get("message_type") != "security.enrollment.approval":
+        raise ValueError("approval AAD must contain exactly the frozen fields")
+    if not isinstance(values.get("transcript_hash"), bytes) or len(values["transcript_hash"]) != 32:
+        raise ValueError("approval transcript hash must be 32 bytes")
+    return cbor_encode(dict(values))
+
+
+def canonical_install_result_without_confirmation(values: Mapping[str, Any]) -> bytes:
+    if set(values) != INSTALL_RESULT_KEYS or values.get("status") != "installed":
+        raise ValueError("install result must contain exactly the frozen success fields")
+    posture = values.get("storage_posture")
+    if not isinstance(posture, Mapping) or set(posture) != {
+        "class",
+        "hardware_backed",
+        "private_key_exportable",
+    }:
+        raise ValueError("invalid storage posture")
+    if not isinstance(values.get("proof_of_possession"), bytes) or not values["proof_of_possession"]:
+        raise ValueError("proof of possession must be non-empty bytes")
+    return cbor_encode(dict(values))
+
+
+def install_confirmation(candidate_confirm_key: bytes, values: Mapping[str, Any]) -> bytes:
+    return hmac.new(
+        candidate_confirm_key,
+        canonical_install_result_without_confirmation(values),
+        hashlib.sha256,
+    ).digest()
+
+
+def install_proof_digest(transcript_digest: bytes, credential_id: str) -> bytes:
+    if len(transcript_digest) != 32 or not credential_id.startswith("sha256:") or len(credential_id) != 71:
+        raise ValueError("invalid installation proof inputs")
+    return sha256(b"ACP enrollment install proof v1" + transcript_digest + credential_id.encode("ascii"))
 
 
 def hkdf_extract(salt: bytes, input_key_material: bytes) -> bytes:

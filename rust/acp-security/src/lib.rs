@@ -3,7 +3,8 @@
 use acp_model::Json;
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::sync::Arc;
 
 macro_rules! uuid_id {
     ($name:ident) => {
@@ -90,7 +91,7 @@ pub enum PrincipalState {
     IdentityConflict,
     Invalid,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SecuritySuite {
     Raw128,
     Pbkdf2_100k,
@@ -307,6 +308,87 @@ pub fn permission_digest(permissions: &Json) -> Result<String, SecurityErrorCode
         .map(|v| digest_id_for(&v))
         .map_err(|_| SecurityErrorCode::TranscriptMismatch)
 }
+pub fn canonical_approval_aad(
+    values: &BTreeMap<String, Json>,
+) -> Result<Vec<u8>, SecurityErrorCode> {
+    const KEYS: [&str; 12] = [
+        "message_type",
+        "attempt_id",
+        "enrollment_id",
+        "candidate_node_id",
+        "commissioner_node_id",
+        "trust_domain_id",
+        "acp_version",
+        "extension_version",
+        "suite",
+        "identity_algorithm",
+        "identity_key_id",
+        "transcript_hash",
+    ];
+    if values.len() != KEYS.len()
+        || !KEYS.iter().all(|key| values.contains_key(*key))
+        || values.get("message_type") != Some(&Json::String("security.enrollment.approval".into()))
+        || !matches!(values.get("transcript_hash"), Some(Json::Bytes(hash)) if hash.len() == 32)
+    {
+        return Err(SecurityErrorCode::TranscriptMismatch);
+    }
+    acp_codec::encode_cbor_value(&Json::Object(
+        values.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+    ))
+    .map_err(|_| SecurityErrorCode::TranscriptMismatch)
+}
+pub fn canonical_install_result_without_confirmation(
+    values: &BTreeMap<String, Json>,
+) -> Result<Vec<u8>, SecurityErrorCode> {
+    const KEYS: [&str; 7] = [
+        "attempt_id",
+        "status",
+        "credential_id",
+        "identity_key_id",
+        "trust_domain_id",
+        "storage_posture",
+        "proof_of_possession",
+    ];
+    if values.len() != KEYS.len()
+        || !KEYS.iter().all(|key| values.contains_key(*key))
+        || values.get("status") != Some(&Json::String("installed".into()))
+        || !matches!(values.get("proof_of_possession"), Some(Json::Bytes(proof)) if !proof.is_empty())
+    {
+        return Err(SecurityErrorCode::TranscriptMismatch);
+    }
+    let Some(Json::Object(posture)) = values.get("storage_posture") else {
+        return Err(SecurityErrorCode::TranscriptMismatch);
+    };
+    let posture_keys: HashSet<&str> = posture.iter().map(|(key, _)| key.as_str()).collect();
+    if posture_keys != HashSet::from(["class", "hardware_backed", "private_key_exportable"]) {
+        return Err(SecurityErrorCode::TranscriptMismatch);
+    }
+    acp_codec::encode_cbor_value(&Json::Object(
+        values.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+    ))
+    .map_err(|_| SecurityErrorCode::TranscriptMismatch)
+}
+pub fn install_confirmation(
+    key: &[u8],
+    values: &BTreeMap<String, Json>,
+) -> Result<[u8; 32], SecurityErrorCode> {
+    Ok(hmac(
+        key,
+        &canonical_install_result_without_confirmation(values)?,
+    ))
+}
+pub fn install_proof_digest(
+    transcript_hash: &[u8],
+    credential_id: &str,
+) -> Result<[u8; 32], SecurityErrorCode> {
+    if transcript_hash.len() != 32 || !valid_digest_id(credential_id) {
+        return Err(SecurityErrorCode::CredentialInvalid);
+    }
+    let mut input = b"ACP enrollment install proof v1".to_vec();
+    input.extend_from_slice(transcript_hash);
+    input.extend_from_slice(credential_id.as_bytes());
+    Ok(sha256(&input))
+}
 pub fn derive_enrollment_keys(
     shared_key: &[u8],
     transcript_hash: &[u8],
@@ -374,12 +456,14 @@ pub trait Spake2PlusOperation: Send {
 pub trait AeadProvider: Send + Sync {
     fn seal(
         &self,
+        key: &SecretBytes,
         plaintext: &SecretBytes,
         nonce: &[u8],
         aad: &[u8],
     ) -> Result<Vec<u8>, SecurityErrorCode>;
     fn open(
         &self,
+        key: &SecretBytes,
         ciphertext: &[u8],
         nonce: &[u8],
         aad: &[u8],
@@ -432,6 +516,546 @@ pub trait RevocationStore: Send + Sync {
     fn epoch(&self) -> u64;
 }
 
+pub struct OneShotApprovalProtector<'a> {
+    aead: &'a dyn AeadProvider,
+    random: &'a dyn SecureRandomProvider,
+    consumed: HashSet<EnrollmentAttemptId>,
+}
+impl<'a> OneShotApprovalProtector<'a> {
+    pub fn new(aead: &'a dyn AeadProvider, random: &'a dyn SecureRandomProvider) -> Self {
+        Self {
+            aead,
+            random,
+            consumed: HashSet::new(),
+        }
+    }
+    pub fn seal(
+        &mut self,
+        attempt: EnrollmentAttemptId,
+        key: &SecretBytes,
+        plaintext: &SecretBytes,
+        aad: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>), SecurityErrorCode> {
+        if !self.consumed.insert(attempt) {
+            return Err(SecurityErrorCode::EnrollmentReplayed);
+        }
+        let nonce_secret = self.random.bytes(12)?;
+        let nonce = nonce_secret.expose_to(ToOwned::to_owned);
+        if nonce.len() != 12 {
+            return Err(SecurityErrorCode::ResourceLimit);
+        }
+        let ciphertext = self.aead.seal(key, plaintext, &nonce, aad)?;
+        Ok((nonce, ciphertext))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CandidateEnrollmentState {
+    Unenrolled,
+    EnrollmentOpen,
+    Negotiating,
+    KeyConfirmed,
+    AwaitingApproval,
+    CredentialStaged,
+    Enrolled,
+    Cancelled,
+    Expired,
+    Locked,
+    Failed,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommissionerEnrollmentState {
+    Idle,
+    CandidateSelected,
+    SecretAcquired,
+    Negotiating,
+    KeyConfirmed,
+    AwaitingOperatorApproval,
+    IssuingCredential,
+    AwaitingInstallReceipt,
+    Complete,
+    Cancelled,
+    Expired,
+    Locked,
+    Failed,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnrollmentLimits {
+    pub concurrent_attempts: usize,
+    pub attempts_per_enrollment: usize,
+    pub attempt_timeout_ns: u64,
+    pub enrollment_window_ns: u64,
+}
+impl EnrollmentLimits {
+    pub fn for_profile(profile: SecurityProfile) -> Self {
+        Self {
+            concurrent_attempts: if profile == SecurityProfile::Full {
+                2
+            } else {
+                1
+            },
+            attempts_per_enrollment: 5,
+            attempt_timeout_ns: 60_000_000_000,
+            enrollment_window_ns: 600_000_000_000,
+        }
+    }
+}
+pub fn select_enrollment_suite(
+    preferred: &[SecuritySuite],
+    supported: &HashSet<SecuritySuite>,
+) -> Result<SecuritySuite, SecurityErrorCode> {
+    preferred
+        .iter()
+        .copied()
+        .find(|suite| supported.contains(suite))
+        .ok_or(SecurityErrorCode::NoCommonSuite)
+}
+#[derive(Debug, Clone)]
+struct CandidateAttempt {
+    state: CandidateEnrollmentState,
+    deadline_ns: u64,
+    peer_share_processed: bool,
+    durable_install_verified: bool,
+}
+
+pub struct CandidateEnrollment {
+    pub enrollment_id: EnrollmentId,
+    state: CandidateEnrollmentState,
+    failed_attempts: usize,
+    suites: HashSet<SecuritySuite>,
+    limits: EnrollmentLimits,
+    opened_ns: u64,
+    attempts: HashMap<EnrollmentAttemptId, CandidateAttempt>,
+    consumed_attempts: HashSet<EnrollmentAttemptId>,
+    audit: Option<Arc<dyn AuditSink>>,
+}
+impl CandidateEnrollment {
+    pub fn state(&self) -> CandidateEnrollmentState {
+        self.state
+    }
+    pub fn failed_attempts(&self) -> usize {
+        self.failed_attempts
+    }
+    pub fn is_consumed(&self, id: &EnrollmentAttemptId) -> bool {
+        self.consumed_attempts.contains(id)
+    }
+    pub fn new(
+        enrollment_id: EnrollmentId,
+        suites: HashSet<SecuritySuite>,
+        limits: EnrollmentLimits,
+        opened_ns: u64,
+    ) -> Self {
+        Self::new_with_audit(enrollment_id, suites, limits, opened_ns, None)
+    }
+    pub fn new_with_audit(
+        enrollment_id: EnrollmentId,
+        suites: HashSet<SecuritySuite>,
+        limits: EnrollmentLimits,
+        opened_ns: u64,
+        audit: Option<Arc<dyn AuditSink>>,
+    ) -> Self {
+        Self {
+            enrollment_id,
+            state: CandidateEnrollmentState::EnrollmentOpen,
+            failed_attempts: 0,
+            suites,
+            limits,
+            opened_ns,
+            attempts: HashMap::new(),
+            consumed_attempts: HashSet::new(),
+            audit,
+        }
+    }
+    pub fn begin(
+        &mut self,
+        id: EnrollmentAttemptId,
+        suite: SecuritySuite,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.check_window(now)?;
+        if self.state == CandidateEnrollmentState::Locked {
+            return Err(SecurityErrorCode::EnrollmentLocked);
+        }
+        if !matches!(
+            self.state,
+            CandidateEnrollmentState::EnrollmentOpen | CandidateEnrollmentState::Negotiating
+        ) {
+            return Err(SecurityErrorCode::EnrollmentClosed);
+        }
+        if self.attempts.contains_key(&id) || self.consumed_attempts.contains(&id) {
+            return Err(SecurityErrorCode::EnrollmentReplayed);
+        }
+        if !self.suites.contains(&suite) {
+            return Err(SecurityErrorCode::NoCommonSuite);
+        }
+        if self.attempts.len() >= self.limits.concurrent_attempts {
+            return Err(SecurityErrorCode::ResourceLimit);
+        }
+        if self.limits.concurrent_attempts == 0 || self.limits.attempts_per_enrollment == 0 {
+            return Err(SecurityErrorCode::ResourceLimit);
+        }
+        let deadline_ns = now
+            .checked_add(self.limits.attempt_timeout_ns)
+            .ok_or(SecurityErrorCode::ResourceLimit)?;
+        self.attempts.insert(
+            id.clone(),
+            CandidateAttempt {
+                state: CandidateEnrollmentState::Negotiating,
+                deadline_ns,
+                peer_share_processed: false,
+                durable_install_verified: false,
+            },
+        );
+        self.state = CandidateEnrollmentState::Negotiating;
+        self.record("security.enrollment.attempt_started", Some(&id));
+        Ok(())
+    }
+    pub fn verify_key_confirmation(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        operation: &mut dyn Spake2PlusOperation,
+        confirmation: &[u8],
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.require(id, CandidateEnrollmentState::Negotiating, now)?;
+        if !self
+            .attempts
+            .get(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .peer_share_processed
+        {
+            self.cryptographic_failure(id);
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        if operation.verify_confirmation(confirmation).is_err() {
+            self.cryptographic_failure(id);
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        self.transition(
+            id,
+            CandidateEnrollmentState::Negotiating,
+            CandidateEnrollmentState::KeyConfirmed,
+            now,
+        )?;
+        self.record("security.enrollment.key_confirmed", Some(id));
+        Ok(())
+    }
+    pub fn process_peer_share(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        operation: &mut dyn Spake2PlusOperation,
+        encoded_share: &[u8],
+        now: u64,
+    ) -> Result<Vec<u8>, SecurityErrorCode> {
+        self.require(id, CandidateEnrollmentState::Negotiating, now)?;
+        if self
+            .attempts
+            .get(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .peer_share_processed
+        {
+            self.cryptographic_failure(id);
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        let response = match operation.receive_peer_share(encoded_share) {
+            Ok(value) if !value.is_empty() => value,
+            _ => {
+                self.cryptographic_failure(id);
+                return Err(SecurityErrorCode::AuthenticationFailed);
+            }
+        };
+        self.attempts
+            .get_mut(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .peer_share_processed = true;
+        self.record("security.enrollment.peer_share_processed", Some(id));
+        Ok(response)
+    }
+    pub fn await_approval(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.transition(
+            id,
+            CandidateEnrollmentState::KeyConfirmed,
+            CandidateEnrollmentState::AwaitingApproval,
+            now,
+        )
+    }
+    pub fn credential_staged(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.transition(
+            id,
+            CandidateEnrollmentState::AwaitingApproval,
+            CandidateEnrollmentState::CredentialStaged,
+            now,
+        )
+    }
+    pub fn durable_install_verified(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.require(id, CandidateEnrollmentState::CredentialStaged, now)?;
+        self.attempts
+            .get_mut(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .durable_install_verified = true;
+        Ok(())
+    }
+    pub fn complete(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.require(id, CandidateEnrollmentState::CredentialStaged, now)?;
+        if !self
+            .attempts
+            .get(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .durable_install_verified
+        {
+            return Err(SecurityErrorCode::StorageFailed);
+        }
+        self.consume(id);
+        self.consume_all();
+        self.state = CandidateEnrollmentState::Enrolled;
+        self.record("security.enrollment.enrolled", Some(id));
+        Ok(())
+    }
+    pub fn cryptographic_failure(&mut self, id: &EnrollmentAttemptId) {
+        self.consume(id);
+        self.failed_attempts += 1;
+        if self.failed_attempts >= self.limits.attempts_per_enrollment {
+            self.consume_all();
+            self.state = CandidateEnrollmentState::Locked;
+        } else {
+            self.state = if self.attempts.is_empty() {
+                CandidateEnrollmentState::EnrollmentOpen
+            } else {
+                CandidateEnrollmentState::Negotiating
+            };
+        }
+        self.record("security.enrollment.cryptographic_failure", Some(id));
+    }
+    pub fn restart(&mut self) {
+        self.consume_all();
+        if !matches!(
+            self.state,
+            CandidateEnrollmentState::Enrolled | CandidateEnrollmentState::Locked
+        ) {
+            self.state = CandidateEnrollmentState::Failed;
+        }
+        self.record("security.enrollment.restart_invalidated", None);
+    }
+    fn transition(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        expected: CandidateEnrollmentState,
+        target: CandidateEnrollmentState,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.require(id, expected, now)?;
+        self.attempts
+            .get_mut(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?
+            .state = target;
+        self.record("security.enrollment.candidate_transition", Some(id));
+        Ok(())
+    }
+    fn require(
+        &mut self,
+        id: &EnrollmentAttemptId,
+        expected: CandidateEnrollmentState,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        self.check_window(now)?;
+        let attempt = self
+            .attempts
+            .get(id)
+            .ok_or(SecurityErrorCode::EnrollmentReplayed)?;
+        if now >= attempt.deadline_ns {
+            self.consume(id);
+            self.state = CandidateEnrollmentState::Expired;
+            return Err(SecurityErrorCode::EnrollmentExpired);
+        }
+        if attempt.state != expected {
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        Ok(())
+    }
+    fn check_window(&mut self, now: u64) -> Result<(), SecurityErrorCode> {
+        let deadline = self
+            .opened_ns
+            .checked_add(self.limits.enrollment_window_ns)
+            .ok_or(SecurityErrorCode::ResourceLimit)?;
+        if now >= deadline {
+            self.consume_all();
+            self.state = CandidateEnrollmentState::Expired;
+            Err(SecurityErrorCode::EnrollmentExpired)
+        } else {
+            Ok(())
+        }
+    }
+    fn consume(&mut self, id: &EnrollmentAttemptId) {
+        self.attempts.remove(id);
+        self.consumed_attempts.insert(id.clone());
+    }
+    fn consume_all(&mut self) {
+        self.consumed_attempts.extend(self.attempts.keys().cloned());
+        self.attempts.clear();
+    }
+    fn record(&self, event: &str, attempt: Option<&EnrollmentAttemptId>) {
+        if let Some(audit) = &self.audit {
+            let mut fields = BTreeMap::from([
+                ("enrollment_id".into(), self.enrollment_id.as_str().into()),
+                ("state".into(), format!("{:?}", self.state)),
+            ]);
+            if let Some(attempt) = attempt {
+                fields.insert("attempt_id".into(), attempt.as_str().into());
+            }
+            audit.record(event, &fields);
+        }
+    }
+}
+
+pub struct CommissionerEnrollment {
+    pub enrollment_id: EnrollmentId,
+    pub attempt_id: EnrollmentAttemptId,
+    pub deadline_ns: u64,
+    state: CommissionerEnrollmentState,
+    consumed: bool,
+    audit: Option<Arc<dyn AuditSink>>,
+}
+impl CommissionerEnrollment {
+    pub fn new(
+        enrollment_id: EnrollmentId,
+        attempt_id: EnrollmentAttemptId,
+        deadline_ns: u64,
+    ) -> Self {
+        Self::new_with_audit(enrollment_id, attempt_id, deadline_ns, None)
+    }
+    pub fn new_with_audit(
+        enrollment_id: EnrollmentId,
+        attempt_id: EnrollmentAttemptId,
+        deadline_ns: u64,
+        audit: Option<Arc<dyn AuditSink>>,
+    ) -> Self {
+        Self {
+            enrollment_id,
+            attempt_id,
+            deadline_ns,
+            state: CommissionerEnrollmentState::Idle,
+            consumed: false,
+            audit,
+        }
+    }
+    pub fn state(&self) -> CommissionerEnrollmentState {
+        self.state
+    }
+    pub fn consumed(&self) -> bool {
+        self.consumed
+    }
+    pub fn transition(
+        &mut self,
+        expected: CommissionerEnrollmentState,
+        target: CommissionerEnrollmentState,
+        now: u64,
+    ) -> Result<(), SecurityErrorCode> {
+        if self.consumed {
+            return Err(SecurityErrorCode::EnrollmentReplayed);
+        }
+        if now >= self.deadline_ns {
+            self.consumed = true;
+            self.state = CommissionerEnrollmentState::Expired;
+            return Err(SecurityErrorCode::EnrollmentExpired);
+        }
+        if self.state != expected {
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        let legal = matches!(
+            (self.state, target),
+            (
+                CommissionerEnrollmentState::Idle,
+                CommissionerEnrollmentState::CandidateSelected
+            ) | (
+                CommissionerEnrollmentState::CandidateSelected,
+                CommissionerEnrollmentState::SecretAcquired
+            ) | (
+                CommissionerEnrollmentState::SecretAcquired,
+                CommissionerEnrollmentState::Negotiating
+            ) | (
+                CommissionerEnrollmentState::Negotiating,
+                CommissionerEnrollmentState::KeyConfirmed
+            ) | (
+                CommissionerEnrollmentState::KeyConfirmed,
+                CommissionerEnrollmentState::AwaitingOperatorApproval
+            ) | (
+                CommissionerEnrollmentState::AwaitingOperatorApproval,
+                CommissionerEnrollmentState::IssuingCredential
+            ) | (
+                CommissionerEnrollmentState::IssuingCredential,
+                CommissionerEnrollmentState::AwaitingInstallReceipt
+            ) | (
+                CommissionerEnrollmentState::AwaitingInstallReceipt,
+                CommissionerEnrollmentState::Complete
+            )
+        );
+        if !legal {
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        self.state = target;
+        self.record("security.enrollment.commissioner_transition");
+        Ok(())
+    }
+    pub fn complete_verified_install(
+        &mut self,
+        now: u64,
+        hmac_valid: bool,
+        proof_valid: bool,
+    ) -> Result<(), SecurityErrorCode> {
+        if !hmac_valid || !proof_valid {
+            self.consumed = true;
+            self.state = CommissionerEnrollmentState::Failed;
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        self.transition(
+            CommissionerEnrollmentState::AwaitingInstallReceipt,
+            CommissionerEnrollmentState::Complete,
+            now,
+        )?;
+        self.consumed = true;
+        self.record("security.enrollment.install_verified");
+        Ok(())
+    }
+    pub fn cancel(&mut self) {
+        self.consumed = true;
+        self.state = CommissionerEnrollmentState::Cancelled;
+        self.record("security.enrollment.cancelled");
+    }
+    pub fn fail(&mut self) {
+        self.consumed = true;
+        self.state = CommissionerEnrollmentState::Failed;
+        self.record("security.enrollment.failed");
+    }
+    fn record(&self, event: &str) {
+        if let Some(audit) = &self.audit {
+            audit.record(
+                event,
+                &BTreeMap::from([
+                    ("enrollment_id".into(), self.enrollment_id.as_str().into()),
+                    ("attempt_id".into(), self.attempt_id.as_str().into()),
+                    ("state".into(), format!("{:?}", self.state)),
+                ]),
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -468,6 +1092,43 @@ mod tests {
         }
         fn trust_state(&self) -> ClockTrustState {
             self.1
+        }
+    }
+    struct FixtureAead;
+    impl AeadProvider for FixtureAead {
+        fn seal(
+            &self,
+            _key: &SecretBytes,
+            plaintext: &SecretBytes,
+            nonce: &[u8],
+            aad: &[u8],
+        ) -> Result<Vec<u8>, SecurityErrorCode> {
+            let mut value = plaintext.expose_to(ToOwned::to_owned);
+            value.extend_from_slice(nonce);
+            value.extend_from_slice(aad);
+            Ok(value)
+        }
+        fn open(
+            &self,
+            _key: &SecretBytes,
+            _ciphertext: &[u8],
+            _nonce: &[u8],
+            _aad: &[u8],
+        ) -> Result<SecretBytes, SecurityErrorCode> {
+            Err(SecurityErrorCode::AuthenticationFailed)
+        }
+    }
+    struct FixtureSpake(bool);
+    impl Spake2PlusOperation for FixtureSpake {
+        fn receive_peer_share(&mut self, share: &[u8]) -> Result<Vec<u8>, SecurityErrorCode> {
+            Ok(share.to_vec())
+        }
+        fn verify_confirmation(&mut self, value: &[u8]) -> Result<(), SecurityErrorCode> {
+            if self.0 && value == b"valid" {
+                Ok(())
+            } else {
+                Err(SecurityErrorCode::AuthenticationFailed)
+            }
         }
     }
     #[test]
@@ -562,5 +1223,188 @@ mod tests {
             .step_by(2)
             .map(|i| u8::from_str_radix(&value[i..i + 2], 16).unwrap())
             .collect()
+    }
+
+    #[test]
+    fn enrollment_requires_durable_install_and_bounds_replay() {
+        let enrollment = EnrollmentId::parse("50617283-94a5-4b6c-9a4b-5c6d7e8f90a1").unwrap();
+        let attempt = EnrollmentAttemptId::parse("60718293-a4b5-4c6d-aa5b-000000000001").unwrap();
+        let mut machine = CandidateEnrollment::new(
+            enrollment,
+            HashSet::from([SecuritySuite::Raw128]),
+            EnrollmentLimits::for_profile(SecurityProfile::Full),
+            0,
+        );
+        machine
+            .begin(attempt.clone(), SecuritySuite::Raw128, 1)
+            .unwrap();
+        machine
+            .process_peer_share(&attempt, &mut FixtureSpake(true), b"share", 2)
+            .unwrap();
+        machine
+            .verify_key_confirmation(&attempt, &mut FixtureSpake(true), b"valid", 2)
+            .unwrap();
+        machine.await_approval(&attempt, 3).unwrap();
+        machine.credential_staged(&attempt, 4).unwrap();
+        assert_eq!(
+            machine.complete(&attempt, 5),
+            Err(SecurityErrorCode::StorageFailed)
+        );
+        machine.durable_install_verified(&attempt, 5).unwrap();
+        machine.complete(&attempt, 6).unwrap();
+        assert_eq!(machine.state, CandidateEnrollmentState::Enrolled);
+        assert_eq!(
+            machine.verify_key_confirmation(&attempt, &mut FixtureSpake(true), b"valid", 7),
+            Err(SecurityErrorCode::EnrollmentReplayed)
+        );
+    }
+
+    #[test]
+    fn enrollment_concurrency_and_lockout_are_bounded() {
+        let enrollment = EnrollmentId::parse("50617283-94a5-4b6c-9a4b-5c6d7e8f90a1").unwrap();
+        let mut machine = CandidateEnrollment::new(
+            enrollment,
+            HashSet::from([SecuritySuite::Raw128]),
+            EnrollmentLimits::for_profile(SecurityProfile::Lightweight),
+            0,
+        );
+        for n in 1..=5 {
+            let id =
+                EnrollmentAttemptId::parse(format!("60718293-a4b5-4c6d-aa5b-{n:012x}")).unwrap();
+            machine.begin(id.clone(), SecuritySuite::Raw128, n).unwrap();
+            machine.cryptographic_failure(&id);
+        }
+        assert_eq!(machine.state, CandidateEnrollmentState::Locked);
+    }
+
+    #[test]
+    fn frozen_approval_and_installation_vectors_match() {
+        let transcript =
+            decode_hex("1713be11b1b0ef86de03b3eca4dbc6d1ae1309f4dda0b0c842b9e9b442b673ba");
+        let key_id = "sha256:f3c9d135604346824a568ba09251f3118e0184b417fae972a66668ff3f93d75d";
+        let aad: BTreeMap<String, Json> = [
+            (
+                "message_type",
+                Json::String("security.enrollment.approval".into()),
+            ),
+            (
+                "attempt_id",
+                Json::String("60718293-a4b5-4c6d-aa5b-6c7d8e9fa0b1".into()),
+            ),
+            (
+                "enrollment_id",
+                Json::String("50617283-94a5-4b6c-9a4b-5c6d7e8f90a1".into()),
+            ),
+            (
+                "candidate_node_id",
+                Json::String("00112233-4455-4677-8899-aabbccddeeff".into()),
+            ),
+            (
+                "commissioner_node_id",
+                Json::String("10213243-5465-4768-9a0b-1c2d3e4f5061".into()),
+            ),
+            (
+                "trust_domain_id",
+                Json::String("40516273-8495-4a6b-8a3b-4c5d6e7f8091".into()),
+            ),
+            ("acp_version", Json::String("1.2".into())),
+            ("extension_version", Json::String("1.0".into())),
+            (
+                "suite",
+                Json::String("ACP-SPAKE2PLUS-P256-SHA256-HKDFSHA256-RAW128-v1".into()),
+            ),
+            (
+                "identity_algorithm",
+                Json::String("ecdsa_p256_sha256".into()),
+            ),
+            ("identity_key_id", Json::String(key_id.into())),
+            ("transcript_hash", Json::Bytes(transcript.clone())),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.into(), v))
+        .collect();
+        assert_eq!(hex(&canonical_approval_aad(&aad).unwrap()), "ac657375697465782f4143502d5350414b4532504c55532d503235362d5348413235362d484b44465348413235362d5241573132382d76316a617474656d70745f6964782436303731383239332d613462352d346336642d616135622d3663376438653966613062316b6163705f76657273696f6e63312e326c6d6573736167655f74797065781c73656375726974792e656e726f6c6c6d656e742e617070726f76616c6d656e726f6c6c6d656e745f6964782435303631373238332d393461352d346236632d396134622d3563366437653866393061316f6964656e746974795f6b65795f696478477368613235363a663363396431333536303433343638323461353638626130393235316633313138653031383462343137666165393732613636363638666633663933643735646f7472616e7363726970745f6861736858201713be11b1b0ef86de03b3eca4dbc6d1ae1309f4dda0b0c842b9e9b442b673ba6f74727573745f646f6d61696e5f6964782434303531363237332d383439352d346136622d386133622d3463356436653766383039317163616e6469646174655f6e6f64655f6964782430303131323233332d343435352d343637372d383839392d61616262636364646565666671657874656e73696f6e5f76657273696f6e63312e30726964656e746974795f616c676f726974686d7165636473615f703235365f73686132353674636f6d6d697373696f6e65725f6e6f64655f6964782431303231333234332d353436352d343736382d396130622d316332643365346635303631");
+        let credential = "sha256:466363fece7088b31d8e677611eab7caab29f8aef3bfd4e207c63c17bd4cfb20";
+        assert_eq!(
+            hex(&install_proof_digest(&transcript, credential).unwrap()),
+            "e7e2cd80703a6adfe8fa6aeb725e3d735d79cb0972719a9553d264f7cda1f350"
+        );
+    }
+
+    #[test]
+    fn suite_intersection_and_deadline_overflow_fail_closed() {
+        let supported = HashSet::from([SecuritySuite::Raw128]);
+        assert_eq!(
+            select_enrollment_suite(
+                &[SecuritySuite::Pbkdf2_100k, SecuritySuite::Raw128],
+                &supported
+            ),
+            Ok(SecuritySuite::Raw128)
+        );
+        assert_eq!(
+            select_enrollment_suite(&[SecuritySuite::Pbkdf2_100k], &supported),
+            Err(SecurityErrorCode::NoCommonSuite)
+        );
+    }
+    #[test]
+    fn approval_key_is_one_shot() {
+        let random = DeterministicRandom {
+            fixture: (0..12).collect(),
+            offset: std::sync::Mutex::new(0),
+        };
+        let mut protector = OneShotApprovalProtector::new(&FixtureAead, &random);
+        let id = EnrollmentAttemptId::parse("60718293-a4b5-4c6d-aa5b-000000000001").unwrap();
+        let key = SecretBytes::new(vec![1; 32]).unwrap();
+        let plaintext = SecretBytes::new(vec![2]).unwrap();
+        assert_eq!(
+            protector
+                .seal(id.clone(), &key, &plaintext, b"aad")
+                .unwrap()
+                .0,
+            (0..12).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            protector.seal(id, &key, &plaintext, b"aad"),
+            Err(SecurityErrorCode::EnrollmentReplayed)
+        );
+    }
+
+    #[test]
+    fn missing_and_duplicate_peer_shares_consume_attempts() {
+        let enrollment = EnrollmentId::parse("50617283-94a5-4b6c-9a4b-5c6d7e8f90a1").unwrap();
+        let mut missing = CandidateEnrollment::new(
+            enrollment.clone(),
+            HashSet::from([SecuritySuite::Raw128]),
+            EnrollmentLimits::for_profile(SecurityProfile::Lightweight),
+            0,
+        );
+        let missing_id =
+            EnrollmentAttemptId::parse("60718293-a4b5-4c6d-aa5b-000000000008").unwrap();
+        missing
+            .begin(missing_id.clone(), SecuritySuite::Raw128, 1)
+            .unwrap();
+        assert_eq!(
+            missing.verify_key_confirmation(&missing_id, &mut FixtureSpake(true), b"valid", 2),
+            Err(SecurityErrorCode::AuthenticationFailed)
+        );
+
+        let mut duplicate = CandidateEnrollment::new(
+            enrollment,
+            HashSet::from([SecuritySuite::Raw128]),
+            EnrollmentLimits::for_profile(SecurityProfile::Lightweight),
+            0,
+        );
+        let duplicate_id =
+            EnrollmentAttemptId::parse("60718293-a4b5-4c6d-aa5b-000000000009").unwrap();
+        duplicate
+            .begin(duplicate_id.clone(), SecuritySuite::Raw128, 1)
+            .unwrap();
+        duplicate
+            .process_peer_share(&duplicate_id, &mut FixtureSpake(true), b"share", 2)
+            .unwrap();
+        assert_eq!(
+            duplicate.process_peer_share(&duplicate_id, &mut FixtureSpake(true), b"share", 3),
+            Err(SecurityErrorCode::AuthenticationFailed)
+        );
     }
 }
