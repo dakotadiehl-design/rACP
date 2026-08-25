@@ -32,6 +32,8 @@ The post-implementation review corrected:
 - offline revocation freshness and the hardened active-session default;
 - durable Python rollback-checkpoint persistence.
 
+A subsequent independent code review found and corrected a two-slot addressing defect: generation parity could overwrite the active slot when generation numbers jumped by an even amount. Swift and Rust now select the inactive physical slot independently of generation numbering and reject rollback or conflicting reuse. Python cleanup now retains the two newest complete generations rather than assuming sequential numbering, file writes handle short writes, compact/revocation timestamps require canonical UTC text, Keychain duplicate races retry deterministically, and delta bounds count replacement IDs correctly.
+
 `git diff --check`, Ruff, mypy, Rust formatting, and clippy are clean.
 
 ## Verification

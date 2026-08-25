@@ -220,7 +220,12 @@ public struct ACPRevocationState: Sendable {
                   UInt64(base) == epoch, nextEpoch == epoch + 1
             else { throw ACPSecurityErrorCode.authenticationFailed }
         }
-        let prospective = format == "acp-revocation-snapshot-v1" ? values.count : values.count + entries.count
+        let incomingIDs = Set(values.compactMap { value -> String? in
+            guard case .object(let fields) = value, case .string(let id) = fields["credential_id"] else { return nil }
+            return id
+        })
+        let prospective = format == "acp-revocation-snapshot-v1"
+            ? values.count : Set(entries.keys.map(\.rawValue)).union(incomingIDs).count
         guard values.count <= maximumEntries, prospective <= maximumEntries else {
             throw ACPSecurityErrorCode.resourceLimit
         }
@@ -294,8 +299,21 @@ public actor ACPTwoSlotIdentityStore {
 
     public func stage(_ value: ACPCredentialGeneration) throws {
         guard !value.credential.isEmpty else { throw ACPSecurityErrorCode.storageFailed }
+        let slots = [safeLoad(name: "slot-0"), safeLoad(name: "slot-1")]
+        if let existing = slots.compactMap({ $0 }).first(where: { $0.slot.value.generation == value.generation }) {
+            guard !existing.slot.committed, existing.slot.value == value,
+                  existing.slot.checksum == checksum(value, false)
+            else { throw ACPSecurityErrorCode.storageFailed }
+            return
+        }
+        guard !slots.compactMap({ $0?.slot.value.generation }).contains(where: { $0 >= value.generation })
+        else { throw ACPSecurityErrorCode.storageFailed }
+        let activeName = slots.compactMap { $0 }
+            .filter { $0.slot.committed && $0.slot.checksum == checksum($0.slot.value, true) }
+            .max { $0.slot.value.generation < $1.slot.value.generation }?.name
+        let target = activeName == "slot-0" ? "slot-1" : "slot-0"
         let slot = ACPCredentialSlot(value: value, committed: false, checksum: checksum(value, false))
-        try backend.write(name: name(value.generation), data: try encode(slot))
+        try backend.write(name: target, data: try encode(slot))
     }
     public func validateStaged(generation: UInt64, valid: Bool) throws {
         guard let slot = try load(generation), slot.value.generation == generation,
@@ -303,15 +321,16 @@ public actor ACPTwoSlotIdentityStore {
         else { throw ACPSecurityErrorCode.storageFailed }
     }
     public func commit(generation: UInt64) throws {
-        guard var slot = try load(generation), slot.value.generation == generation,
-              slot.checksum == checksum(slot.value, slot.committed)
+        guard let located = try locate(generation), located.slot.value.generation == generation,
+              located.slot.checksum == checksum(located.slot.value, located.slot.committed)
         else { throw ACPSecurityErrorCode.storageFailed }
+        var slot = located.slot
         slot.committed = true; slot.checksum = checksum(slot.value, true)
-        try backend.write(name: name(generation), data: try encode(slot))
+        try backend.write(name: located.name, data: try encode(slot))
         try backend.write(name: "active", data: Data("\(generation)\n".utf8))
     }
     public func recover() throws -> ACPCredentialGeneration? {
-        [safeLoad(0), safeLoad(1)].compactMap { $0 }
+        [safeLoad(name: "slot-0"), safeLoad(name: "slot-1")].compactMap { $0?.slot }
             .filter { $0.committed && $0.checksum == checksum($0.value, true) }
             .max { $0.value.generation < $1.value.generation }?.value
     }
@@ -319,13 +338,22 @@ public actor ACPTwoSlotIdentityStore {
         try backend.delete(name: "slot-0"); try backend.delete(name: "slot-1")
         try backend.delete(name: "active")
     }
-    private func name(_ generation: UInt64) -> String { "slot-\(generation & 1)" }
     private func load(_ generation: UInt64) throws -> ACPCredentialSlot? {
-        guard let raw = try backend.read(name: name(generation)) else { return nil }
-        return try JSONDecoder().decode(ACPCredentialSlot.self, from: raw)
+        try locate(generation)?.slot
     }
-    private func safeLoad(_ generation: UInt64) -> ACPCredentialSlot? {
-        try? load(generation)
+    private func locate(_ generation: UInt64) throws -> (name: String, slot: ACPCredentialSlot)? {
+        for name in ["slot-0", "slot-1"] {
+            guard let raw = try backend.read(name: name) else { continue }
+            guard let slot = try? JSONDecoder().decode(ACPCredentialSlot.self, from: raw) else { continue }
+            if slot.value.generation == generation { return (name, slot) }
+        }
+        return nil
+    }
+    private func safeLoad(name: String) -> (name: String, slot: ACPCredentialSlot)? {
+        guard let raw = try? backend.read(name: name),
+              let slot = try? JSONDecoder().decode(ACPCredentialSlot.self, from: raw)
+        else { return nil }
+        return (name, slot)
     }
     private func encode(_ slot: ACPCredentialSlot) throws -> Data {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]

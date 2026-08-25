@@ -40,7 +40,7 @@ def _timestamp(value: object) -> datetime:
     if not isinstance(value, CborTag) or value.tag != 0 or not isinstance(value.value, str):
         _fail()
     try:
-        parsed = datetime.fromisoformat(value.value.replace("Z", "+00:00"))
+        parsed = datetime.strptime(value.value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
     except ValueError:
         _fail()
     if parsed.tzinfo is None:
@@ -316,7 +316,12 @@ class RevocationState:
                 _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
         elif "base_epoch" in body:
             _fail()
-        prospective = len(values) if body["format"] == "acp-revocation-snapshot-v1" else len(values) + len(self.entries)
+        incoming_ids = {value.get("credential_id") for value in values if isinstance(value, dict)}
+        prospective = (
+            len(values)
+            if body["format"] == "acp-revocation-snapshot-v1"
+            else len(set(self.entries).union(incoming_ids))
+        )
         if len(values) > self.max_entries or prospective > self.max_entries:
             _fail(SecurityErrorCode.RESOURCE_LIMIT)
         if not isinstance(issuer, str) or not verifier(
@@ -440,7 +445,12 @@ class JournaledIdentityStore:
         try:
             if self.inject is not None:
                 self.inject(PersistenceBoundary.PARTIAL_WRITE)
-            os.write(descriptor, data)
+            remaining = memoryview(data)
+            while remaining:
+                written = os.write(descriptor, remaining)
+                if written <= 0:
+                    _fail(SecurityErrorCode.STORAGE_FAILED)
+                remaining = remaining[written:]
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
@@ -453,6 +463,15 @@ class JournaledIdentityStore:
             os.close(directory)
 
     def stage(self, value: CredentialGeneration) -> None:
+        active = self.recover()
+        if active is not None and value.generation <= active.generation:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
+        existing = self._path(value.generation)
+        if existing.exists():
+            staged, committed = self._read(existing)
+            if not committed and staged == value:
+                return
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         self._atomic_write(self._path(value.generation), self._document(value, False))
         self.inject(PersistenceBoundary.AFTER_STAGE)
 
@@ -491,7 +510,15 @@ class JournaledIdentityStore:
         active = self.recover()
         if active is None:
             return
-        keep = {active.generation, max(0, active.generation - 1)}
+        complete: list[int] = []
+        for path in self.root.glob("identity-*.json"):
+            try:
+                value, committed = self._read(path)
+                if committed:
+                    complete.append(value.generation)
+            except (OSError, ValueError, TypeError, KeyError, CredentialLifecycleError):
+                continue
+        keep = set(sorted(complete, reverse=True)[:2])
         for path in self.root.glob("identity-*.json"):
             generation = int(path.stem.split("-")[1])
             if generation not in keep:

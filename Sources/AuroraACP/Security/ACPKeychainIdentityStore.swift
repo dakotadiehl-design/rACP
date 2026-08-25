@@ -27,7 +27,11 @@ public final class ACPKeychainCredentialBackend: ACPCredentialSlotBackend, @unch
         let update = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
         if update == errSecItemNotFound {
             var insertion = query; attributes.forEach { insertion[$0] = $1 }
-            guard SecItemAdd(insertion as CFDictionary, nil) == errSecSuccess else { throw ACPSecurityErrorCode.storageFailed }
+            let add = SecItemAdd(insertion as CFDictionary, nil)
+            if add == errSecDuplicateItem {
+                guard SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecSuccess
+                else { throw ACPSecurityErrorCode.storageFailed }
+            } else if add != errSecSuccess { throw ACPSecurityErrorCode.storageFailed }
         } else if update != errSecSuccess { throw ACPSecurityErrorCode.storageFailed }
     }
     public func delete(name: String) throws {

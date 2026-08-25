@@ -498,7 +498,17 @@ impl RevocationState {
         let prospective = if format == "acp-revocation-snapshot-v1" {
             values.len()
         } else {
-            values.len() + self.entries.len()
+            let mut ids = self
+                .entries
+                .keys()
+                .map(CredentialId::as_str)
+                .collect::<std::collections::HashSet<_>>();
+            ids.extend(
+                values
+                    .iter()
+                    .filter_map(|value| object(value).ok()?.get("credential_id")?.as_str()),
+            );
+            ids.len()
         };
         if values.len() > self.max_entries || prospective > self.max_entries {
             return Err(SecurityErrorCode::ResourceLimit);
@@ -650,13 +660,46 @@ impl TwoSlotIdentityStore {
         if value.credential.is_empty() {
             return Err(SecurityErrorCode::StorageFailed);
         }
-        let index = (value.generation & 1) as usize;
+        if let Some(existing) = self
+            .slots
+            .iter()
+            .flatten()
+            .find(|slot| slot.value.generation == value.generation)
+        {
+            return if !existing.committed && existing.valid() && existing.value == value {
+                Ok(())
+            } else {
+                Err(SecurityErrorCode::StorageFailed)
+            };
+        }
+        if self
+            .slots
+            .iter()
+            .flatten()
+            .any(|slot| slot.value.generation >= value.generation)
+        {
+            return Err(SecurityErrorCode::StorageFailed);
+        }
+        let active = self
+            .slots
+            .iter()
+            .enumerate()
+            .filter(|(_, slot)| {
+                slot.as_ref()
+                    .is_some_and(|slot| slot.committed && slot.valid())
+            })
+            .max_by_key(|(_, slot)| slot.as_ref().map(|slot| slot.value.generation))
+            .map(|(index, _)| index);
+        let index = active.map_or(0, |index| 1 - index);
         self.slots[index] = Some(Slot::new(value, false));
         Ok(())
     }
     pub fn validate_staged(&self, generation: u64, valid: bool) -> Result<(), SecurityErrorCode> {
-        let slot = self.slots[(generation & 1) as usize]
-            .as_ref()
+        let slot = self
+            .slots
+            .iter()
+            .flatten()
+            .find(|slot| slot.value.generation == generation)
             .ok_or(SecurityErrorCode::StorageFailed)?;
         if slot.value.generation != generation || slot.committed || !slot.valid() || !valid {
             return Err(SecurityErrorCode::StorageFailed);
@@ -664,8 +707,11 @@ impl TwoSlotIdentityStore {
         Ok(())
     }
     pub fn commit(&mut self, generation: u64) -> Result<(), SecurityErrorCode> {
-        let slot = self.slots[(generation & 1) as usize]
-            .as_mut()
+        let slot = self
+            .slots
+            .iter_mut()
+            .flatten()
+            .find(|slot| slot.value.generation == generation)
             .ok_or(SecurityErrorCode::StorageFailed)?;
         if slot.value.generation != generation || !slot.valid() {
             return Err(SecurityErrorCode::StorageFailed);
@@ -1009,6 +1055,19 @@ mod tests {
         store.validate_staged(2, true).unwrap();
         store.commit(2).unwrap();
         assert_eq!(store.recover(), Some(&generation(2)));
+    }
+
+    #[test]
+    fn two_slot_nonsequential_stage_preserves_active_generation() {
+        let mut store = TwoSlotIdentityStore::default();
+        store.stage(generation(2)).unwrap();
+        store.validate_staged(2, true).unwrap();
+        store.commit(2).unwrap();
+        store.stage(generation(4)).unwrap();
+        assert_eq!(store.recover(), Some(&generation(2)));
+        store.validate_staged(4, true).unwrap();
+        store.commit(4).unwrap();
+        assert_eq!(store.recover(), Some(&generation(4)));
     }
 
     #[test]

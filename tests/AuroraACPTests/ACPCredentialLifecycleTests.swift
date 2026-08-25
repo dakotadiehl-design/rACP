@@ -65,6 +65,20 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         XCTAssertEqual(failedRecovery, first)
     }
 
+    func testTwoSlotNonsequentialGenerationPreservesActiveIdentity() async throws {
+        let store = ACPTwoSlotIdentityStore(backend: MemoryCredentialBackend())
+        let first = generation(2), next = generation(4)
+        try await store.stage(first); try await store.validateStaged(generation: 2, valid: true)
+        try await store.commit(generation: 2)
+        try await store.stage(next)
+        let staged = try await store.recover()
+        XCTAssertEqual(staged, first)
+        try await store.validateStaged(generation: 4, valid: true)
+        try await store.commit(generation: 4)
+        let committed = try await store.recover()
+        XCTAssertEqual(committed, next)
+    }
+
     func testClockPolicyRejectsUntrustedAndRollback() throws {
         let now = Date(timeIntervalSince1970: 10)
         XCTAssertEqual(try ACPAcceptedTime(state: .trustedWallClock, wall: now, checkpoint: nil, commissioner: nil, lastCheckpoint: Date(timeIntervalSince1970: 9)), now)

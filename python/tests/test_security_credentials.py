@@ -138,6 +138,21 @@ def test_journal_store_recovers_only_complete_generations(tmp_path: Path) -> Non
     assert store.recover() == second
     assert (tmp_path / "identities" / "identity-1.json").exists()
     assert not (tmp_path / "assets").exists()
+    with pytest.raises(CredentialLifecycleError, match=SecurityErrorCode.STORAGE_FAILED.value):
+        store.stage(first)
+
+
+def test_cleanup_retains_previous_complete_nonsequential_generation(tmp_path: Path) -> None:
+    store = JournaledIdentityStore(tmp_path / "identities")
+    for number in (1, 9, 42):
+        value = generation(number)
+        store.stage(value)
+        store.validate_staged(number, lambda candidate, expected=value: candidate == expected)
+        store.commit(number)
+    store.cleanup()
+    assert store.recover() == generation(42)
+    assert (tmp_path / "identities" / "identity-9.json").exists()
+    assert not (tmp_path / "identities" / "identity-1.json").exists()
 
 
 @pytest.mark.parametrize("boundary", list(PersistenceBoundary))
