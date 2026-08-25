@@ -35,6 +35,16 @@ pub struct FullTlsHandshake {
     pub resumption_used: bool,
 }
 
+pub struct LightweightFinishedInputs<'a> {
+    pub client_credential: &'a [u8],
+    pub server_credential: &'a [u8],
+    pub client_spki: &'a [u8],
+    pub server_spki: &'a [u8],
+    pub client_node_id: &'a str,
+    pub server_node_id: &'a str,
+    pub trust_domain_id: &'a str,
+}
+
 fn field<'a>(object: &'a [(String, Json)], key: &str) -> Result<&'a Json, SecurityErrorCode> {
     object
         .iter()
@@ -208,17 +218,48 @@ pub fn parse_lightweight_preface(
     Ok((evidence, &data[2..]))
 }
 
+pub fn lightweight_finished_context(
+    inputs: &LightweightFinishedInputs<'_>,
+) -> Result<Vec<u8>, SecurityErrorCode> {
+    for value in [
+        inputs.client_credential,
+        inputs.server_credential,
+        inputs.client_spki,
+        inputs.server_spki,
+    ] {
+        if value.is_empty() || value.len() > 2048 {
+            return Err(SecurityErrorCode::ResourceLimit);
+        }
+    }
+    let context = acp_codec::encode_cbor_value(&Json::Array(vec![
+        Json::String("ACP lightweight finished v1".into()),
+        Json::Bytes(inputs.client_credential.into()),
+        Json::Bytes(inputs.server_credential.into()),
+        Json::Bytes(inputs.client_spki.into()),
+        Json::Bytes(inputs.server_spki.into()),
+        Json::String(inputs.client_node_id.into()),
+        Json::String(inputs.server_node_id.into()),
+        Json::String(inputs.trust_domain_id.into()),
+    ]))
+    .map_err(|_| SecurityErrorCode::CredentialInvalid)?;
+    if context.len() > 8192 {
+        return Err(SecurityErrorCode::ResourceLimit);
+    }
+    Ok(context)
+}
+
 pub fn verify_lightweight_finished(
     exported_key: &[u8],
-    context: &[u8],
+    inputs: &LightweightFinishedInputs<'_>,
     received: &[u8],
 ) -> Result<(), SecurityErrorCode> {
-    if exported_key.len() != 32 || context.len() > 8192 || received.len() != 32 {
+    if exported_key.len() != 32 || received.len() != 32 {
         return Err(SecurityErrorCode::AuthenticationFailed);
     }
+    let context = lightweight_finished_context(inputs)?;
     let mut mac = Hmac::<Sha256>::new_from_slice(exported_key)
         .map_err(|_| SecurityErrorCode::AuthenticationFailed)?;
-    mac.update(context);
+    mac.update(&context);
     mac.verify_slice(received)
         .map_err(|_| SecurityErrorCode::AuthenticationFailed)
 }
@@ -319,16 +360,25 @@ mod tests {
         assert_eq!(parsed, evidence);
         assert_eq!(raw, credential);
         let key = [0x6b; 32];
-        let context = b"finished-context";
+        let inputs = LightweightFinishedInputs {
+            client_credential: credential,
+            server_credential: credential,
+            client_spki: b"client-spki",
+            server_spki: b"server-spki",
+            client_node_id: "00112233-4455-4677-8899-aabbccddeeff",
+            server_node_id: "00112233-4455-4677-8899-aabbccddeeff",
+            trust_domain_id: "40516273-8495-4a6b-8a3b-4c5d6e7f8091",
+        };
+        let context = lightweight_finished_context(&inputs).unwrap();
         let mut mac = Hmac::<Sha256>::new_from_slice(&key).unwrap();
-        mac.update(context);
+        mac.update(&context);
         let finished = mac.finalize().into_bytes();
         assert_eq!(
-            verify_lightweight_finished(&key, context, &finished),
+            verify_lightweight_finished(&key, &inputs, &finished),
             Ok(())
         );
         assert_eq!(
-            verify_lightweight_finished(&key, context, &[0; 32]),
+            verify_lightweight_finished(&key, &inputs, &[0; 32]),
             Err(SecurityErrorCode::AuthenticationFailed)
         );
     }

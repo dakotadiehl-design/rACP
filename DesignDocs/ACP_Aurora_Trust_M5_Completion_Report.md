@@ -23,6 +23,8 @@ The M5 shared transport-verification and session-binding implementation is compl
 2. Python's legacy session path accepted a nonempty transport node-id string as sufficient for `aurora_trust`. It now requires typed verified transport evidence and calls the frozen HELLO admission boundary.
 3. Local Python HELLO construction could diverge from the selected authentication mode. It now rejects absent or mismatched Aurora Trust auth material before transmission.
 4. Lightweight Finished verification and strict preface bounds were made explicit in all SDKs.
+5. A subsequent deep review found that Python's client-side HELLO_ACK path constructed a principal directly from provider evidence. The shared boundary now revalidates mode, credential state, zero-RTT/resumption policy, channel binding, identity tuple, and expected node before principal creation.
+6. The initial Lightweight Finished API accepted an arbitrary caller-supplied context. Swift, Python, and Rust now construct the frozen credential/SPKI/node/trust-domain transcript internally from typed inputs, preventing a caller from omitting or substituting required bindings.
 
 ## Verification
 

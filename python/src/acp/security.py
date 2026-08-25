@@ -130,6 +130,37 @@ def bind_hello_auth(
     )
 
 
+def principal_from_verified_evidence(expected_node_id: str, evidence: TransportEvidence) -> AuthenticatedPrincipal:
+    """Revalidate provider evidence when a peer sends no repeatable auth object (HELLO_ACK)."""
+    if evidence.mode is not AuthenticationMode.AURORA_TRUST:
+        raise SecurityAdmissionError("security.downgrade_forbidden")
+    if evidence.zero_rtt_used or evidence.resumption_used:
+        raise SecurityAdmissionError("security.downgrade_forbidden")
+    if evidence.credential_state is CredentialState.REVOKED:
+        raise SecurityAdmissionError("security.credential_revoked")
+    if evidence.credential_state is CredentialState.EXPIRED:
+        raise SecurityAdmissionError("security.credential_expired")
+    if evidence.credential_state is not CredentialState.ACTIVE:
+        raise SecurityAdmissionError("security.credential_invalid")
+    if not evidence.channel_binding_verified or not evidence.channel_binding:
+        raise SecurityAdmissionError("security.authentication_failed")
+    if evidence.node_id != expected_node_id:
+        raise SecurityAdmissionError("security.identity_mismatch")
+    if not all((evidence.trust_domain_id, evidence.credential_id, evidence.identity_key_id)):
+        raise SecurityAdmissionError("security.credential_invalid")
+    return AuthenticatedPrincipal(
+        PrincipalState.AUTHENTICATED,
+        evidence.mode,
+        evidence.trust_domain_id,
+        evidence.node_id,
+        evidence.credential_id,
+        evidence.identity_key_id,
+        evidence.credential_format,
+        evidence.role_constraints,
+        evidence.profile,
+    )
+
+
 def effective_permissions(
     credential_constraints: set[str], local_policy: set[str], capabilities: set[str], safety_policy: set[str]
 ) -> frozenset[str]:

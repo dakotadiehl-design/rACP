@@ -13,8 +13,10 @@ from acp.security_context import base64url_encode
 from acp.security_models import SecurityProfile
 from acp.security_transport import (
     FullTLSHandshake,
+    LightweightFinishedInputs,
     full_transport_evidence,
     hello_exporter_context,
+    lightweight_finished_context,
     parse_lightweight_preface,
     verify_lightweight_finished,
 )
@@ -106,8 +108,18 @@ def test_lightweight_preface_and_finished_are_bounded() -> None:
     credential = b"credential"
     parsed, raw = parse_lightweight_preface(len(credential).to_bytes(2, "big") + credential, lambda _: lightweight)
     assert parsed == lightweight and raw == credential
-    key, context = b"k" * 32, b"finished-context"
+    key = b"k" * 32
+    inputs = LightweightFinishedInputs(
+        credential,
+        credential,
+        b"client-spki",
+        b"server-spki",
+        facts().node_id,
+        facts().node_id,
+        facts().trust_domain_id,
+    )
+    context = lightweight_finished_context(inputs)
     finished = hmac.new(key, context, hashlib.sha256).digest()
-    verify_lightweight_finished(key, context, finished)
+    verify_lightweight_finished(key, inputs, finished)
     with pytest.raises(SecurityAdmissionError):
-        verify_lightweight_finished(key, context, b"x" * 32)
+        verify_lightweight_finished(key, inputs, b"x" * 32)

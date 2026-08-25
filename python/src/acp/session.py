@@ -28,10 +28,10 @@ from .negotiate import (
 from .registry import allowed_to_receive, allowed_to_send, expected_response_type, lookup
 from .security import (
     AuthenticatedPrincipal,
-    PrincipalState,
     SecurityAdmissionError,
     TransportEvidence,
     bind_hello_auth,
+    principal_from_verified_evidence,
 )
 from .types import (
     Capability,
@@ -385,20 +385,14 @@ class Session:
             raise SessionError("authentication", "ACK source does not match payload node_id")
         if self.auth_mode == "aurora_trust":
             evidence = self.transport_evidence
-            if evidence is None or evidence.node_id != peer.node_id:
+            if evidence is None:
                 self.state = SessionState.FAILED
                 raise SessionError("authentication", "ACK node_id does not match verified transport evidence")
-            self.authenticated_principal = AuthenticatedPrincipal(
-                PrincipalState.AUTHENTICATED,
-                evidence.mode,
-                evidence.trust_domain_id,
-                evidence.node_id,
-                evidence.credential_id,
-                evidence.identity_key_id,
-                evidence.credential_format,
-                evidence.role_constraints,
-                evidence.profile,
-            )
+            try:
+                self.authenticated_principal = principal_from_verified_evidence(peer.node_id, evidence)
+            except SecurityAdmissionError as exc:
+                self.state = SessionState.FAILED
+                raise SessionError("authentication", str(exc)) from exc
         elif self.transport_identity and peer.node_id != self.transport_identity:
             self.state = SessionState.FAILED
             raise SessionError("authentication", "ACK node_id does not match transport identity")

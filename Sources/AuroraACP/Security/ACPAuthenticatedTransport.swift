@@ -31,6 +31,17 @@ public struct ACPFullTLSHandshake: Sendable {
     }
 }
 
+public struct ACPLightweightFinishedInputs: Sendable {
+    public let clientCredential, serverCredential, clientSPKI, serverSPKI: Data
+    public let clientNodeID, serverNodeID, trustDomainID: String
+    public init(clientCredential: Data, serverCredential: Data, clientSPKI: Data, serverSPKI: Data,
+                clientNodeID: String, serverNodeID: String, trustDomainID: String) {
+        self.clientCredential = clientCredential; self.serverCredential = serverCredential
+        self.clientSPKI = clientSPKI; self.serverSPKI = serverSPKI
+        self.clientNodeID = clientNodeID; self.serverNodeID = serverNodeID; self.trustDomainID = trustDomainID
+    }
+}
+
 public enum ACPAuthenticatedTransport {
     private static func closed(_ source: [String: AnySendable], _ keys: [String]) throws -> [String: AnySendable] {
         var result: [String: AnySendable] = [:]
@@ -106,10 +117,27 @@ public enum ACPAuthenticatedTransport {
         return (evidence, Data(credential))
     }
 
-    public static func verifyLightweightFinished(exportedKey: Data, context: Data, received: Data) throws {
-        guard exportedKey.count == 32, context.count <= 8192, received.count == 32 else {
+    public static func lightweightFinishedContext(_ inputs: ACPLightweightFinishedInputs) throws -> Data {
+        let blobs = [inputs.clientCredential, inputs.serverCredential, inputs.clientSPKI, inputs.serverSPKI]
+        guard blobs.allSatisfy({ !$0.isEmpty && $0.count <= 2048 }) else {
+            throw ACPSecurityErrorCode.resourceLimit
+        }
+        let context = try ACPEncoding.encodeValue(.plain(.array([
+            .string("ACP lightweight finished v1"), .bytes(inputs.clientCredential),
+            .bytes(inputs.serverCredential), .bytes(inputs.clientSPKI), .bytes(inputs.serverSPKI),
+            .string(inputs.clientNodeID), .string(inputs.serverNodeID), .string(inputs.trustDomainID),
+        ])))
+        guard context.count <= 8192 else { throw ACPSecurityErrorCode.resourceLimit }
+        return context
+    }
+
+    public static func verifyLightweightFinished(
+        exportedKey: Data, inputs: ACPLightweightFinishedInputs, received: Data
+    ) throws {
+        guard exportedKey.count == 32, received.count == 32 else {
             throw ACPSecurityAdmissionError.authenticationFailed
         }
+        let context = try lightweightFinishedContext(inputs)
         let expected = Data(HMAC<SHA256>.authenticationCode(
             for: context, using: SymmetricKey(data: exportedKey)))
         guard ACPSecurityContext.channelBindingsEqual(expected, received) else {

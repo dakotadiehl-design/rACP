@@ -146,12 +146,17 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         let preface = Data([0, UInt8(credential.count)]) + credential
         let (parsed, raw) = try ACPAuthenticatedTransport.parseLightweightPreface(preface) { _ in evidence }
         XCTAssertEqual(parsed, evidence); XCTAssertEqual(raw, credential)
-        let key = Data(repeating: 0x6b, count: 32), context = Data("finished-context".utf8)
+        let key = Data(repeating: 0x6b, count: 32)
+        let inputs = ACPLightweightFinishedInputs(
+            clientCredential: credential, serverCredential: credential,
+            clientSPKI: Data("client-spki".utf8), serverSPKI: Data("server-spki".utf8),
+            clientNodeID: node.rawValue, serverNodeID: node.rawValue, trustDomainID: domain.rawValue)
+        let context = try ACPAuthenticatedTransport.lightweightFinishedContext(inputs)
         let finished = Data(HMAC<SHA256>.authenticationCode(for: context, using: SymmetricKey(data: key)))
         XCTAssertNoThrow(try ACPAuthenticatedTransport.verifyLightweightFinished(
-            exportedKey: key, context: context, received: finished))
+            exportedKey: key, inputs: inputs, received: finished))
         XCTAssertThrowsError(try ACPAuthenticatedTransport.verifyLightweightFinished(
-            exportedKey: key, context: context, received: Data(repeating: 0, count: 32)))
+            exportedKey: key, inputs: inputs, received: Data(repeating: 0, count: 32)))
     }
 
     private func generation(_ value: UInt64) -> ACPCredentialGeneration {
