@@ -1,5 +1,8 @@
 //! Aurora Trust typed models and narrow cryptographic provider boundaries. No networking.
 
+mod credential;
+pub use credential::*;
+
 use acp_model::Json;
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
