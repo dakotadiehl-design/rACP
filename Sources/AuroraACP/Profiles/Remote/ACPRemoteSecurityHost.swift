@@ -2,16 +2,18 @@ import Foundation
 
 public actor ACPRemoteSecurityHost {
     private let core: ACPRemoteAuthorityCore
+    private let policyStore: ACPAuthorizationPolicyStore
     public let allowUnauthenticatedView: Bool
-    public init(core: ACPRemoteAuthorityCore, allowUnauthenticatedView: Bool = false) {
-        self.core = core; self.allowUnauthenticatedView = allowUnauthenticatedView
+    public init(core: ACPRemoteAuthorityCore, policyStore: ACPAuthorizationPolicyStore,
+                allowUnauthenticatedView: Bool = false) {
+        self.core = core; self.policyStore = policyStore; self.allowUnauthenticatedView = allowUnauthenticatedView
     }
     public func invoke(
         context: ACPAuthorizationContext, instanceID: String, sessionID: String,
         controlID: String, invocationID: String, interaction: ACPRemoteInteraction,
         leaseID: String? = nil, claimedRoles: [String] = []
     ) async -> (status: String, code: String?, leaseID: String?, hold: ACPRemoteHoldState?) {
-        let decision = ACPAuthorization.authorize("remote.control.invoke", context: context)
+        let decision = await policyStore.authorize("remote.control.invoke", context: context)
         guard decision.allowed, let nodeID = decision.principal.nodeID else {
             return ("rejected", "remote.control.permission_denied", nil, nil)
         }

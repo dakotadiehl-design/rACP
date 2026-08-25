@@ -24,6 +24,7 @@ M6 authorization and production Remote gating are implemented across Swift, Pyth
 2. The first Rust implementation contained the shared authorization model but no canonical registry resolver or authenticated Remote integration. `acp-session` now resolves registry permissions through the shared boundary and exposes an authenticated Remote host keyed by verified device identity.
 3. Swift policy revision increment could trap at `UInt64.max`. It now saturates, preserving fail-closed availability under pathological revision exhaustion.
 4. Remote negative tests were tightened so unauthenticated denial is proven with the required Remote permission present in every non-identity input; the denial cannot be attributed to an accidentally missing permission.
+5. A later full review found that Remote hosts trusted caller-supplied local-policy permissions and revisions. Swift, Python, and Rust hosts now rebind every invocation to the current policy store, so stale contexts cannot retain removed authority.
 
 ## Exit-gate evidence
 

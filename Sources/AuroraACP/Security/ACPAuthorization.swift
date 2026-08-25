@@ -94,4 +94,17 @@ public actor ACPAuthorizationPolicyStore {
         return revision
     }
     public func permissions(nodeID: String) -> Set<String> { permissionsByNode[nodeID] ?? [] }
+    public func authorize(_ operation: String, context: ACPAuthorizationContext) -> ACPAuthorizationDecision {
+        guard let identity = try? ACPAuthorization.deviceIdentity(context.principal) else {
+            return ACPAuthorization.authorize(operation, context: context)
+        }
+        let current = ACPAuthorizationContext(
+            principal: context.principal, credentialPermissions: context.credentialPermissions,
+            localPolicyPermissions: permissionsByNode[identity.nodeID] ?? [],
+            capabilityPermissions: context.capabilityPermissions, safetyPermissions: context.safetyPermissions,
+            policyRevision: revision, safetyState: context.safetyState,
+            auditCorrelationID: context.auditCorrelationID, operatorIdentity: context.operatorIdentity,
+            operatorRequired: context.operatorRequired)
+        return ACPAuthorization.authorize(operation, context: current)
+    }
 }

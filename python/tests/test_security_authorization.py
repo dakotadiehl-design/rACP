@@ -69,7 +69,19 @@ def test_policy_removal_terminates_and_remote_host_rejects_claims() -> None:
     )
     assert store.revalidation_action(previous, current) is SessionRevalidationAction.TERMINATE
     assert cached_assets == {"layout": b"cached-layout"}
-    host = RemoteAuthorityHost(lambda decision, payload: (decision.principal.node_id, payload["value"]))
+    host = RemoteAuthorityHost(
+        lambda decision, payload: (decision.principal.node_id, payload["value"]),
+        AuthorizationPolicyStore({"node": frozenset({PERMISSION})}),
+    )
     assert host.invoke("security.credential.revoke", context(), {"value": 1}) == ("node", 1)
     with pytest.raises(PermissionError):
         host.invoke("security.credential.revoke", context(allowed=False), {"claimed_node_id": "node", "value": 1})
+
+
+def test_remote_host_rebinds_stale_context_to_current_policy() -> None:
+    store = AuthorizationPolicyStore({"node": frozenset({PERMISSION})})
+    host = RemoteAuthorityHost(lambda decision, payload: payload, store)
+    stale = context()
+    store.replace({"node": frozenset()})
+    with pytest.raises(PermissionError):
+        host.invoke("security.credential.revoke", stale, {})

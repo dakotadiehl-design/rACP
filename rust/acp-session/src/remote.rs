@@ -69,13 +69,19 @@ pub struct RemoteAuthority {
 /// the authority identity from message-body claims.
 pub struct AuthenticatedRemoteAuthority {
     core: RemoteAuthority,
+    policy_store: acp_security::AuthorizationPolicyStore,
     pub allow_unauthenticated_view: bool,
 }
 
 impl AuthenticatedRemoteAuthority {
-    pub fn new(core: RemoteAuthority, allow_unauthenticated_view: bool) -> Self {
+    pub fn new(
+        core: RemoteAuthority,
+        policy_store: acp_security::AuthorizationPolicyStore,
+        allow_unauthenticated_view: bool,
+    ) -> Self {
         Self {
             core,
+            policy_store,
             allow_unauthenticated_view,
         }
     }
@@ -96,7 +102,8 @@ impl AuthenticatedRemoteAuthority {
         layout_id: Option<&str>,
         lease_id: Option<&str>,
     ) -> InvokeResult {
-        let decision = crate::security::authorize_operation("remote.control.invoke", context);
+        let permission = crate::security::required_permission("remote.control.invoke");
+        let decision = self.policy_store.authorize(permission, context);
         let Some(identity) = acp_security::device_identity(&decision.principal) else {
             return fail("remote.control.permission_denied");
         };
@@ -122,6 +129,10 @@ impl AuthenticatedRemoteAuthority {
 
     pub fn core(&self) -> &RemoteAuthority {
         &self.core
+    }
+
+    pub fn replace_policy(&mut self, value: HashMap<String, HashSet<String>>) -> u64 {
+        self.policy_store.replace(value)
     }
 }
 
@@ -529,8 +540,19 @@ mod tests {
 
     #[test]
     fn authenticated_remote_boundary_uses_device_identity_and_fails_closed() {
-        let mut host =
-            AuthenticatedRemoteAuthority::new(RemoteAuthority::new("show", "layout"), false);
+        let node = "00112233-4455-4677-8899-aabbccddeeff";
+        let policy = acp_security::AuthorizationPolicyStore::new(HashMap::from([(
+            node.into(),
+            ["remote.control.invoke", "remote.operator"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+        )]));
+        let mut host = AuthenticatedRemoteAuthority::new(
+            RemoteAuthority::new("show", "layout"),
+            policy,
+            false,
+        );
         let valid = authorization_context(acp_security::PrincipalState::Authenticated);
         let applied = host.invoke(
             &valid,
@@ -542,6 +564,12 @@ mod tests {
             None,
         );
         assert_eq!(applied.status, "applied");
+        host.replace_policy(HashMap::new());
+        let stale = host.invoke(&valid, "cue_go", "inv-stale", "activate", None, None, None);
+        assert_eq!(
+            stale.code.as_deref(),
+            Some("remote.control.permission_denied")
+        );
         let revoked = authorization_context(acp_security::PrincipalState::Revoked);
         let denied = host.invoke(
             &revoked,

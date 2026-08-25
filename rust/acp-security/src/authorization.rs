@@ -146,6 +146,20 @@ impl AuthorizationPolicyStore {
             .cloned()
             .unwrap_or_default()
     }
+    pub fn authorize(
+        &self,
+        required_permission: Option<&str>,
+        context: &AuthorizationContext,
+    ) -> AuthorizationDecision {
+        let mut current = context.clone();
+        if let Some(identity) = device_identity(&current.principal) {
+            current.local_policy_permissions = self.permissions(identity.node_id.as_str());
+        } else {
+            current.local_policy_permissions.clear();
+        }
+        current.policy_revision = self.revision;
+        authorize(required_permission, &current)
+    }
     pub fn revalidation_action(
         previous: &AuthorizationDecision,
         current: &AuthorizationDecision,

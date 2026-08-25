@@ -4,14 +4,17 @@ pub fn authorize_operation(
     operation: &str,
     context: &acp_security::AuthorizationContext,
 ) -> acp_security::AuthorizationDecision {
-    let explicit = match operation {
+    acp_security::authorize(required_permission(operation), context)
+}
+
+pub fn required_permission(operation: &str) -> Option<&str> {
+    match operation {
         "remote.control.invoke" | "remote.macro.invoke" | "remote.navigation.invoke" => {
             Some(operation)
         }
         _ => crate::registry::lookup(operation)
             .and_then(|row| row.authorization_permission.as_deref()),
-    };
-    acp_security::authorize(explicit, context)
+    }
 }
 
 const CONSTANTS: &str = include_str!("../../../schema/constants.json");

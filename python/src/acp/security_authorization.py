@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, TypeVar
 
@@ -129,6 +129,15 @@ class AuthorizationPolicyStore:
     def permissions(self, node_id: str) -> frozenset[str]:
         return self.permissions_by_node.get(node_id, frozenset())
 
+    def authorize(self, operation: str, context: AuthorizationContext) -> AuthorizationDecision:
+        identity = device_identity(context.principal)
+        current = replace(
+            context,
+            local_policy_permissions=self.permissions(identity.node_id),
+            policy_revision=self.revision,
+        )
+        return authorize(operation, current)
+
     def revalidation_action(
         self, previous: AuthorizationDecision, current: AuthorizationDecision
     ) -> SessionRevalidationAction:
@@ -157,10 +166,14 @@ class RemoteAuthorityHost:
     """Authenticated production boundary around an existing Remote safety core."""
 
     invoke_core: Callable[[AuthorizationDecision, Mapping[str, Any]], Any]
+    policy_store: AuthorizationPolicyStore
     allow_unauthenticated_view: bool = False
 
     def invoke(self, operation: str, context: AuthorizationContext, payload: Mapping[str, Any]) -> Any:
-        return invoke_sensitive(operation, context, self.invoke_core, payload)
+        decision = self.policy_store.authorize(operation, context)
+        if not decision.allowed:
+            raise PermissionError(decision.reason)
+        return self.invoke_core(decision, payload)
 
     def may_view(self, context: AuthorizationContext | None) -> bool:
         if context is None:
