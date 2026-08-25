@@ -64,6 +64,67 @@ pub struct RemoteAuthority {
     applied_order: VecDeque<String>,
 }
 
+/// Production authorization boundary for Remote commands. The legacy
+/// `RemoteAuthority` remains a simulator; callers of this wrapper cannot select
+/// the authority identity from message-body claims.
+pub struct AuthenticatedRemoteAuthority {
+    core: RemoteAuthority,
+    pub allow_unauthenticated_view: bool,
+}
+
+impl AuthenticatedRemoteAuthority {
+    pub fn new(core: RemoteAuthority, allow_unauthenticated_view: bool) -> Self {
+        Self {
+            core,
+            allow_unauthenticated_view,
+        }
+    }
+
+    pub fn may_view(&self, context: Option<&acp_security::AuthorizationContext>) -> bool {
+        context.is_some_and(|value| acp_security::device_identity(&value.principal).is_some())
+            || self.allow_unauthenticated_view
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn invoke(
+        &mut self,
+        context: &acp_security::AuthorizationContext,
+        control_id: &str,
+        invocation_id: &str,
+        interaction: &str,
+        show_id: Option<&str>,
+        layout_id: Option<&str>,
+        lease_id: Option<&str>,
+    ) -> InvokeResult {
+        let decision = crate::security::authorize_operation("remote.control.invoke", context);
+        let Some(identity) = acp_security::device_identity(&decision.principal) else {
+            return fail("remote.control.permission_denied");
+        };
+        if !decision.allowed {
+            return fail("remote.control.permission_denied");
+        }
+        let roles: Vec<&str> = decision
+            .effective_permissions
+            .iter()
+            .map(String::as_str)
+            .collect();
+        self.core.grant(identity.node_id.as_str(), &roles);
+        self.core.invoke(
+            identity.node_id.as_str(),
+            control_id,
+            invocation_id,
+            interaction,
+            show_id,
+            layout_id,
+            lease_id,
+        )
+    }
+
+    pub fn core(&self) -> &RemoteAuthority {
+        &self.core
+    }
+}
+
 impl RemoteAuthority {
     pub fn new(show_id: &str, layout_id: &str) -> Self {
         let mut controls = HashMap::new();
@@ -417,6 +478,46 @@ fn fail(code: &str) -> InvokeResult {
 mod tests {
     use super::*;
 
+    fn authorization_context(
+        state: acp_security::PrincipalState,
+    ) -> acp_security::AuthorizationContext {
+        use acp_security::*;
+        let permissions: HashSet<String> = ["remote.control.invoke", "remote.operator"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        AuthorizationContext {
+            principal: AuthenticatedPrincipal {
+                state,
+                mode: AuthenticationMode::AuroraTrust,
+                profile: Some(SecurityProfile::Full),
+                trust_domain_id: Some(
+                    TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap(),
+                ),
+                node_id: Some(
+                    SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
+                ),
+                credential_id: Some(
+                    CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
+                ),
+                identity_key_id: Some(
+                    IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap(),
+                ),
+                credential_format: Some(CredentialFormat::X509Der),
+                role_constraints: HashSet::new(),
+            },
+            credential_permissions: permissions.clone(),
+            local_policy_permissions: permissions.clone(),
+            capability_permissions: permissions.clone(),
+            safety_permissions: permissions,
+            policy_revision: 1,
+            safety_state: "armed".into(),
+            audit_correlation_id: "audit-1".into(),
+            operator: None,
+            operator_required: false,
+        }
+    }
+
     #[test]
     fn shared_remote_vocabulary_is_reexported() {
         assert_eq!(PROFILE_PRISM, "aurora.remote.prism.v1");
@@ -424,6 +525,38 @@ mod tests {
         assert!(REMOTE_ACTIONS.contains(&"effects.stop"));
         assert!(REMOTE_PERMISSIONS.contains(&"observe"));
         assert!(REMOTE_CONTROL_TYPES.contains(&"fader"));
+    }
+
+    #[test]
+    fn authenticated_remote_boundary_uses_device_identity_and_fails_closed() {
+        let mut host =
+            AuthenticatedRemoteAuthority::new(RemoteAuthority::new("show", "layout"), false);
+        let valid = authorization_context(acp_security::PrincipalState::Authenticated);
+        let applied = host.invoke(
+            &valid,
+            "cue_go",
+            "inv-auth",
+            "activate",
+            Some("show"),
+            Some("layout"),
+            None,
+        );
+        assert_eq!(applied.status, "applied");
+        let revoked = authorization_context(acp_security::PrincipalState::Revoked);
+        let denied = host.invoke(
+            &revoked,
+            "cue_go",
+            "inv-revoked",
+            "activate",
+            None,
+            None,
+            None,
+        );
+        assert_eq!(
+            denied.code.as_deref(),
+            Some("remote.control.permission_denied")
+        );
+        assert!(!host.may_view(None));
     }
 
     fn ready() -> RemoteAuthority {

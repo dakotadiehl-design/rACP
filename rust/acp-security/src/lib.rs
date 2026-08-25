@@ -1,7 +1,9 @@
 //! Aurora Trust typed models and narrow cryptographic provider boundaries. No networking.
 
+mod authorization;
 mod credential;
 mod transport;
+pub use authorization::*;
 pub use credential::*;
 pub use transport::*;
 

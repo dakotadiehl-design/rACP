@@ -31,6 +31,7 @@ version = "1.2.0"
 dependencies = [
  "acp-codec",
  "acp-model",
+ "acp-security",
  "serde_json",
  "tokio",
  "uuid",
