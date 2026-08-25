@@ -111,6 +111,49 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         XCTAssertEqual(rotated.nextKeyID, next); XCTAssertEqual(rotated.nodeID, node)
     }
 
+    func testFullTransportFrozenExporterAndFailClosedFacts() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let vector = try json(root.appendingPathComponent("vectors/security/hello_binding/primary.json"))
+        let canonical = Data(hexM4: vector["canonical_cbor_hex"] as! String)!
+        guard case .object(var hello) = try ACPEncoding.decodeValue(canonical), case .object(var auth) = hello["auth"]
+        else { return XCTFail("invalid fixture") }
+        auth["channel_binding"] = .bytes(Data(repeating: 0x65, count: 32)); hello["auth"] = .object(auth)
+        XCTAssertEqual(try ACPAuthenticatedTransport.helloExporterContext(hello).hexM4,
+                       vector["exporter_context_sha256_hex"] as? String)
+        let handshake = fullHandshake()
+        let evidence = try ACPAuthenticatedTransport.fullEvidence(
+            hello: hello, handshake: handshake, exporter: FixedExporter(Data(repeating: 0x65, count: 32))
+        )
+        XCTAssertTrue(evidence.channelBindingVerified)
+        let invalid = ACPFullTLSHandshake(
+            protocolVersion: "TLSv1.2", mutualAuthentication: true, isolatedTrustStore: true,
+            peerCertificateValid: true, localCredentialSelected: true, peerSANExtracted: true,
+            trustDomainID: handshake.trustDomainID, nodeID: handshake.nodeID,
+            credentialID: handshake.credentialID, identityKeyID: handshake.identityKeyID,
+            roleConstraints: [], credentialState: .active
+        )
+        XCTAssertThrowsError(try ACPAuthenticatedTransport.fullEvidence(
+            hello: hello, handshake: invalid, exporter: FixedExporter(Data(repeating: 0x65, count: 32))))
+    }
+
+    func testLightweightPrefaceAndFinishedAreBounded() throws {
+        let evidence = ACPTransportEvidence(
+            mode: .auroraTrust, profile: .lightweight, trustDomainID: domain.rawValue,
+            nodeID: node.rawValue, credentialID: "sha256:" + String(repeating: "1", count: 64),
+            identityKeyID: "sha256:" + String(repeating: "2", count: 64),
+            credentialFormat: "compact_v1", credentialState: .active, channelBindingVerified: true)
+        let credential = Data("credential".utf8)
+        let preface = Data([0, UInt8(credential.count)]) + credential
+        let (parsed, raw) = try ACPAuthenticatedTransport.parseLightweightPreface(preface) { _ in evidence }
+        XCTAssertEqual(parsed, evidence); XCTAssertEqual(raw, credential)
+        let key = Data(repeating: 0x6b, count: 32), context = Data("finished-context".utf8)
+        let finished = Data(HMAC<SHA256>.authenticationCode(for: context, using: SymmetricKey(data: key)))
+        XCTAssertNoThrow(try ACPAuthenticatedTransport.verifyLightweightFinished(
+            exportedKey: key, context: context, received: finished))
+        XCTAssertThrowsError(try ACPAuthenticatedTransport.verifyLightweightFinished(
+            exportedKey: key, context: context, received: Data(repeating: 0, count: 32)))
+    }
+
     private func generation(_ value: UInt64) -> ACPCredentialGeneration {
         let text = "sha256:" + String(format: "%064llx", value)
         return .init(generation: value, credentialID: ACPCredentialID(rawValue: text)!,
@@ -125,6 +168,26 @@ final class ACPCredentialLifecycleTests: XCTestCase {
     }
     private func json(_ url: URL) throws -> [String: Any] {
         try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+    }
+    private func fullHandshake() -> ACPFullTLSHandshake {
+        .init(
+            protocolVersion: "TLSv1.3", mutualAuthentication: true, isolatedTrustStore: true,
+            peerCertificateValid: true, localCredentialSelected: true, peerSANExtracted: true,
+            trustDomainID: domain.rawValue, nodeID: node.rawValue,
+            credentialID: "sha256:466363fece7088b31d8e677611eab7caab29f8aef3bfd4e207c63c17bd4cfb20",
+            identityKeyID: "sha256:f3c9d135604346824a568ba09251f3118e0184b417fae972a66668ff3f93d75d",
+            roleConstraints: ["remote"], credentialState: .active)
+    }
+}
+
+private struct FixedExporter: ACPTLSExporter {
+    let value: Data
+    init(_ value: Data) { self.value = value }
+    func export(label: String, context: Data, length: Int) throws -> Data {
+        guard label == ACPHelloExporterLabel, context.count == 32, length == 32 else {
+            throw ACPSecurityAdmissionError.authenticationFailed
+        }
+        return value
     }
 }
 
@@ -155,6 +218,7 @@ private final class MemoryCredentialBackend: ACPCredentialSlotBackend, @unchecke
 }
 
 private extension Data {
+    var hexM4: String { map { String(format: "%02x", $0) }.joined() }
     init?(hexM4: String) {
         guard hexM4.count.isMultiple(of: 2) else { return nil }
         var result = Data(), index = hexM4.startIndex

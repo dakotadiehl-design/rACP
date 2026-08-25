@@ -26,6 +26,13 @@ from .negotiate import (
     version_leq,
 )
 from .registry import allowed_to_receive, allowed_to_send, expected_response_type, lookup
+from .security import (
+    AuthenticatedPrincipal,
+    PrincipalState,
+    SecurityAdmissionError,
+    TransportEvidence,
+    bind_hello_auth,
+)
 from .types import (
     Capability,
     CommandStatus,
@@ -104,6 +111,8 @@ class Session:
     auth_mode: str = "trusted_lan"
     allow_plaintext: bool = False
     transport_identity: str | None = None
+    transport_evidence: TransportEvidence | None = None
+    local_auth: dict[str, Any] | None = None
     idempotency: IdempotencyCache | None = None
 
     state: SessionState = field(default=SessionState.CLOSED, init=False)
@@ -112,6 +121,7 @@ class Session:
     encoding: str = field(default="cbor", init=False)
     peer: NodeIdentity | None = field(default=None, init=False)
     peer_node_id: str | None = field(default=None, init=False)
+    authenticated_principal: AuthenticatedPrincipal | None = field(default=None, init=False)
     local_offered: list[Capability] = field(default_factory=list, init=False)
     peer_offered: list[Capability] = field(default_factory=list, init=False)
     negotiated_capabilities: set[str] = field(default_factory=set, init=False)
@@ -141,6 +151,8 @@ class Session:
             self.idempotency = IdempotencyCache.from_profile(self.profile)
         if self.transport_identity is None:
             self.transport_identity = getattr(self.transport, "peer_identity", None)
+        if self.transport_evidence is None:
+            self.transport_evidence = getattr(self.transport, "peer_evidence", None)
 
     @property
     def limits(self) -> dict[str, int]:
@@ -181,8 +193,10 @@ class Session:
                 "authentication",
                 "trusted_lan is unauthenticated plaintext; set allow_plaintext=True to opt in",
             )
-        if mode in {"tls", "aurora_trust"} and not self.transport_identity:
+        if mode == "tls" and not self.transport_identity:
             raise SessionError("authentication", f"{mode} requires a TLS transport identity")
+        if mode == "aurora_trust" and self.transport_evidence is None:
+            raise SessionError("authentication", "aurora_trust requires verified transport evidence")
 
     async def start_receiver(self) -> None:
         if self._recv_task is None:
@@ -213,6 +227,9 @@ class Session:
         return ack
 
     def _build_hello(self, capabilities: list[Capability]) -> Envelope:
+        auth = dict(self.local_auth or {"mode": self.auth_mode})
+        if auth.get("mode") != self.auth_mode or (self.auth_mode == "aurora_trust" and self.local_auth is None):
+            raise SessionError("authentication", "local HELLO auth does not match the authenticated transport")
         return make_envelope(
             type="session.hello",
             source=self.source(),
@@ -224,7 +241,7 @@ class Session:
                 "encodings": list(self.encodings),
                 "profiles": list(self.profiles),
                 "capabilities": [c.to_dict() for c in capabilities],
-                "auth": {"mode": self.auth_mode},
+                "auth": auth,
             },
         )
 
@@ -252,9 +269,25 @@ class Session:
             peer = NodeIdentity.from_dict(payload["node"])
             if hello.source.node_id != peer.node_id:
                 raise SessionError("authentication", "HELLO source does not match payload node_id")
-            if self.transport_identity and self.transport_identity != peer.node_id:
+            if str(auth_mode) == "aurora_trust":
+                auth = payload.get("auth")
+                if not isinstance(auth, dict):
+                    raise SessionError("authentication", "HELLO auth is malformed")
+                security_caps = tuple(
+                    (str(item["id"]), str(item["version"]))
+                    for item in auth.get("security_capabilities", [])
+                    if isinstance(item, dict) and "id" in item and "version" in item
+                )
+                self.authenticated_principal = bind_hello_auth(
+                    peer.node_id,
+                    auth,
+                    self.transport_evidence,
+                    hardened=not self.allow_plaintext,
+                    security_capabilities=security_caps,
+                )
+            elif self.transport_identity and self.transport_identity != peer.node_id:
                 raise SessionError("authentication", "HELLO node_id does not match transport identity")
-        except (KeyError, TypeError, ValueError, VersionError, SessionError) as exc:
+        except (KeyError, TypeError, ValueError, VersionError, SessionError, SecurityAdmissionError) as exc:
             ack = make_envelope(
                 type="session.hello_ack",
                 source=self.source(),
@@ -350,7 +383,23 @@ class Session:
         if ack.source.node_id != peer.node_id:
             self.state = SessionState.FAILED
             raise SessionError("authentication", "ACK source does not match payload node_id")
-        if self.transport_identity and peer.node_id != self.transport_identity:
+        if self.auth_mode == "aurora_trust":
+            evidence = self.transport_evidence
+            if evidence is None or evidence.node_id != peer.node_id:
+                self.state = SessionState.FAILED
+                raise SessionError("authentication", "ACK node_id does not match verified transport evidence")
+            self.authenticated_principal = AuthenticatedPrincipal(
+                PrincipalState.AUTHENTICATED,
+                evidence.mode,
+                evidence.trust_domain_id,
+                evidence.node_id,
+                evidence.credential_id,
+                evidence.identity_key_id,
+                evidence.credential_format,
+                evidence.role_constraints,
+                evidence.profile,
+            )
+        elif self.transport_identity and peer.node_id != self.transport_identity:
             self.state = SessionState.FAILED
             raise SessionError("authentication", "ACK node_id does not match transport identity")
         self.peer = peer
