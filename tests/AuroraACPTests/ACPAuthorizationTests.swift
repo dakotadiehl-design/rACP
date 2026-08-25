@@ -4,6 +4,23 @@ import XCTest
 final class ACPAuthorizationTests: XCTestCase {
     private let permission = "security.credential.revoke"
 
+    func testMigrationNeverGrantsUnauthenticatedControlOrDowngrade() {
+        for stage in ACPMigrationStage.allCases {
+            XCTAssertFalse(ACPMigrationSecurity.decide(
+                stage: stage, authenticated: false, explicitlyAllowTrustedLAN: true
+            ).sensitiveControlAllowed)
+        }
+        XCTAssertFalse(ACPMigrationSecurity.decide(
+            stage: .observe, authenticated: false, explicitlyAllowTrustedLAN: true,
+            strongerAuthenticationFailed: true).connectionAllowed)
+        XCTAssertFalse(ACPMigrationSecurity.decide(
+            stage: .enforce, authenticated: false, explicitlyAllowTrustedLAN: true).connectionAllowed)
+        let authenticatedOnly = ACPMigrationSecurity.decide(
+            stage: .enforce, authenticated: true, authorized: false, explicitlyAllowTrustedLAN: false)
+        XCTAssertTrue(authenticatedOnly.connectionAllowed)
+        XCTAssertFalse(authenticatedOnly.sensitiveControlAllowed)
+    }
+
     private func principal(_ state: ACPPrincipalState = .authenticated) -> ACPAuthenticatedPrincipal {
         .init(state: state, mode: .auroraTrust, profile: .full, trustDomainID: "domain", nodeID: "node-a",
               credentialID: "credential", identityKeyID: "key", credentialFormat: "x509_der",
@@ -56,8 +73,9 @@ final class ACPAuthorizationTests: XCTestCase {
         let core = ACPRemoteAuthorityCore(showID: "show", layout: layout,
             policy: ACPRemoteStaticPolicy(rolesByNode: ["node-a": ["remote.operator"]]),
             router: ACPRemoteMemoryRouter())
-        let host = ACPRemoteSecurityHost(core: core)
         let remotePermission = "remote.control.invoke"
+        let policyStore = ACPAuthorizationPolicyStore(["node-a": [remotePermission]])
+        let host = ACPRemoteSecurityHost(core: core, policyStore: policyStore)
         let allowed = ACPAuthorizationContext(
             principal: principal(), credentialPermissions: [remotePermission], localPolicyPermissions: [remotePermission],
             capabilityPermissions: [remotePermission], safetyPermissions: [remotePermission], policyRevision: 1,
@@ -74,5 +92,9 @@ final class ACPAuthorizationTests: XCTestCase {
                                          controlID: "go", invocationID: "inv-2", interaction: .activate,
                                          claimedRoles: ["remote.admin"])
         XCTAssertEqual(rejected.code, "remote.control.permission_denied")
+        _ = await policyStore.replace(["node-a": []])
+        let stale = await host.invoke(context: allowed, instanceID: "i", sessionID: "s", controlID: "go",
+                                     invocationID: "inv-3", interaction: .activate)
+        XCTAssertEqual(stale.code, "remote.control.permission_denied")
     }
 }

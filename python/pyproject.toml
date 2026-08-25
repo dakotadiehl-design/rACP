@@ -32,6 +32,7 @@ security-vectors = [
 acp = "acp.__main__:main"
 acp-inspect = "acp.__main__:main"
 acp-sim = "acp.__main__:main"
+acp-security = "acp.security_cli:main"
 
 [project.urls]
 Repository = "https://github.com/aurora/acp"

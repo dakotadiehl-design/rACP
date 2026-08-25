@@ -52,6 +52,8 @@ local f_security_key = ProtoField.string("acp.security.identity_key_id", "Identi
 local f_security_enrollment = ProtoField.string("acp.security.enrollment_id", "Enrollment ID")
 local f_security_attempt = ProtoField.string("acp.security.attempt_id", "Enrollment attempt ID")
 local f_security_suite = ProtoField.string("acp.security.suite", "Security suite")
+local f_security_revocation = ProtoField.string("acp.security.revocation_state", "Revocation state")
+local f_security_policy_revision = ProtoField.uint64("acp.security.policy_revision", "Policy revision")
 
 acp.fields = {
   f_magic, f_dver, f_enc, f_version, f_type, f_message_id, f_correlation_id,
@@ -62,7 +64,8 @@ acp.fields = {
   f_remote_layout_rev, f_remote_control, f_remote_ctype, f_remote_ix, f_remote_inv,
   f_remote_value, f_remote_perm, f_remote_ready, f_remote_lease, f_remote_exp,
   f_security_mode, f_security_state, f_security_domain, f_security_credential,
-  f_security_key, f_security_enrollment, f_security_attempt, f_security_suite
+  f_security_key, f_security_enrollment, f_security_attempt, f_security_suite,
+  f_security_revocation, f_security_policy_revision
 }
 
 local udp_port = DissectorTable.get("udp.port")
@@ -103,6 +106,8 @@ local function add_json_fields(tree, buf, json)
     if p.enrollment_id then tree:add(f_security_enrollment, p.enrollment_id) end
     if p.attempt_id then tree:add(f_security_attempt, p.attempt_id) end
     if p.suite then tree:add(f_security_suite, p.suite) end
+    if p.revocation_state then tree:add(f_security_revocation, p.revocation_state) end
+    if p.policy_revision then tree:add(f_security_policy_revision, p.policy_revision) end
     if p.status and json.type == "command.ack" then tree:add(f_cmd_status, p.status) end
     if p.resource then tree:add(f_state_res, p.resource) end
     if p.revision then tree:add(f_state_rev, p.revision) end

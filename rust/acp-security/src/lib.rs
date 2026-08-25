@@ -2,9 +2,11 @@
 
 mod authorization;
 mod credential;
+mod migration;
 mod transport;
 pub use authorization::*;
 pub use credential::*;
+pub use migration::*;
 pub use transport::*;
 
 use acp_model::Json;
