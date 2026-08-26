@@ -59,6 +59,8 @@ public actor ACPSession {
     private var lastRx: UInt64?
     private var gapCount: UInt32 = 0
     private var inbox: [ACPEnvelope] = []
+    private let authenticatedEvidence: ACPTransportEvidence?
+    private let authenticatedPhase: ACPAuthenticatedConnection.Role?
 
     public static let defaultCapabilities: [ACPCapability] = [
         ACPCapability(id: "health.heartbeat", version: "1.0"),
@@ -76,6 +78,23 @@ public actor ACPSession {
         self.local = local
         self.isServer = isServer
         self.allowPlaintext = allowPlaintext
+        self.authenticatedEvidence = nil
+        self.authenticatedPhase = nil
+    }
+
+    package init(authenticated payload: ACPAuthenticatedConnection.Payload, local: ACPIdentity) throws {
+        guard payload.evidence.credentialState == .active,
+              payload.evidence.channelBindingVerified,
+              payload.evidence.mode == .auroraTrust,
+              payload.evidence.profile == .full
+        else { throw ACPSecurityAdmissionError.authenticationFailed }
+        self.transport = payload.transport
+        self.local = local
+        self.isServer = payload.role == .serverHelloReceived
+        self.allowPlaintext = false
+        self.authenticatedEvidence = payload.evidence
+        self.authenticatedPhase = payload.role
+        if let hello = payload.prefetchedHello { self.inbox = [hello] }
     }
 
     public func setEncodings(_ value: [String]) { encodings = value }
@@ -89,6 +108,7 @@ public actor ACPSession {
 
     public func handshake() async throws -> ACPEnvelope {
         do {
+            if authenticatedEvidence != nil { return try await authenticatedHandshake() }
             if !allowPlaintext { throw ACPSessionError("authentication", "trusted_lan requires allow_plaintext") }
             state = .connecting
             if isServer {
@@ -104,6 +124,56 @@ public actor ACPSession {
         } catch {
             await failClose(code: (error as? ACPSessionError)?.code ?? "timeout", message: "\(error)")
             throw error
+        }
+    }
+
+    private func authenticatedHandshake() async throws -> ACPEnvelope {
+        guard let evidence = authenticatedEvidence, let phase = authenticatedPhase else {
+            throw ACPSessionError("authentication", "missing authenticated transport evidence")
+        }
+        state = phase == .serverHelloReceived ? .connecting : .helloSent
+        if phase == .serverHelloReceived {
+            let hello = try await waitType("session.hello", timeout: handshakeTimeout)
+            try bindAuthenticatedHello(hello, evidence: evidence)
+            return try await acceptHello(hello)
+        }
+        let ack = try await waitType("session.hello_ack", timeout: handshakeTimeout)
+        try applyHelloAck(ack)
+        guard peer?.nodeID == evidence.nodeID else {
+            throw ACPSessionError("authentication", "authenticated ACK identity mismatch")
+        }
+        return ack
+    }
+
+    private func bindAuthenticatedHello(_ hello: ACPEnvelope, evidence: ACPTransportEvidence) throws {
+        guard case .object(let node) = hello.payload["node"],
+              case .string(let claimedNode) = node["node_id"],
+              case .object(let authValues) = hello.payload["auth"]
+        else { throw ACPSessionError("authentication", "missing authenticated HELLO identity") }
+        var auth: [String: String] = [:]
+        for (key, value) in authValues {
+            switch value {
+            case .string(let text): auth[key] = text
+            case .bytes(let bytes): auth[key] = ACPSecurityContext.base64URLEncode(bytes)
+            default: break
+            }
+        }
+        let securityCapabilities: [(id: String, version: String)]
+        if case .array(let values) = authValues["security_capabilities"] {
+            securityCapabilities = values.compactMap {
+                guard case .object(let fields) = $0,
+                      case .string(let id) = fields["id"],
+                      case .string(let version) = fields["version"] else { return nil }
+                return (id, version)
+            }
+        } else { securityCapabilities = [] }
+        do {
+            _ = try ACPSecurityAdmission.bindHello(
+                claimedNodeID: claimedNode, auth: auth, evidence: evidence,
+                hardened: true, securityCapabilities: securityCapabilities
+            )
+        } catch {
+            throw ACPSessionError("authentication", "authenticated HELLO binding failed")
         }
     }
 

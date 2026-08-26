@@ -33,7 +33,12 @@ public final class ACPAuthenticatedConnection: @unchecked Sendable {
     package struct Payload: Sendable {
         let transport: any ACPTransport
         let evidence: ACPTransportEvidence
+        let role: Role
+        let prefetchedHello: ACPEnvelope?
+        let localNodeID: String
     }
+
+    package enum Role: Sendable { case clientHelloSent, serverHelloReceived }
 
     private let lock = NSLock()
     private var payload: Payload?
@@ -44,11 +49,17 @@ public final class ACPAuthenticatedConnection: @unchecked Sendable {
         transport: any ACPTransport,
         evidence: ACPTransportEvidence,
         providerProvenance: ACPProviderProvenance,
+        role: Role,
+        prefetchedHello: ACPEnvelope? = nil,
+        localNodeID: String,
         observation: ACPUnverifiedPeerObservation = .init()
     ) throws {
         guard providerProvenance.qualificationStatus == .pass
         else { throw ACPAuthenticatedConnectionError.invalidProviderProvenance }
-        self.payload = Payload(transport: transport, evidence: evidence)
+        self.payload = Payload(
+            transport: transport, evidence: evidence, role: role,
+            prefetchedHello: prefetchedHello, localNodeID: localNodeID
+        )
         self.providerManifestDigest = providerProvenance.manifestDigest
         self.observation = observation
     }
@@ -67,6 +78,19 @@ public final class ACPAuthenticatedConnection: @unchecked Sendable {
             self.payload = nil
             return payload
         }
+    }
+
+
+    /// Transfers this one-shot authenticated capability into an ACP session.
+    /// The server/client role is sealed by the provider and cannot be selected
+    /// by application code.
+    public func makeSession(local: ACPIdentity) throws -> ACPSession {
+        let payload = try consume()
+        guard local.nodeID == payload.localNodeID else {
+            Task { await payload.transport.close() }
+            throw ACPSecurityAdmissionError.identityMismatch
+        }
+        return try ACPSession(authenticated: payload, local: local)
     }
 }
 

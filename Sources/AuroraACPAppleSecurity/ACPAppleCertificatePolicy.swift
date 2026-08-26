@@ -18,6 +18,13 @@ public enum ACPAppleSecurityError: String, Error, Sendable {
     case exporterFailure = "security.authentication_failed.exporter"
     case earlyData = "security.downgrade_forbidden"
     case providerUnavailable = "security.provider_unavailable"
+    case localIdentityMismatch = "security.local_identity_mismatch"
+    case invalidHello = "security.invalid_hello"
+    case listenerState = "security.listener_state"
+    case timeout = "security.timeout"
+    case identityMissing = "security.identity_missing"
+    case privateKeyUnavailable = "security.private_key_unavailable"
+    case keychainFailure = "security.keychain_failure"
 }
 
 public protocol ACPAppleRevocationChecking: Sendable {

@@ -5,183 +5,321 @@ import Network
 import Security
 
 public struct ACPAppleFullProviderConfiguration {
-    public let localIdentity: sec_identity_t
+    package let localIdentity: sec_identity_t
+    package let localCertificateChain: [SecCertificate]
+    public let localACPIdentity: ACPIdentity
     public let anchors: [SecCertificate]
     public let trustDomainID: ACPTrustDomainID
     public let expectedPeerNodeID: ACPSecurityNodeID?
     public let providerProvenance: ACPProviderProvenance
     public let revocation: (any ACPAppleRevocationChecking)?
 
-    public init(
-        localIdentity: sec_identity_t,
-        anchors: [SecCertificate],
-        trustDomainID: ACPTrustDomainID,
-        expectedPeerNodeID: ACPSecurityNodeID? = nil,
-        providerProvenance: ACPProviderProvenance,
-        revocation: (any ACPAppleRevocationChecking)? = nil
-    ) {
-        self.localIdentity = localIdentity
-        self.anchors = anchors
-        self.trustDomainID = trustDomainID
-        self.expectedPeerNodeID = expectedPeerNodeID
-        self.providerProvenance = providerProvenance
-        self.revocation = revocation
+    public init(localIdentity: ACPAppleLocalIdentity, anchors: [SecCertificate],
+                trustDomainID: ACPTrustDomainID, expectedPeerNodeID: ACPSecurityNodeID? = nil,
+                providerProvenance: ACPProviderProvenance,
+                revocation: (any ACPAppleRevocationChecking)? = nil) {
+        self.localIdentity = localIdentity.networkIdentity
+        self.localCertificateChain = localIdentity.certificateChain
+        self.localACPIdentity = localIdentity.acpIdentity; self.anchors = anchors
+        self.trustDomainID = trustDomainID; self.expectedPeerNodeID = expectedPeerNodeID
+        self.providerProvenance = providerProvenance; self.revocation = revocation
     }
 }
 
-/// ACP-owned Network.framework TLS 1.3 client. It validates and exports from
-/// the same `NWConnection`, then seals that live connection into one opaque
-/// ACP capability.
-public enum ACPAppleFullConnectionFactory {
-    @available(*, unavailable, message: "S10 live HELLO/session binding and server qualification are not complete")
-    public static func connect(
-        host: String,
-        port: UInt16,
-        hello: [String: AnySendable],
-        configuration: ACPAppleFullProviderConfiguration,
-        timeout: TimeInterval = 10
-    ) async throws -> ACPAuthenticatedConnection {
-        let tls = NWProtocolTLS.Options()
-        let options = tls.securityProtocolOptions
-        sec_protocol_options_set_min_tls_protocol_version(options, .TLSv13)
-        sec_protocol_options_set_max_tls_protocol_version(options, .TLSv13)
-        sec_protocol_options_set_peer_authentication_required(options, true)
-        sec_protocol_options_set_tls_tickets_enabled(options, false)
-        sec_protocol_options_set_tls_resumption_enabled(options, false)
-        sec_protocol_options_set_local_identity(options, configuration.localIdentity)
-        sec_protocol_options_set_verify_block(options, { metadata, _, complete in
-            do {
-                let chain = certificateChain(metadata)
-                _ = try ACPAppleCertificatePolicy.validate(
-                    chain: chain, anchors: configuration.anchors,
-                    expectedDomain: configuration.trustDomainID,
-                    expectedNode: configuration.expectedPeerNodeID,
-                    revocation: configuration.revocation
-                )
-                complete(true)
-            } catch {
-                complete(false)
-            }
-        }, .global(qos: .userInitiated))
+public struct ACPAppleFullServerEndpoint: Sendable, Equatable {
+    public let port: UInt16
+    public let profile = "full"
+    public let securityMode = "aurora_trust"
+    public let tlsRequired = true
+}
 
-        let parameters = NWParameters(tls: tls, tcp: NWProtocolTCP.Options())
-        let connection = NWConnection(
-            host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!, using: parameters
-        )
-        try await start(connection, timeout: timeout)
+/// TLS client that owns authenticated HELLO construction and exporter binding.
+public enum ACPAppleFullConnectionFactory {
+    public static func connect(host: String, port: UInt16,
+                               configuration: ACPAppleFullProviderConfiguration,
+                               timeout: TimeInterval = 10) async throws -> ACPAuthenticatedConnection {
+        let local = try validateLocal(configuration)
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: try endpointPort(port),
+                                      using: parameters(configuration))
         do {
-            guard let tlsMetadata = connection.metadata(definition: NWProtocolTLS.definition)
-                    as? NWProtocolTLS.Metadata
-            else { throw ACPAppleSecurityError.providerUnavailable }
-            let metadata = tlsMetadata.securityProtocolMetadata
-            guard sec_protocol_metadata_get_negotiated_tls_protocol_version(metadata) == .TLSv13,
-                  !sec_protocol_metadata_get_early_data_accepted(metadata)
-            else { throw ACPAppleSecurityError.earlyData }
-            let verified = try ACPAppleCertificatePolicy.validate(
-                chain: certificateChain(metadata), anchors: configuration.anchors,
-                expectedDomain: configuration.trustDomainID,
-                expectedNode: configuration.expectedPeerNodeID,
-                revocation: configuration.revocation
-            )
-            let context = try ACPAuthenticatedTransport.helloExporterContext(hello)
-            guard let exported = export(metadata: metadata, context: context, length: 32) else {
-                throw ACPAppleSecurityError.exporterFailure
-            }
-            let exporter = FixedExporter(value: exported, expectedContext: context)
-            let handshake = ACPFullTLSHandshake(
-                protocolVersion: "TLSv1.3", mutualAuthentication: true, isolatedTrustStore: true,
-                peerCertificateValid: true, localCredentialSelected: true, peerSANExtracted: true,
-                trustDomainID: verified.trustDomainID.rawValue, nodeID: verified.nodeID.rawValue,
-                credentialID: verified.credentialID.rawValue, identityKeyID: verified.identityKeyID.rawValue,
-                roleConstraints: [], credentialState: .active
-            )
-            let evidence = try ACPAuthenticatedTransport.fullEvidence(
-                hello: hello, handshake: handshake, exporter: exporter
-            )
+            try await startConnection(connection, timeout: timeout)
+            let metadata = try tlsMetadata(connection)
+            let peer = try validatePeer(metadata, configuration)
             let framed = ACPFramedConnection(connection: connection)
-            return try ACPAuthenticatedConnection(
-                transport: framed, evidence: evidence,
-                providerProvenance: configuration.providerProvenance,
-                observation: .init(
-                    protocolVersion: "TLSv1.3", claimedNodeID: verified.nodeID.rawValue,
-                    claimedTrustDomainID: verified.trustDomainID.rawValue
-                )
-            )
-        } catch {
-            connection.cancel()
-            throw error
-        }
+            let hello = try bind(authenticatedHello(configuration.localACPIdentity, local: local), metadata: metadata)
+            try await framed.send(try ACPEncoding.encodeCBOR(hello), text: false)
+            let proof = try evidence(for: peer, hello: hello.payload, metadata: metadata)
+            return try result(framed, proof: proof, peer: peer, configuration: configuration,
+                              role: .clientHelloSent)
+        } catch { connection.cancel(); throw error }
+    }
+}
+
+public enum ACPAppleFullServerFactory {
+    public static func makeListener(port: UInt16 = 0,
+                                    configuration: ACPAppleFullProviderConfiguration) throws
+        -> ACPAppleFullServerListener {
+        try ACPAppleFullServerListener(port: port, configuration: configuration)
+    }
+}
+
+/// Lifecycle-owned, fail-closed TLS listener. `accept` returns only after mTLS,
+/// certificate policy, HELLO parsing, and exporter verification have succeeded.
+public actor ACPAppleFullServerListener {
+    private let listener: NWListener
+    private let configuration: ACPAppleFullProviderConfiguration
+    private var pending: [NWConnection] = []
+    private var waiter: CheckedContinuation<NWConnection, Error>?
+    private var started = false
+    private var stopped = false
+
+    package init(port: UInt16, configuration: ACPAppleFullProviderConfiguration) throws {
+        _ = try validateLocal(configuration)
+        self.configuration = configuration
+        listener = try NWListener(using: parameters(configuration), on: try endpointPort(port))
     }
 
-    private static func start(_ connection: NWConnection, timeout: TimeInterval) async throws {
+    public var endpoint: ACPAppleFullServerEndpoint { .init(port: listener.port?.rawValue ?? 0) }
+
+    public func start(timeout: TimeInterval = 10) async throws {
+        guard !started, !stopped else { throw ACPAppleSecurityError.listenerState }
+        listener.newConnectionHandler = { connection in Task { await self.enqueue(connection) } }
         try await withThrowingTaskGroup(of: Void.self) { group in
             group.addTask {
                 try await withCheckedThrowingContinuation { continuation in
                     let gate = CompletionGate()
-                    connection.stateUpdateHandler = { state in
+                    self.listener.stateUpdateHandler = { state in
                         switch state {
                         case .ready: gate.run { continuation.resume() }
                         case .failed(let error): gate.run { continuation.resume(throwing: error) }
-                        case .cancelled: gate.run { continuation.resume(throwing: ACPAppleSecurityError.providerUnavailable) }
+                        case .cancelled: gate.run { continuation.resume(throwing: ACPAppleSecurityError.listenerState) }
                         default: break
                         }
                     }
-                    connection.start(queue: .global(qos: .userInitiated))
+                    self.listener.start(queue: .global(qos: .userInitiated))
                 }
             }
-            group.addTask {
-                try await Task.sleep(nanoseconds: UInt64(max(timeout, 0.01) * 1_000_000_000))
-                throw ACPAppleSecurityError.providerUnavailable
-            }
+            group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
             defer { group.cancelAll() }
             _ = try await group.next()
-            connection.stateUpdateHandler = nil
+        }
+        listener.stateUpdateHandler = nil; started = true
+    }
+
+    public func accept(timeout: TimeInterval = 10) async throws -> ACPAuthenticatedConnection {
+        guard started, !stopped else { throw ACPAppleSecurityError.listenerState }
+        let connection = try await next(timeout: timeout)
+        do {
+            try await startConnection(connection, timeout: timeout)
+            let metadata = try tlsMetadata(connection)
+            let peer = try validatePeer(metadata, configuration)
+            let framed = ACPFramedConnection(connection: connection)
+            let (data, text) = try await receive(framed, timeout: timeout)
+            let hello = text ? try ACPEncoding.decodeJSON(data) : try ACPEncoding.decodeCBOR(data)
+            guard hello.type == "session.hello" else { throw ACPAppleSecurityError.invalidHello }
+            let proof = try evidence(for: peer, hello: hello.payload, metadata: metadata)
+            return try result(framed, proof: proof, peer: peer, configuration: configuration,
+                              role: .serverHelloReceived, prefetchedHello: hello)
+        } catch { connection.cancel(); throw error }
+    }
+
+    public func shutdown() {
+        guard !stopped else { return }
+        stopped = true; listener.cancel(); pending.forEach { $0.cancel() }; pending.removeAll()
+        waiter?.resume(throwing: ACPAppleSecurityError.listenerState); waiter = nil
+    }
+
+    private func enqueue(_ connection: NWConnection) {
+        guard !stopped else { connection.cancel(); return }
+        if let waiter { self.waiter = nil; waiter.resume(returning: connection) }
+        else { pending.append(connection) }
+    }
+
+    private func next(timeout: TimeInterval) async throws -> NWConnection {
+        if !pending.isEmpty { return pending.removeFirst() }
+        return try await withThrowingTaskGroup(of: ConnectionBox.self) { group in
+            group.addTask {
+                return try await withTaskCancellationHandler {
+                    ConnectionBox(try await self.waitForConnection())
+                } onCancel: { Task { await self.cancelWaiter() } }
+            }
+            group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
+            defer { group.cancelAll() }
+            return try await group.next()!.value
         }
     }
 
-    private static func export(metadata: sec_protocol_metadata_t, context: Data, length: Int) -> Data? {
-        let label = Array(ACPHelloExporterLabel.utf8CString)
-        return label.withUnsafeBufferPointer { labelBuffer in
-            context.withUnsafeBytes { contextBuffer -> Data? in
-                guard let secret = sec_protocol_metadata_create_secret_with_context(
-                    metadata, label.count - 1, labelBuffer.baseAddress!, length,
-                    contextBuffer.bindMemory(to: UInt8.self).baseAddress!, context.count
-                ) else { return nil }
-                let dispatch = secret as DispatchData
-                return dispatch.withUnsafeBytes { (pointer: UnsafePointer<UInt8>) in
-                    Data(bytes: pointer, count: dispatch.count)
-                }
+    private func waitForConnection() async throws -> NWConnection {
+        try await withCheckedThrowingContinuation { install($0) }
+    }
+
+    private func install(_ continuation: CheckedContinuation<NWConnection, Error>) {
+        guard waiter == nil, !stopped else { continuation.resume(throwing: ACPAppleSecurityError.listenerState); return }
+        waiter = continuation
+    }
+    private func cancelWaiter() { waiter?.resume(throwing: CancellationError()); waiter = nil }
+}
+
+private func parameters(_ configuration: ACPAppleFullProviderConfiguration) -> NWParameters {
+    let tls = NWProtocolTLS.Options(); let options = tls.securityProtocolOptions
+    sec_protocol_options_set_min_tls_protocol_version(options, .TLSv13)
+    sec_protocol_options_set_max_tls_protocol_version(options, .TLSv13)
+    sec_protocol_options_set_peer_authentication_required(options, true)
+    sec_protocol_options_set_tls_tickets_enabled(options, false)
+    sec_protocol_options_set_tls_resumption_enabled(options, false)
+    sec_protocol_options_set_local_identity(options, configuration.localIdentity)
+    sec_protocol_options_set_verify_block(options, { metadata, _, complete in
+        do {
+            _ = try ACPAppleCertificatePolicy.validate(chain: certificateChain(metadata), anchors: configuration.anchors,
+                expectedDomain: configuration.trustDomainID, expectedNode: configuration.expectedPeerNodeID,
+                revocation: configuration.revocation)
+            complete(true)
+        } catch { complete(false) }
+    }, .global(qos: .userInitiated))
+    return NWParameters(tls: tls, tcp: NWProtocolTCP.Options())
+}
+
+private func validateLocal(_ configuration: ACPAppleFullProviderConfiguration) throws -> ACPAppleVerifiedCertificate {
+    guard let node = ACPSecurityNodeID(rawValue: configuration.localACPIdentity.nodeID) else {
+        throw ACPAppleSecurityError.localIdentityMismatch
+    }
+    return try ACPAppleCertificatePolicy.validate(chain: configuration.localCertificateChain,
+        anchors: configuration.anchors, expectedDomain: configuration.trustDomainID,
+        expectedNode: node, revocation: configuration.revocation)
+}
+
+private func authenticatedHello(_ identity: ACPIdentity,
+                                local: ACPAppleVerifiedCertificate) -> ACPEnvelope {
+    ACPEnvelope(acp: "1.2", messageID: UUID().uuidString.lowercased(), type: "session.hello",
+        source: .init(nodeID: identity.nodeID), timestampUTC: ISO8601DateFormatter().string(from: Date()),
+        qos: .reliable, payload: [
+            "node": .object(["node_id": .string(identity.nodeID), "instance_id": .string(identity.instanceID),
+                             "role": .string(identity.role), "name": .string(identity.name)]),
+            "protocol": .object(["min": .string("1.0"), "max": .string("1.2")]),
+            "encodings": .array([.string("cbor"), .string("json")]), "profiles": .array([.string("core")]),
+            "capabilities": .array(ACPSession.defaultCapabilities.map {
+                .object(["id": .string($0.id), "version": .string($0.version)])
+            }),
+            "auth": .object(["mode": .string("aurora_trust"),
+                "trust_domain_id": .string(local.trustDomainID.rawValue),
+                "credential_id": .string(local.credentialID.rawValue),
+                "identity_key_id": .string(local.identityKeyID.rawValue),
+                "security_capabilities": .array([.object(["id": .string("aurora-trust"),
+                                                           "version": .string("1.0")])])])])
+}
+
+private func bind(_ hello: ACPEnvelope, metadata: sec_protocol_metadata_t) throws -> ACPEnvelope {
+    let context = try ACPAuthenticatedTransport.helloExporterContext(hello.payload)
+    guard let binding = export(metadata, context: context, length: 32) else { throw ACPAppleSecurityError.exporterFailure }
+    var copy = hello
+    guard case .object(var auth) = copy.payload["auth"] else { throw ACPAppleSecurityError.invalidHello }
+    auth["channel_binding"] = .bytes(binding); copy.payload["auth"] = .object(auth); return copy
+}
+
+private func evidence(for peer: ACPAppleVerifiedCertificate, hello: [String: AnySendable],
+                      metadata: sec_protocol_metadata_t) throws -> ACPTransportEvidence {
+    let context = try ACPAuthenticatedTransport.helloExporterContext(hello)
+    guard let exported = export(metadata, context: context, length: 32) else { throw ACPAppleSecurityError.exporterFailure }
+    let handshake = ACPFullTLSHandshake(protocolVersion: "TLSv1.3", mutualAuthentication: true,
+        isolatedTrustStore: true, peerCertificateValid: true, localCredentialSelected: true,
+        peerSANExtracted: true, trustDomainID: peer.trustDomainID.rawValue, nodeID: peer.nodeID.rawValue,
+        credentialID: peer.credentialID.rawValue, identityKeyID: peer.identityKeyID.rawValue,
+        roleConstraints: [], credentialState: .active)
+    return try ACPAuthenticatedTransport.fullEvidence(hello: hello, handshake: handshake,
+        exporter: FixedExporter(value: exported, expectedContext: context))
+}
+
+private func result(_ transport: ACPFramedConnection, proof: ACPTransportEvidence,
+                    peer: ACPAppleVerifiedCertificate, configuration: ACPAppleFullProviderConfiguration,
+                    role: ACPAuthenticatedConnection.Role, prefetchedHello: ACPEnvelope? = nil) throws
+    -> ACPAuthenticatedConnection {
+    try ACPAuthenticatedConnection(transport: transport, evidence: proof,
+        providerProvenance: configuration.providerProvenance, role: role, prefetchedHello: prefetchedHello,
+        localNodeID: configuration.localACPIdentity.nodeID,
+        observation: .init(protocolVersion: "TLSv1.3", claimedNodeID: peer.nodeID.rawValue,
+                           claimedTrustDomainID: peer.trustDomainID.rawValue))
+}
+
+private func tlsMetadata(_ connection: NWConnection) throws -> sec_protocol_metadata_t {
+    guard let tls = connection.metadata(definition: NWProtocolTLS.definition) as? NWProtocolTLS.Metadata else {
+        throw ACPAppleSecurityError.providerUnavailable
+    }
+    let metadata = tls.securityProtocolMetadata
+    guard sec_protocol_metadata_get_negotiated_tls_protocol_version(metadata) == .TLSv13,
+          !sec_protocol_metadata_get_early_data_accepted(metadata) else { throw ACPAppleSecurityError.earlyData }
+    return metadata
+}
+
+private func validatePeer(_ metadata: sec_protocol_metadata_t,
+                          _ configuration: ACPAppleFullProviderConfiguration) throws -> ACPAppleVerifiedCertificate {
+    try ACPAppleCertificatePolicy.validate(chain: certificateChain(metadata), anchors: configuration.anchors,
+        expectedDomain: configuration.trustDomainID, expectedNode: configuration.expectedPeerNodeID,
+        revocation: configuration.revocation)
+}
+
+private func startConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {
+    try await withThrowingTaskGroup(of: Void.self) { group in
+        group.addTask {
+            try await withCheckedThrowingContinuation { continuation in
+                let gate = CompletionGate(); connection.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready: gate.run { continuation.resume() }
+                    case .failed(let error): gate.run { continuation.resume(throwing: error) }
+                    case .cancelled: gate.run { continuation.resume(throwing: ACPAppleSecurityError.providerUnavailable) }
+                    default: break
+                    }
+                }; connection.start(queue: .global(qos: .userInitiated))
             }
         }
+        group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
+        defer { group.cancelAll() }; _ = try await group.next()
+    }
+    connection.stateUpdateHandler = nil
+}
+
+private func receive(_ transport: ACPFramedConnection, timeout: TimeInterval) async throws -> (Data, Bool) {
+    try await withThrowingTaskGroup(of: (Data, Bool).self) { group in
+        group.addTask { try await transport.recv() }
+        group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
+        defer { group.cancelAll() }; return try await group.next()!
     }
 }
 
+private func endpointPort(_ port: UInt16) throws -> NWEndpoint.Port {
+    guard let value = NWEndpoint.Port(rawValue: port) else { throw ACPAppleSecurityError.listenerState }; return value
+}
+private func timeoutNS(_ timeout: TimeInterval) -> UInt64 { UInt64(max(timeout, 0.01) * 1_000_000_000) }
+
 private func certificateChain(_ metadata: sec_protocol_metadata_t) -> [SecCertificate] {
     var result: [SecCertificate] = []
-    sec_protocol_metadata_access_peer_certificate_chain(metadata) { certificate in
-        result.append(sec_certificate_copy_ref(certificate).takeRetainedValue())
+    sec_protocol_metadata_access_peer_certificate_chain(metadata) {
+        result.append(sec_certificate_copy_ref($0).takeRetainedValue())
     }
     return result
 }
 
+private func export(_ metadata: sec_protocol_metadata_t, context: Data, length: Int) -> Data? {
+    let label = Array(ACPHelloExporterLabel.utf8CString)
+    return label.withUnsafeBufferPointer { labelBuffer in context.withUnsafeBytes { contextBuffer -> Data? in
+        guard let secret = sec_protocol_metadata_create_secret_with_context(metadata, label.count - 1,
+            labelBuffer.baseAddress!, length, contextBuffer.bindMemory(to: UInt8.self).baseAddress!, context.count)
+        else { return nil }
+        let dispatch = secret as DispatchData
+        return dispatch.withUnsafeBytes { (pointer: UnsafePointer<UInt8>) in Data(bytes: pointer, count: dispatch.count) }
+    } }
+}
+
 private struct FixedExporter: ACPTLSExporter {
-    let value: Data
-    let expectedContext: Data
+    let value: Data; let expectedContext: Data
     func export(label: String, context: Data, length: Int) throws -> Data {
-        guard label == ACPHelloExporterLabel, context == expectedContext, length == value.count else {
-            throw ACPAppleSecurityError.exporterFailure
-        }
-        return value
+        guard label == ACPHelloExporterLabel, context == expectedContext, length == value.count
+        else { throw ACPAppleSecurityError.exporterFailure }; return value
     }
 }
 
 private final class CompletionGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var completed = false
-    func run(_ operation: () -> Void) {
-        lock.lock(); defer { lock.unlock() }
-        guard !completed else { return }
-        completed = true
-        operation()
-    }
+    private let lock = NSLock(); private var completed = false
+    func run(_ operation: () -> Void) { lock.lock(); defer { lock.unlock() }; guard !completed else { return }; completed = true; operation() }
 }
+
+private struct ConnectionBox: @unchecked Sendable { let value: NWConnection; init(_ value: NWConnection) { self.value = value } }
