@@ -47,11 +47,10 @@ public enum ACPAppleCertificatePolicy {
         guard sanValues.count == 1, sanValues[0].hasPrefix(expectedPrefix),
               let node = ACPSecurityNodeID(rawValue: String(sanValues[0].dropFirst(expectedPrefix.count))),
               expectedNode.map({ $0 == node }) ?? true,
-              hasExtension(values, oid: kSecOIDBasicConstraints as String),
-              hasExtension(values, oid: kSecOIDSubjectKeyIdentifier as String),
-              hasExtension(values, oid: kSecOIDAuthorityKeyIdentifier as String),
-              hasExtension(values, oid: kSecOIDKeyUsage as String),
-              hasExtension(values, oid: kSecOIDExtendedKeyUsage as String),
+              validBasicConstraints(values), validKeyUsage(values), validExtendedKeyUsage(values),
+              validKeyIdentifier(values, oid: kSecOIDSubjectKeyIdentifier as String),
+              validKeyIdentifier(values, oid: kSecOIDAuthorityKeyIdentifier as String),
+              validSerial(values),
               let publicKey = SecCertificateCopyKey(leaf),
               let external = SecKeyCopyExternalRepresentation(publicKey, nil) as Data?,
               let spki = p256SPKI(external),
@@ -81,7 +80,7 @@ public enum ACPAppleCertificatePolicy {
 
     private static func certificateValues(_ certificate: SecCertificate) throws -> [String: Any] {
         let keys = [kSecOIDSubjectAltName, kSecOIDBasicConstraints, kSecOIDKeyUsage, kSecOIDExtendedKeyUsage,
-                    kSecOIDSubjectKeyIdentifier, kSecOIDAuthorityKeyIdentifier] as CFArray
+                    kSecOIDSubjectKeyIdentifier, kSecOIDAuthorityKeyIdentifier, kSecOIDX509V1SerialNumber] as CFArray
         var error: Unmanaged<CFError>?
         guard let values = SecCertificateCopyValues(certificate, keys, &error) as? [String: Any]
         else {
@@ -101,8 +100,50 @@ public enum ACPAppleCertificatePolicy {
         return []
     }
 
-    private static func hasExtension(_ values: [String: Any], oid: String) -> Bool {
-        values[oid] != nil
+    private static func extensionValue(_ values: [String: Any], oid: String) -> Any? {
+        (values[oid] as? [String: Any])?[kSecPropertyKeyValue as String]
+    }
+
+    private static func validBasicConstraints(_ values: [String: Any]) -> Bool {
+        guard let entries = extensionValue(values, oid: kSecOIDBasicConstraints as String) as? [[String: Any]] else {
+            return false
+        }
+        let pairs = Dictionary(uniqueKeysWithValues: entries.compactMap { entry -> (String, String)? in
+            guard let label = entry[kSecPropertyKeyLabel as String] as? String,
+                  let value = entry[kSecPropertyKeyValue as String] as? String else { return nil }
+            return (label, value)
+        })
+        return pairs["Critical"] == "Yes" && pairs["Certificate Authority"] == "No"
+    }
+
+    private static func validKeyUsage(_ values: [String: Any]) -> Bool {
+        guard let number = extensionValue(values, oid: kSecOIDKeyUsage as String) as? NSNumber else { return false }
+        let bits = number.uint32Value
+        return bits & 1 == 1 && bits & 0x7fff_fffe == 0
+    }
+
+    private static func validExtendedKeyUsage(_ values: [String: Any]) -> Bool {
+        guard let usages = extensionValue(values, oid: kSecOIDExtendedKeyUsage as String) as? [Data] else {
+            return false
+        }
+        return Set(usages) == Set([
+            Data([0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x01]),
+            Data([0x2b, 0x06, 0x01, 0x05, 0x05, 0x07, 0x03, 0x02]),
+        ])
+    }
+
+    private static func validKeyIdentifier(_ values: [String: Any], oid: String) -> Bool {
+        guard let entries = extensionValue(values, oid: oid) as? [[String: Any]] else { return false }
+        let identifiers = entries.compactMap { $0[kSecPropertyKeyValue as String] as? Data }
+        return identifiers.count == 1 && identifiers[0].count == 20
+    }
+
+    private static func validSerial(_ values: [String: Any]) -> Bool {
+        guard let text = extensionValue(values, oid: kSecOIDX509V1SerialNumber as String) as? String else {
+            return false
+        }
+        let octets = text.split(separator: " ").compactMap { UInt8($0, radix: 16) }
+        return octets.count == 16 && octets.contains(where: { $0 != 0 })
     }
 
     private static func digestID(_ data: Data) -> String {

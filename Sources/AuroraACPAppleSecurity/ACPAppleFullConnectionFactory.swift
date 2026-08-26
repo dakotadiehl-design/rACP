@@ -9,7 +9,7 @@ public struct ACPAppleFullProviderConfiguration {
     public let anchors: [SecCertificate]
     public let trustDomainID: ACPTrustDomainID
     public let expectedPeerNodeID: ACPSecurityNodeID?
-    public let providerManifestDigest: String
+    public let providerProvenance: ACPProviderProvenance
     public let revocation: (any ACPAppleRevocationChecking)?
 
     public init(
@@ -17,14 +17,14 @@ public struct ACPAppleFullProviderConfiguration {
         anchors: [SecCertificate],
         trustDomainID: ACPTrustDomainID,
         expectedPeerNodeID: ACPSecurityNodeID? = nil,
-        providerManifestDigest: String,
+        providerProvenance: ACPProviderProvenance,
         revocation: (any ACPAppleRevocationChecking)? = nil
     ) {
         self.localIdentity = localIdentity
         self.anchors = anchors
         self.trustDomainID = trustDomainID
         self.expectedPeerNodeID = expectedPeerNodeID
-        self.providerManifestDigest = providerManifestDigest
+        self.providerProvenance = providerProvenance
         self.revocation = revocation
     }
 }
@@ -101,7 +101,7 @@ public enum ACPAppleFullConnectionFactory {
             let framed = ACPFramedConnection(connection: connection)
             return try ACPAuthenticatedConnection(
                 transport: framed, evidence: evidence,
-                providerManifestDigest: configuration.providerManifestDigest,
+                providerProvenance: configuration.providerProvenance,
                 observation: .init(
                     protocolVersion: "TLSv1.3", claimedNodeID: verified.nodeID.rawValue,
                     claimedTrustDomainID: verified.trustDomainID.rawValue

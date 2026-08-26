@@ -5,6 +5,9 @@ import Security
 import XCTest
 
 final class ACPAppleCertificatePolicyTests: XCTestCase {
+    private struct Revoked: ACPAppleRevocationChecking {
+        func isRevoked(_ credentialID: ACPCredentialID) -> Bool { true }
+    }
     private func fixture() throws -> (SecCertificate, SecCertificate, [String: Any]) {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("vectors/security/x509/full_profile.json")
@@ -45,5 +48,20 @@ final class ACPAppleCertificatePolicyTests: XCTestCase {
             expectedDomain: ACPTrustDomainID(rawValue: "40516273-8495-4a6b-8a3b-4c5d6e7f8091")!,
             evaluationDate: date
         ))
+    }
+
+    func testExpiredFutureAndRevokedCredentialsFailClosed() throws {
+        let (leaf, authority, _) = try fixture()
+        let domain = ACPTrustDomainID(rawValue: "40516273-8495-4a6b-8a3b-4c5d6e7f8091")!
+        for date in ["2026-08-20T12:00:00Z", "2027-08-22T12:00:00Z"] {
+            XCTAssertThrowsError(try ACPAppleCertificatePolicy.validate(
+                chain: [leaf, authority], anchors: [authority], expectedDomain: domain,
+                evaluationDate: ISO8601DateFormatter().date(from: date)!
+            ))
+        }
+        XCTAssertThrowsError(try ACPAppleCertificatePolicy.validate(
+            chain: [leaf, authority], anchors: [authority], expectedDomain: domain,
+            evaluationDate: ISO8601DateFormatter().date(from: "2026-08-26T12:00:00Z")!, revocation: Revoked()
+        )) { XCTAssertEqual($0 as? ACPAppleSecurityError, .revoked) }
     }
 }
