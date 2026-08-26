@@ -38,6 +38,7 @@ public enum ACPAppleFullConnectionFactory {
     public static func connect(host: String, port: UInt16,
                                configuration: ACPAppleFullProviderConfiguration,
                                timeout: TimeInterval = 10) async throws -> ACPAuthenticatedConnection {
+        try validateTimeout(timeout)
         let local = try validateLocal(configuration)
         let connection = NWConnection(host: NWEndpoint.Host(host), port: try endpointPort(port),
                                       using: parameters(configuration))
@@ -70,7 +71,7 @@ public actor ACPAppleFullServerListener {
     private let listener: NWListener
     private let configuration: ACPAppleFullProviderConfiguration
     private var pending: [NWConnection] = []
-    private var waiter: CheckedContinuation<NWConnection, Error>?
+    private var waiter: (id: UUID, continuation: CheckedContinuation<NWConnection, Error>)?
     private var started = false
     private var stopped = false
 
@@ -83,6 +84,7 @@ public actor ACPAppleFullServerListener {
     public var endpoint: ACPAppleFullServerEndpoint { .init(port: listener.port?.rawValue ?? 0) }
 
     public func start(timeout: TimeInterval = 10) async throws {
+        try validateTimeout(timeout)
         guard !started, !stopped else { throw ACPAppleSecurityError.listenerState }
         listener.newConnectionHandler = { connection in Task { await self.enqueue(connection) } }
         let startResult = await withTaskGroup(of: Result<Void, Error>.self) { group in
@@ -110,11 +112,17 @@ public actor ACPAppleFullServerListener {
             }
             let first = await group.next()!; group.cancelAll(); return first
         }
-        try startResult.get()
-        listener.stateUpdateHandler = nil; started = true
+        do {
+            try startResult.get()
+            listener.stateUpdateHandler = nil; started = true
+        } catch {
+            listener.stateUpdateHandler = nil; listener.cancel(); stopped = true
+            throw error
+        }
     }
 
     public func accept(timeout: TimeInterval = 10) async throws -> ACPAuthenticatedConnection {
+        try validateTimeout(timeout)
         guard started, !stopped else { throw ACPAppleSecurityError.listenerState }
         let connection = try await next(timeout: timeout)
         do {
@@ -138,22 +146,23 @@ public actor ACPAppleFullServerListener {
     public func shutdown() {
         guard !stopped else { return }
         stopped = true; listener.cancel(); pending.forEach { $0.cancel() }; pending.removeAll()
-        waiter?.resume(throwing: ACPAppleSecurityError.listenerState); waiter = nil
+        waiter?.continuation.resume(throwing: ACPAppleSecurityError.listenerState); waiter = nil
     }
 
     private func enqueue(_ connection: NWConnection) {
         guard !stopped else { connection.cancel(); return }
-        if let waiter { self.waiter = nil; waiter.resume(returning: connection) }
+        if let waiter { self.waiter = nil; waiter.continuation.resume(returning: connection) }
         else { pending.append(connection) }
     }
 
     private func next(timeout: TimeInterval) async throws -> NWConnection {
         if !pending.isEmpty { return pending.removeFirst() }
+        let waiterID = UUID()
         let outcome = await withTaskGroup(of: Result<ConnectionBox, Error>.self) { group in
             group.addTask {
                 do { return .success(try await withTaskCancellationHandler {
-                    ConnectionBox(try await self.waitForConnection())
-                } onCancel: { Task { await self.cancelWaiter() } }) }
+                    ConnectionBox(try await self.waitForConnection(id: waiterID))
+                } onCancel: { Task { await self.cancelWaiter(id: waiterID) } }) }
                 catch { return .failure(error) }
             }
             group.addTask {
@@ -165,15 +174,18 @@ public actor ACPAppleFullServerListener {
         return try outcome.get().value
     }
 
-    private func waitForConnection() async throws -> NWConnection {
-        try await withCheckedThrowingContinuation { install($0) }
+    private func waitForConnection(id: UUID) async throws -> NWConnection {
+        try await withCheckedThrowingContinuation { install(id: id, continuation: $0) }
     }
 
-    private func install(_ continuation: CheckedContinuation<NWConnection, Error>) {
+    private func install(id: UUID, continuation: CheckedContinuation<NWConnection, Error>) {
         guard waiter == nil, !stopped else { continuation.resume(throwing: ACPAppleSecurityError.listenerState); return }
-        waiter = continuation
+        waiter = (id, continuation)
     }
-    private func cancelWaiter() { waiter?.resume(throwing: CancellationError()); waiter = nil }
+    private func cancelWaiter(id: UUID) {
+        guard waiter?.id == id else { return }
+        waiter?.continuation.resume(throwing: CancellationError()); waiter = nil
+    }
 }
 
 private func parameters(_ configuration: ACPAppleFullProviderConfiguration) -> NWParameters {
@@ -339,6 +351,11 @@ private func endpointPort(_ port: UInt16) throws -> NWEndpoint.Port {
     guard let value = NWEndpoint.Port(rawValue: port) else { throw ACPAppleSecurityError.listenerState }; return value
 }
 private func timeoutNS(_ timeout: TimeInterval) -> UInt64 { UInt64(max(timeout, 0.01) * 1_000_000_000) }
+private func validateTimeout(_ timeout: TimeInterval) throws {
+    guard timeout.isFinite, (0.01...3_600).contains(timeout) else {
+        throw ACPAppleSecurityError.resourceLimit
+    }
+}
 
 private func certificateChain(_ metadata: sec_protocol_metadata_t) -> [SecCertificate] {
     var result: [SecCertificate] = []
