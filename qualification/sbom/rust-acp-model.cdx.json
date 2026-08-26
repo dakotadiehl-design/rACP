@@ -1,0 +1,51 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "version": 1,
+  "serialNumber": "urn:uuid:ff114c78-7214-4851-afd9-8740b0d2aa12",
+  "metadata": {
+    "timestamp": "2026-08-26T20:31:22.814493000Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cargo-cyclonedx",
+        "version": "0.5.9"
+      }
+    ],
+    "component": {
+      "type": "library",
+      "bom-ref": "path+file:///Users/dakota/code/AuroraCommunicationsProtocol/rust/acp-model#1.2.0",
+      "name": "acp-model",
+      "version": "1.2.0",
+      "description": "Aurora Communications Protocol — typed models (no Tokio)",
+      "scope": "required",
+      "licenses": [
+        {
+          "expression": "LicenseRef-Proprietary"
+        }
+      ],
+      "purl": "pkg:cargo/acp-model@1.2.0?download_url=file://.",
+      "components": [
+        {
+          "type": "library",
+          "bom-ref": "path+file:///Users/dakota/code/AuroraCommunicationsProtocol/rust/acp-model#1.2.0 bin-target-0",
+          "name": "acp_model",
+          "version": "1.2.0",
+          "purl": "pkg:cargo/acp-model@1.2.0?download_url=file://.#src/lib.rs"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "cdx:rustc:sbom:target:triple",
+        "value": "aarch64-apple-darwin"
+      }
+    ]
+  },
+  "components": [],
+  "dependencies": [
+    {
+      "ref": "path+file:///Users/dakota/code/AuroraCommunicationsProtocol/rust/acp-model#1.2.0"
+    }
+  ]
+}
