@@ -268,7 +268,12 @@ private func result(_ transport: ACPFramedConnection, proof: ACPTransportEvidenc
                     peer: ACPAppleVerifiedCertificate, configuration: ACPAppleFullProviderConfiguration,
                     role: ACPAuthenticatedConnection.Role, prefetchedHello: ACPEnvelope? = nil) throws
     -> ACPAuthenticatedConnection {
-    try ACPAuthenticatedConnection(transport: transport, evidence: proof,
+    guard let credentialID = ACPCredentialID(rawValue: peer.credentialID.rawValue) else {
+        throw ACPAppleSecurityError.invalidCertificate
+    }
+    let monitored = try ACPAppleRevocationMonitoredTransport(
+        transport: transport, credentialID: credentialID, store: configuration.trustStore)
+    return try ACPAuthenticatedConnection(transport: monitored, evidence: proof,
         providerProvenance: configuration.providerProvenance, role: role, prefetchedHello: prefetchedHello,
         localNodeID: configuration.localACPIdentity.nodeID,
         observation: .init(protocolVersion: "TLSv1.3", claimedNodeID: peer.nodeID.rawValue,
@@ -391,3 +396,36 @@ private final class CompletionGate: @unchecked Sendable {
 
 private struct ConnectionBox: @unchecked Sendable { let value: NWConnection; init(_ value: NWConnection) { self.value = value } }
 private struct ReceivedFrame: Sendable { let data: Data; let text: Bool }
+
+private actor ACPAppleRevocationMonitoredTransport: ACPTransport {
+    private let transport: any ACPTransport
+    private let credentialID: ACPCredentialID
+    private let store: ACPAppleTrustedPeerStore
+    private let observerID: UUID
+    private var closed = false
+
+    init(transport: any ACPTransport, credentialID: ACPCredentialID,
+         store: ACPAppleTrustedPeerStore) throws {
+        self.transport = transport; self.credentialID = credentialID; self.store = store
+        observerID = try store.observeRevocation(credentialID) {
+            Task { await transport.close() }
+        }
+    }
+
+    func send(_ data: Data, text: Bool) async throws {
+        guard !closed else { throw ACPAppleSecurityError.revoked }
+        try await transport.send(data, text: text)
+    }
+
+    func recv() async throws -> (Data, Bool) {
+        guard !closed else { throw ACPAppleSecurityError.revoked }
+        return try await transport.recv()
+    }
+
+    func close() async {
+        guard !closed else { return }
+        closed = true
+        store.removeRevocationObserver(observerID, credentialID: credentialID)
+        await transport.close()
+    }
+}

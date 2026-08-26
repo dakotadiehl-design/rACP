@@ -36,6 +36,29 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
         XCTAssertTrue(try ACPAppleTrustedPeerStore(service: service, account: account).trustedPeers().isEmpty)
     }
 
+    func testRevocationAndTrustResetNotifyActiveObserversExactlyOnce() throws {
+        let service = "com.aurora.acp.tests.\(UUID().uuidString)"
+        let store = try ACPAppleTrustedPeerStore(service: service, account: UUID().uuidString)
+        defer { try? store.reset() }
+        let certificate = verifiedCertificate()
+        try store.recordAuthenticated(certificate, displayName: nil)
+        let notifications = LockedCounter()
+        _ = try store.observeRevocation(certificate.credentialID) {
+            notifications.increment()
+        }
+        XCTAssertEqual(try store.revoke(certificate.credentialID), .revoked)
+        XCTAssertEqual(notifications.value, 1)
+        XCTAssertThrowsError(try store.observeRevocation(certificate.credentialID) {})
+
+        try store.reset()
+        try store.recordAuthenticated(certificate, displayName: nil)
+        _ = try store.observeRevocation(certificate.credentialID) {
+            notifications.increment()
+        }
+        try store.reset()
+        XCTAssertEqual(notifications.value, 2)
+    }
+
     private func verifiedCertificate() -> ACPAppleVerifiedCertificate {
         ACPAppleVerifiedCertificate(
             trustDomainID: ACPTrustDomainID(rawValue: "40516273-8495-4a6b-8a3b-4c5d6e7f8091")!,
@@ -44,4 +67,11 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
             identityKeyID: ACPIdentityKeyID(rawValue: "sha256:" + String(repeating: "2", count: 64))!,
             leafDER: Data([1, 2, 3]))
     }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var value: Int { lock.withLock { count } }
+    func increment() { lock.withLock { count += 1 } }
 }

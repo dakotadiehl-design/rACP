@@ -48,7 +48,7 @@ final class ACPAppleFullAllUpTests: XCTestCase {
             domain: "ACPAppleFullAllUpTests.clientConnect", code: 1,
             userInfo: [NSUnderlyingErrorKey: error]) }
         let clientSession = try authenticatedClient.makeSession(local: clientACP)
-        let acceptedPeer = try await serverTask.value
+        let (serverSession, acceptedPeer) = try await serverTask.value
         do { _ = try await clientSession.handshake() }
         catch {
             let detail = (error as? ACPSessionError).map { "\($0.code): \($0.message)" } ?? String(describing: error)
@@ -59,16 +59,21 @@ final class ACPAppleFullAllUpTests: XCTestCase {
         let clientPeer = await clientSession.peer?.nodeID
         XCTAssertEqual(clientPeer, fixture.host)
         XCTAssertEqual(acceptedPeer, fixture.client)
-        await clientSession.goodbye()
-        await listener.shutdown()
         XCTAssertEqual(hostTrust.trustedPeers().first?.nodeID, fixture.client)
         XCTAssertEqual(clientTrust.trustedPeers().first?.nodeID, fixture.host)
 
         let credential = try XCTUnwrap(hostTrust.trustedPeers().first?.credentialID)
         let credentialID = try XCTUnwrap(ACPCredentialID(rawValue: credential))
+        XCTAssertEqual(try hostTrust.revoke(credentialID), .revoked)
+        await XCTAssertThrowsErrorAsync {
+            _ = try await clientSession.pumpOnce(deadline: Date().addingTimeInterval(2))
+        }
+        await serverSession.goodbye(); await clientSession.goodbye()
+        await listener.shutdown()
+
         let restoredHostTrust = try ACPAppleTrustedPeerStore(
             service: fixture.service + ".host-trust", account: "peers")
-        XCTAssertEqual(try restoredHostTrust.revoke(credentialID), .revoked)
+        XCTAssertEqual(try restoredHostTrust.revoke(credentialID), .alreadyRevoked)
         let revokedHostConfiguration = ACPAppleFullProviderConfiguration(
             localIdentity: hostIdentity, anchors: [root], trustDomainID: domain,
             expectedPeerNodeID: ACPSecurityNodeID(rawValue: fixture.client)!,
@@ -92,13 +97,12 @@ final class ACPAppleFullAllUpTests: XCTestCase {
     }
 
     private func acceptSession(_ listener: ACPAppleFullServerListener,
-                               local: ACPIdentity) async throws -> String? {
+                               local: ACPIdentity) async throws -> (ACPSession, String?) {
         let connection = try await listener.accept()
         let session = try connection.makeSession(local: local)
         _ = try await session.handshake()
         let peer = await session.peer?.nodeID
-        await session.goodbye()
-        return peer
+        return (session, peer)
     }
 
     private func provenance() throws -> ACPProviderProvenance {

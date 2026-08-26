@@ -34,6 +34,8 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
     private let account: String
     private let maximumPeers: Int
     private var snapshot: Snapshot
+    private var revocationObservers: [String: [UUID: @Sendable () -> Void]] = [:]
+    private var revocationObserverCount = 0
 
     public init(service: String = "com.aurora.acp.trust", account: String,
                 accessGroup: String? = nil, maximumPeers: Int = 1024) throws {
@@ -63,10 +65,10 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
 
     public func revoke(_ credentialID: ACPCredentialID, at date: Date = Date()) throws
         -> ACPAppleRevocationResult {
-        try lock.withLock {
+        let (result, callbacks): (ACPAppleRevocationResult, [@Sendable () -> Void]) = try lock.withLock {
             guard let index = snapshot.peers.firstIndex(where: { $0.credentialID == credentialID.rawValue })
-            else { return .unknownCredential }
-            guard snapshot.peers[index].state != .revoked else { return .alreadyRevoked }
+            else { return (.unknownCredential, []) }
+            guard snapshot.peers[index].state != .revoked else { return (.alreadyRevoked, []) }
             let old = snapshot
             let peer = snapshot.peers[index]
             snapshot.peers[index] = .init(
@@ -74,17 +76,28 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
                 identityKeyID: peer.identityKeyID, displayName: peer.displayName,
                 state: .revoked, lastSeen: peer.lastSeen, revokedAt: date)
             do { try persist() } catch { snapshot = old; throw error }
-            return .revoked
+            let callbacks = Array(revocationObservers.removeValue(
+                forKey: credentialID.rawValue)?.values ?? [:].values)
+            revocationObserverCount -= callbacks.count
+            return (.revoked, callbacks)
         }
+        callbacks.forEach { $0() }
+        return result
     }
 
     /// Removes ACP trust-display and revocation state without touching cached
     /// show assets or local device identities.
     public func reset() throws {
-        try lock.withLock {
-            do { try backend.delete(name: account); snapshot = Snapshot() }
+        let callbacks: [@Sendable () -> Void] = try lock.withLock {
+            do { try backend.delete(name: account) }
             catch { throw ACPAppleSecurityError.trustStoreFailure }
+            snapshot = Snapshot()
+            let callbacks = revocationObservers.values.flatMap { $0.values }
+            revocationObservers.removeAll(keepingCapacity: false)
+            revocationObserverCount = 0
+            return callbacks
         }
+        callbacks.forEach { $0() }
     }
 
     package func recordAuthenticated(_ certificate: ACPAppleVerifiedCertificate,
@@ -110,6 +123,31 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
                     displayName: displayName, state: .trusted, lastSeen: date, revokedAt: nil))
             }
             do { try persist() } catch { snapshot = old; throw error }
+        }
+    }
+
+    package func observeRevocation(_ credentialID: ACPCredentialID,
+                                   callback: @escaping @Sendable () -> Void) throws -> UUID {
+        try lock.withLock {
+            guard snapshot.peers.first(where: { $0.credentialID == credentialID.rawValue })?.state != .revoked
+            else { throw ACPAppleSecurityError.revoked }
+            guard revocationObserverCount < maximumPeers * 4 else {
+                throw ACPAppleSecurityError.resourceLimit
+            }
+            let id = UUID()
+            revocationObservers[credentialID.rawValue, default: [:]][id] = callback
+            revocationObserverCount += 1
+            return id
+        }
+    }
+
+    package func removeRevocationObserver(_ id: UUID, credentialID: ACPCredentialID) {
+        lock.withLock {
+            guard revocationObservers[credentialID.rawValue]?.removeValue(forKey: id) != nil else { return }
+            revocationObserverCount -= 1
+            if revocationObservers[credentialID.rawValue]?.isEmpty == true {
+                revocationObservers.removeValue(forKey: credentialID.rawValue)
+            }
         }
     }
 
