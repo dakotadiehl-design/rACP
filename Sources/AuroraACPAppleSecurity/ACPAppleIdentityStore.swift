@@ -69,7 +69,7 @@ public actor ACPAppleIdentityStore {
         var privateKey: SecKey?
         guard SecIdentityCopyCertificate(secIdentity, &certificate) == errSecSuccess,
               SecIdentityCopyPrivateKey(secIdentity, &privateKey) == errSecSuccess,
-              let certificate, privateKey != nil,
+              let certificate, let privateKey,
               SecCertificateCopyData(certificate) as Data == SecCertificateCopyData(chain[0]) as Data,
               let expected = ACPSecurityNodeID(rawValue: identity.nodeID) else {
             throw ACPAppleSecurityError.privateKeyUnavailable
@@ -77,19 +77,22 @@ public actor ACPAppleIdentityStore {
         _ = try ACPAppleCertificatePolicy.validate(
             chain: chain, anchors: anchors, expectedDomain: trustDomainID,
             expectedNode: expected, revocation: revocation)
-        var persistent: CFTypeRef?
-        let persistentStatus = SecItemCopyMatching([
-            kSecValueRef as String: secIdentity, kSecReturnPersistentRef as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne] as CFDictionary, &persistent)
-        guard persistentStatus == errSecSuccess, let persistentData = persistent as? Data else {
-            throw ACPAppleSecurityError.keychainFailure
-        }
+        // Persist the certificate and key references separately. A persistent
+        // reference queried from a SecIdentity can resolve as its private key
+        // on macOS; treating that object as SecIdentity causes a native crash.
+        // SecIdentityCreate reconstructs only an opaque signing capability and
+        // never exports private-key bytes.
+        let locator = try ACPAppleIdentityLocator(
+            certificate: persistentReference(to: certificate),
+            privateKey: persistentReference(to: privateKey))
+        let locatorData = try JSONEncoder().encode(locator)
         do {
-            try references.write(name: label, data: persistentData)
+            try references.write(name: label, data: locatorData)
             return try load(label: label, identity: identity)
         }
         catch {
-            _ = SecItemDelete([kSecValuePersistentRef as String: persistentData] as CFDictionary)
+            try? deletePersistent(locator.certificate)
+            try? deletePersistent(locator.privateKey)
             try? references.delete(name: label)
             throw error
         }
@@ -102,26 +105,20 @@ public actor ACPAppleIdentityStore {
               let expected = ACPSecurityNodeID(rawValue: identity.nodeID) else {
             throw ACPAppleSecurityError.localIdentityMismatch
         }
-        guard let persistent = try references.read(name: label) else {
+        guard let locatorData = try references.read(name: label) else {
             throw ACPAppleSecurityError.identityMissing
         }
-        let query: [String: Any] = [
-            kSecValuePersistentRef as String: persistent,
-            kSecReturnRef as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { throw ACPAppleSecurityError.identityMissing }
-        guard status == errSecSuccess, let secIdentity = result as! SecIdentity? else {
-            throw ACPAppleSecurityError.keychainFailure
+        guard let locator = try? JSONDecoder().decode(ACPAppleIdentityLocator.self, from: locatorData),
+              let certificate = try resolve(locator.certificate, typeID: SecCertificateGetTypeID()),
+              let privateKey = try resolve(locator.privateKey, typeID: SecKeyGetTypeID()) else {
+            throw ACPAppleSecurityError.identityMissing
         }
-        var certificate: SecCertificate?
-        var privateKey: SecKey?
-        guard SecIdentityCopyCertificate(secIdentity, &certificate) == errSecSuccess,
-              SecIdentityCopyPrivateKey(secIdentity, &privateKey) == errSecSuccess,
-              let certificate, privateKey != nil else { throw ACPAppleSecurityError.privateKeyUnavailable }
-        let chain = [certificate] + anchors
+        let certificateRef = unsafeBitCast(certificate, to: SecCertificate.self)
+        let keyRef = unsafeBitCast(privateKey, to: SecKey.self)
+        guard let secIdentity = makeIdentity(certificate: certificateRef, privateKey: keyRef) else {
+            throw ACPAppleSecurityError.privateKeyUnavailable
+        }
+        let chain = [certificateRef] + anchors
         let verified = try ACPAppleCertificatePolicy.validate(
             chain: chain, anchors: anchors, expectedDomain: trustDomainID,
             expectedNode: expected, revocation: revocation
@@ -136,11 +133,63 @@ public actor ACPAppleIdentityStore {
     /// Deletes only the selected ACP Keychain identity. Missing is idempotent.
     public func reset(label: String) throws {
         guard (1...128).contains(label.utf8.count) else { throw ACPAppleSecurityError.keychainFailure }
-        guard let persistent = try references.read(name: label) else { return }
+        guard let locatorData = try references.read(name: label) else { return }
+        guard let locator = try? JSONDecoder().decode(ACPAppleIdentityLocator.self, from: locatorData) else {
+            throw ACPAppleSecurityError.keychainFailure
+        }
+        try deletePersistent(locator.certificate)
+        try deletePersistent(locator.privateKey)
+        try references.delete(name: label)
+    }
+
+    private func persistentReference(to value: CFTypeRef) throws -> Data {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecValueRef as String: value,
+            kSecReturnPersistentRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            throw ACPAppleSecurityError.keychainFailure
+        }
+        return data
+    }
+
+    private func resolve(_ persistent: Data, typeID: CFTypeID) throws -> CFTypeRef? {
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching([
+            kSecValuePersistentRef as String: persistent,
+            kSecReturnRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as CFDictionary, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let result, CFGetTypeID(result) == typeID else {
+            throw ACPAppleSecurityError.keychainFailure
+        }
+        return result
+    }
+
+    private func deletePersistent(_ persistent: Data) throws {
         let status = SecItemDelete([kSecValuePersistentRef as String: persistent] as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw ACPAppleSecurityError.keychainFailure
         }
-        try references.delete(name: label)
     }
+
+    private func makeIdentity(certificate: SecCertificate, privateKey: SecKey) -> SecIdentity? {
+#if os(macOS)
+        var identity: SecIdentity?
+        guard SecIdentityCreateWithCertificate(nil, certificate, &identity) == errSecSuccess else {
+            return nil
+        }
+        return identity
+#else
+        return SecIdentityCreate(nil, certificate, privateKey)
+#endif
+    }
+}
+
+private struct ACPAppleIdentityLocator: Codable {
+    let certificate: Data
+    let privateKey: Data
 }

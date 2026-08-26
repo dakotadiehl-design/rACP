@@ -89,7 +89,7 @@ public enum ACPAuthenticatedTransport {
         }
         let exported = try exporter.export(label: ACPHelloExporterLabel, context: helloExporterContext(hello), length: 32)
         guard exported.count == 32, case .object(let auth) = hello["auth"],
-              case .bytes(let claimed) = auth["channel_binding"],
+              let claimed = channelBindingBytes(auth["channel_binding"]),
               ACPSecurityContext.channelBindingsEqual(exported, claimed)
         else { throw ACPSecurityAdmissionError.authenticationFailed }
         return .init(
@@ -99,6 +99,14 @@ public enum ACPAuthenticatedTransport {
             channelBinding: ACPSecurityContext.base64URLEncode(exported), roleConstraints: handshake.roleConstraints,
             credentialState: .active, channelBindingVerified: true
         )
+    }
+
+    private static func channelBindingBytes(_ value: AnySendable?) -> Data? {
+        switch value {
+        case .bytes(let bytes): return bytes
+        case .string(let text): return try? ACPSecurityContext.base64URLDecode(text)
+        default: return nil
+        }
     }
 
     public static func parseLightweightPreface(

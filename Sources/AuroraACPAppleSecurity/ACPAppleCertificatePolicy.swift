@@ -29,6 +29,8 @@ public enum ACPAppleSecurityError: String, Error, Sendable {
     case resourceLimit = "security.resource_limit"
     case malformedIdentity = "security.identity_malformed"
     case duplicateIdentity = "security.identity_duplicate"
+    case tlsHandshake = "security.tls_handshake"
+    case helloReceive = "security.hello_receive"
 }
 
 public protocol ACPAppleRevocationChecking: Sendable {

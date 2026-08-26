@@ -85,25 +85,32 @@ public actor ACPAppleFullServerListener {
     public func start(timeout: TimeInterval = 10) async throws {
         guard !started, !stopped else { throw ACPAppleSecurityError.listenerState }
         listener.newConnectionHandler = { connection in Task { await self.enqueue(connection) } }
-        try await withThrowingTaskGroup(of: Void.self) { group in
+        let startResult = await withTaskGroup(of: Result<Void, Error>.self) { group in
             group.addTask {
-                try await withCheckedThrowingContinuation { continuation in
-                    let gate = CompletionGate()
-                    self.listener.stateUpdateHandler = { state in
-                        switch state {
-                        case .ready: gate.run { continuation.resume() }
-                        case .failed(let error): gate.run { continuation.resume(throwing: error) }
-                        case .cancelled: gate.run { continuation.resume(throwing: ACPAppleSecurityError.listenerState) }
-                        default: break
+                do {
+                    try await withCheckedThrowingContinuation { continuation in
+                        let gate = CompletionGate()
+                        self.listener.stateUpdateHandler = { state in
+                            switch state {
+                            case .ready: gate.run { continuation.resume() }
+                            case .failed(let error): gate.run { continuation.resume(throwing: error) }
+                            case .cancelled: gate.run { continuation.resume(throwing: ACPAppleSecurityError.listenerState) }
+                            default: break
+                            }
                         }
+                        self.listener.start(queue: .global(qos: .userInitiated))
                     }
-                    self.listener.start(queue: .global(qos: .userInitiated))
-                }
+                    return .success(())
+                } catch { return .failure(error) }
             }
-            group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
-            defer { group.cancelAll() }
-            _ = try await group.next()
+            group.addTask {
+                do { try await Task.sleep(nanoseconds: timeoutNS(timeout)); self.listener.cancel()
+                    return .failure(ACPAppleSecurityError.timeout) }
+                catch { return .failure(error) }
+            }
+            let first = await group.next()!; group.cancelAll(); return first
         }
+        try startResult.get()
         listener.stateUpdateHandler = nil; started = true
     }
 
@@ -111,11 +118,14 @@ public actor ACPAppleFullServerListener {
         guard started, !stopped else { throw ACPAppleSecurityError.listenerState }
         let connection = try await next(timeout: timeout)
         do {
-            try await startConnection(connection, timeout: timeout)
+            do { try await startConnection(connection, timeout: timeout) }
+            catch { throw ACPAppleSecurityError.tlsHandshake }
             let metadata = try tlsMetadata(connection)
             let peer = try validatePeer(metadata, configuration)
             let framed = ACPFramedConnection(connection: connection)
-            let (data, text) = try await receive(framed, timeout: timeout)
+            let (data, text): (Data, Bool)
+            do { (data, text) = try await receive(framed, connection: connection, timeout: timeout) }
+            catch { throw ACPAppleSecurityError.helloReceive }
             let hello = text ? try ACPEncoding.decodeJSON(data) : try ACPEncoding.decodeCBOR(data)
             guard hello.type == "session.hello" else { throw ACPAppleSecurityError.invalidHello }
             let proof = try evidence(for: peer, hello: hello.payload, metadata: metadata)
@@ -139,16 +149,20 @@ public actor ACPAppleFullServerListener {
 
     private func next(timeout: TimeInterval) async throws -> NWConnection {
         if !pending.isEmpty { return pending.removeFirst() }
-        return try await withThrowingTaskGroup(of: ConnectionBox.self) { group in
+        let outcome = await withTaskGroup(of: Result<ConnectionBox, Error>.self) { group in
             group.addTask {
-                return try await withTaskCancellationHandler {
+                do { return .success(try await withTaskCancellationHandler {
                     ConnectionBox(try await self.waitForConnection())
-                } onCancel: { Task { await self.cancelWaiter() } }
+                } onCancel: { Task { await self.cancelWaiter() } }) }
+                catch { return .failure(error) }
             }
-            group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
-            defer { group.cancelAll() }
-            return try await group.next()!.value
+            group.addTask {
+                do { try await Task.sleep(nanoseconds: timeoutNS(timeout)); return .failure(ACPAppleSecurityError.timeout) }
+                catch { return .failure(error) }
+            }
+            let first = await group.next()!; group.cancelAll(); return first
         }
+        return try outcome.get().value
     }
 
     private func waitForConnection() async throws -> NWConnection {
@@ -193,7 +207,7 @@ private func validateLocal(_ configuration: ACPAppleFullProviderConfiguration) t
 private func authenticatedHello(_ identity: ACPIdentity,
                                 local: ACPAppleVerifiedCertificate) -> ACPEnvelope {
     ACPEnvelope(acp: "1.2", messageID: UUID().uuidString.lowercased(), type: "session.hello",
-        source: .init(nodeID: identity.nodeID), timestampUTC: ISO8601DateFormatter().string(from: Date()),
+        source: .init(nodeID: identity.nodeID), timestampUTC: securityTimestamp(),
         qos: .reliable, payload: [
             "node": .object(["node_id": .string(identity.nodeID), "instance_id": .string(identity.instanceID),
                              "role": .string(identity.role), "name": .string(identity.name)]),
@@ -210,12 +224,19 @@ private func authenticatedHello(_ identity: ACPIdentity,
                                                            "version": .string("1.0")])])])])
 }
 
+private func securityTimestamp(_ date: Date = Date()) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
+}
+
 private func bind(_ hello: ACPEnvelope, metadata: sec_protocol_metadata_t) throws -> ACPEnvelope {
     let context = try ACPAuthenticatedTransport.helloExporterContext(hello.payload)
     guard let binding = export(metadata, context: context, length: 32) else { throw ACPAppleSecurityError.exporterFailure }
     var copy = hello
     guard case .object(var auth) = copy.payload["auth"] else { throw ACPAppleSecurityError.invalidHello }
-    auth["channel_binding"] = .bytes(binding); copy.payload["auth"] = .object(auth); return copy
+    auth["channel_binding"] = .string(ACPSecurityContext.base64URLEncode(binding))
+    copy.payload["auth"] = .object(auth); return copy
 }
 
 private func evidence(for peer: ACPAppleVerifiedCertificate, hello: [String: AnySendable],
@@ -266,9 +287,9 @@ private func helloDisplayName(_ hello: ACPEnvelope) -> String? {
 }
 
 private func startConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {
-    try await withThrowingTaskGroup(of: Void.self) { group in
+    let outcome = await withTaskGroup(of: Result<Void, Error>.self) { group in
         group.addTask {
-            try await withCheckedThrowingContinuation { continuation in
+            do { try await withCheckedThrowingContinuation { continuation in
                 let gate = CompletionGate(); connection.stateUpdateHandler = { state in
                     switch state {
                     case .ready: gate.run { continuation.resume() }
@@ -277,20 +298,41 @@ private func startConnection(_ connection: NWConnection, timeout: TimeInterval) 
                     default: break
                     }
                 }; connection.start(queue: .global(qos: .userInitiated))
-            }
+            }; return .success(()) } catch { return .failure(error) }
         }
-        group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
-        defer { group.cancelAll() }; _ = try await group.next()
+        group.addTask {
+            do { try await Task.sleep(nanoseconds: timeoutNS(timeout)); connection.cancel()
+                return .failure(ACPAppleSecurityError.timeout) }
+            catch { return .failure(error) }
+        }
+        let first = await group.next()!; group.cancelAll(); return first
     }
+    try outcome.get()
     connection.stateUpdateHandler = nil
 }
 
-private func receive(_ transport: ACPFramedConnection, timeout: TimeInterval) async throws -> (Data, Bool) {
-    try await withThrowingTaskGroup(of: (Data, Bool).self) { group in
-        group.addTask { try await transport.recv() }
-        group.addTask { try await Task.sleep(nanoseconds: timeoutNS(timeout)); throw ACPAppleSecurityError.timeout }
-        defer { group.cancelAll() }; return try await group.next()!
+private func receive(_ transport: ACPFramedConnection, connection: NWConnection,
+                     timeout: TimeInterval) async throws -> (Data, Bool) {
+    let outcome = await withTaskGroup(of: Result<ReceivedFrame, Error>.self) { group in
+        group.addTask {
+            do {
+                let (data, text) = try await transport.recv()
+                return .success(.init(data: data, text: text))
+            } catch { return .failure(error) }
+        }
+        group.addTask {
+            do {
+                try await Task.sleep(nanoseconds: timeoutNS(timeout))
+                connection.cancel()
+                return .failure(ACPAppleSecurityError.timeout)
+            } catch { return .failure(error) }
+        }
+        let first = await group.next()!
+        group.cancelAll()
+        return first
     }
+    let frame = try outcome.get()
+    return (frame.data, frame.text)
 }
 
 private func endpointPort(_ port: UInt16) throws -> NWEndpoint.Port {
@@ -331,3 +373,4 @@ private final class CompletionGate: @unchecked Sendable {
 }
 
 private struct ConnectionBox: @unchecked Sendable { let value: NWConnection; init(_ value: NWConnection) { self.value = value } }
+private struct ReceivedFrame: Sendable { let data: Data; let text: Bool }

@@ -19,7 +19,7 @@ CLIENT = "00112233-4455-4677-8899-aabbccddeeff"
 PASSWORD = b"aurora-synthetic-qualification"
 
 
-def issue(output: Path, host_label: str) -> None:
+def issue(output: Path, host_label: str, client_label: str) -> None:
     now = datetime.now(UTC)
     ca_key = ec.derive_private_key(0x23456789ABCDEF123456789ABCDEF123456789ABCDEF123456789ABCDEF1, ec.SECP256R1())
     ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Aurora S10 Synthetic CA")])
@@ -55,17 +55,19 @@ def issue(output: Path, host_label: str) -> None:
                 .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
                 .sign(ca_key, hashes.SHA256()))
         bundle = pkcs12.serialize_key_and_certificates(
-            (host_label if name == "host" else name).encode(), key, cert, [ca],
+            (host_label if name == "host" else client_label).encode(), key, cert, [ca],
             serialization.BestAvailableEncryption(PASSWORD))
         (output / f"{name}.p12").write_bytes(bundle)
     (output / "manifest.json").write_text(json.dumps({"domain": DOMAIN, "host": HOST, "client": CLIENT,
                                                         "password": PASSWORD.decode(),
-                                                        "host_label": host_label}, sort_keys=True))
+                                                        "host_label": host_label,
+                                                        "client_label": client_label}, sort_keys=True))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("output", type=Path)
     parser.add_argument("--host-label", required=True)
+    parser.add_argument("--client-label", default="client")
     args = parser.parse_args()
-    issue(args.output, args.host_label)
+    issue(args.output, args.host_label, args.client_label)
