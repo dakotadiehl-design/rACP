@@ -1,0 +1,47 @@
+{
+  "adapter": {
+    "id": "apple.network-framework.full",
+    "provider": "Network.framework/Security.framework",
+    "source_revision": "513653d6e96051f5959ef1d7cbbe8f61ce006c5a"
+  },
+  "evidence": {
+    "compiled_api_fabrication_audit": "PASS",
+    "keychain_identity_install_load_reset": "PASS",
+    "process_restart": {
+      "both_peers_restarted": "PASS",
+      "durable_identity_reload": "PASS",
+      "persistent_revocation_rejection": "PASS",
+      "raw_artifact_sha256": "1cd8607f8e4b89396bd1f0db4379864e061516c8490c1824e6a890a54e0a3448"
+    },
+    "release_executable_sha256": "b08f0f3833057b9d15c9d49d2ac1f0b6d4ef131d6507f6b8cc4b36cda29babdd",
+    "swift_tests": {
+      "passed": 123,
+      "status": "PASS"
+    },
+    "tls": {
+      "early_data_rejected": "PASS",
+      "exporter_hello_binding": "PASS",
+      "mutual_authentication": "PASS",
+      "peer_certificate_identity_binding": "PASS",
+      "resumption_disabled": "PASS",
+      "version": "TLSv1.3"
+    }
+  },
+  "platform": {
+    "architecture": "arm64",
+    "build": "25F71",
+    "name": "macOS",
+    "version": "26.5"
+  },
+  "profile": "full",
+  "schema_version": "1.0",
+  "scope_status": "PASS",
+  "s10_overall_status": "BLOCKED",
+  "s10_unmet_requirements": [
+    "production Apple enrollment lacks a qualified SPAKE2+ implementation and X.509 issuance provider",
+    "Python reference SDK has no production Full-profile TLS exporter adapter",
+    "Rust SDK has no production Full-profile TLS provider/adapter",
+    "crash-injection and complete Keychain failure matrix are incomplete",
+    "two unchanged-source final release qualification runs cannot start until mandatory S10 paths exist"
+  ]
+}

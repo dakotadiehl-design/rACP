@@ -1,0 +1,31 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "name": "AuroraACPAppleSecurity",
+      "properties": [
+        {"name": "aurora:source_revision", "value": "513653d6e96051f5959ef1d7cbbe8f61ce006c5a"},
+        {"name": "aurora:key_storage", "value": "Apple Keychain"}
+      ],
+      "type": "library",
+      "version": "1.2.0"
+    },
+    {
+      "name": "Network.framework",
+      "properties": [{"name": "aurora:platform_build", "value": "macOS 26.5 (25F71)"}],
+      "type": "framework"
+    },
+    {
+      "name": "Security.framework",
+      "properties": [{"name": "aurora:platform_build", "value": "macOS 26.5 (25F71)"}],
+      "type": "framework"
+    }
+  ],
+  "metadata": {
+    "component": {"name": "ACP Apple Full Host", "type": "application", "version": "1.2.0"},
+    "timestamp": "2026-08-26T21:56:17Z"
+  },
+  "serialNumber": "urn:uuid:7a414474-f20f-4ffd-88f0-1ecac7765aa6",
+  "specVersion": "1.5",
+  "version": 1
+}
