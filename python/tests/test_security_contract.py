@@ -8,11 +8,6 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from jsonschema import ValidationError as JSONSchemaValidationError
-from security_testkit import (
-    unsafe_authenticated_principal_for_testing,
-    unsafe_replace_security_value_for_testing,
-    unsafe_transport_evidence_for_testing,
-)
 
 from acp.__main__ import redact_security
 from acp.cbor_cde import decode as decode_cbor_value
@@ -32,6 +27,11 @@ from acp.security import (
     profile_limits,
 )
 from acp.validate import ValidationError, validate_message
+from security_testkit import (
+    unsafe_authenticated_principal_for_testing,
+    unsafe_replace_security_value_for_testing,
+    unsafe_transport_evidence_for_testing,
+)
 
 ROOT_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
 NODE_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000002"

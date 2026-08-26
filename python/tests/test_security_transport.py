@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from security_testkit import unsafe_full_tls_handshake_for_testing, unsafe_replace_security_value_for_testing
 
 from acp.security import CredentialState, SecurityAdmissionError, bind_hello_auth
 from acp.security_context import base64url_encode
@@ -22,6 +21,7 @@ from acp.security_transport import (
     parse_lightweight_preface,
     verify_lightweight_finished,
 )
+from security_testkit import unsafe_full_tls_handshake_for_testing, unsafe_replace_security_value_for_testing
 
 replace = unsafe_replace_security_value_for_testing
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from security_testkit import unsafe_authenticated_principal_for_testing
 
 from acp.security import AuthenticatedPrincipal
 from acp.security_authorization import (
@@ -16,6 +15,7 @@ from acp.security_authorization import (
     device_identity,
 )
 from acp.security_models import AuthenticationMode, PrincipalState, SecurityProfile
+from security_testkit import unsafe_authenticated_principal_for_testing
 
 PERMISSION = "security.credential.revoke"
 

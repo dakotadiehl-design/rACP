@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from security_testkit import unsafe_authenticated_principal_for_testing
 
 from acp.cbor_cde import CborTag, decode, encode
 from acp.security import AuthenticatedPrincipal
@@ -26,6 +25,7 @@ from acp.security_models import (
 )
 from acp.security_operations import OperationalStateStore
 from acp.security_transport import parse_lightweight_preface
+from security_testkit import unsafe_authenticated_principal_for_testing
 
 DOMAIN = TrustDomainID("40516273-8495-4a6b-8a3b-4c5d6e7f8091")
 NODE = SecurityNodeID("00112233-4455-4677-8899-aabbccddeeff")

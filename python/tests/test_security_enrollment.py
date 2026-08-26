@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-from security_test_providers import DeterministicRandom
 
 from acp.security_context import (
     canonical_approval_aad,
@@ -24,6 +23,7 @@ from acp.security_enrollment import (
 )
 from acp.security_models import EnrollmentAttemptID, EnrollmentID, SecurityErrorCode, SecuritySuite
 from acp.security_secrets import SecretBytes
+from security_test_providers import DeterministicRandom
 
 ROOT = Path(__file__).parents[2]
 EID = EnrollmentID("50617283-94a5-4b6c-9a4b-5c6d7e8f90a1")
