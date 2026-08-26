@@ -189,6 +189,7 @@ pub enum SecurityErrorCode {
     PermissionDenied,
     DowngradeForbidden,
     StorageFailed,
+    ProviderUnavailable,
     ResourceLimit,
     ClockUntrusted,
 }
@@ -231,6 +232,68 @@ pub struct TransportEvidence {
     pub(crate) role_constraints: HashSet<String>,
 }
 
+/// Caller-visible TLS metadata with no authorization meaning.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct UnverifiedPeerObservation {
+    pub protocol: Option<String>,
+    pub certificate_subject: Option<String>,
+    pub claimed_node_id: Option<String>,
+    pub claimed_trust_domain_id: Option<String>,
+}
+
+/// Non-cloneable provider capability bound to exactly one live transport.
+pub struct AuthenticatedConnection<T> {
+    transport: T,
+    evidence: TransportEvidence,
+    provider_manifest_digest: String,
+    observation: UnverifiedPeerObservation,
+}
+
+impl<T> AuthenticatedConnection<T> {
+    // Used by package-owned provider modules introduced in S11. It remains
+    // crate-private so downstream applications cannot mint the capability.
+    #[allow(dead_code)]
+    pub(crate) fn from_provider(
+        transport: T,
+        evidence: TransportEvidence,
+        provider_manifest_digest: String,
+        observation: UnverifiedPeerObservation,
+    ) -> Result<Self, SecurityErrorCode> {
+        let valid_digest = provider_manifest_digest
+            .strip_prefix("sha256:")
+            .is_some_and(|hex| {
+                hex.len() == 64 && hex.bytes().all(|value| value.is_ascii_hexdigit())
+            });
+        if !valid_digest {
+            return Err(SecurityErrorCode::ProviderUnavailable);
+        }
+        Ok(Self {
+            transport,
+            evidence,
+            provider_manifest_digest,
+            observation,
+        })
+    }
+
+    pub fn peer_node_id(&self) -> &SecurityNodeId {
+        &self.evidence.node_id
+    }
+    pub fn trust_domain_id(&self) -> &TrustDomainId {
+        &self.evidence.trust_domain_id
+    }
+    pub fn provider_manifest_digest(&self) -> &str {
+        &self.provider_manifest_digest
+    }
+    pub fn observation(&self) -> &UnverifiedPeerObservation {
+        &self.observation
+    }
+
+    /// Consumes the capability so its evidence cannot be attached to a second transport.
+    pub fn into_parts(self) -> (T, TransportEvidence) {
+        (self.transport, self.evidence)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthenticatedPrincipal {
     pub(crate) state: PrincipalState,
@@ -245,15 +308,33 @@ pub struct AuthenticatedPrincipal {
 }
 
 impl AuthenticatedPrincipal {
-    pub fn state(&self) -> PrincipalState { self.state }
-    pub fn mode(&self) -> AuthenticationMode { self.mode }
-    pub fn profile(&self) -> Option<SecurityProfile> { self.profile }
-    pub fn trust_domain_id(&self) -> Option<&TrustDomainId> { self.trust_domain_id.as_ref() }
-    pub fn node_id(&self) -> Option<&SecurityNodeId> { self.node_id.as_ref() }
-    pub fn credential_id(&self) -> Option<&CredentialId> { self.credential_id.as_ref() }
-    pub fn identity_key_id(&self) -> Option<&IdentityKeyId> { self.identity_key_id.as_ref() }
-    pub fn credential_format(&self) -> Option<CredentialFormat> { self.credential_format }
-    pub fn role_constraints(&self) -> &HashSet<String> { &self.role_constraints }
+    pub fn state(&self) -> PrincipalState {
+        self.state
+    }
+    pub fn mode(&self) -> AuthenticationMode {
+        self.mode
+    }
+    pub fn profile(&self) -> Option<SecurityProfile> {
+        self.profile
+    }
+    pub fn trust_domain_id(&self) -> Option<&TrustDomainId> {
+        self.trust_domain_id.as_ref()
+    }
+    pub fn node_id(&self) -> Option<&SecurityNodeId> {
+        self.node_id.as_ref()
+    }
+    pub fn credential_id(&self) -> Option<&CredentialId> {
+        self.credential_id.as_ref()
+    }
+    pub fn identity_key_id(&self) -> Option<&IdentityKeyId> {
+        self.identity_key_id.as_ref()
+    }
+    pub fn credential_format(&self) -> Option<CredentialFormat> {
+        self.credential_format
+    }
+    pub fn role_constraints(&self) -> &HashSet<String> {
+        &self.role_constraints
+    }
 }
 
 /// Explicitly opt-in constructors for negative-path tests. This feature must
@@ -274,8 +355,17 @@ pub mod testkit {
         credential_format: Option<CredentialFormat>,
         role_constraints: HashSet<String>,
     ) -> AuthenticatedPrincipal {
-        AuthenticatedPrincipal { state, mode, profile, trust_domain_id, node_id, credential_id,
-            identity_key_id, credential_format, role_constraints }
+        AuthenticatedPrincipal {
+            state,
+            mode,
+            profile,
+            trust_domain_id,
+            node_id,
+            credential_id,
+            identity_key_id,
+            credential_format,
+            role_constraints,
+        }
     }
 }
 
@@ -1455,5 +1545,48 @@ mod tests {
             duplicate.process_peer_share(&duplicate_id, &mut FixtureSpake(true), b"share", 3),
             Err(SecurityErrorCode::AuthenticationFailed)
         );
+    }
+
+    #[test]
+    fn authenticated_connection_is_non_cloneable_provider_owned_and_consumed() {
+        let evidence = TransportEvidence {
+            mode: AuthenticationMode::AuroraTrust,
+            profile: SecurityProfile::Full,
+            trust_domain_id: TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap(),
+            node_id: SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
+            credential_id: CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
+            identity_key_id: IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap(),
+            credential_format: CredentialFormat::X509Der,
+            channel_binding: Some([0; 32]),
+            credential_status: CredentialStatus::Active,
+            channel_binding_verified: true,
+            zero_rtt_used: false,
+            resumption_used: false,
+            role_constraints: HashSet::new(),
+        };
+        assert_eq!(
+            AuthenticatedConnection::from_provider(
+                "transport",
+                evidence.clone(),
+                "unqualified".into(),
+                Default::default()
+            )
+            .err(),
+            Some(SecurityErrorCode::ProviderUnavailable)
+        );
+        let connection = AuthenticatedConnection::from_provider(
+            "transport",
+            evidence,
+            format!("sha256:{}", "aa".repeat(32)),
+            Default::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            connection.peer_node_id().as_str(),
+            "00112233-4455-4677-8899-aabbccddeeff"
+        );
+        let (transport, evidence) = connection.into_parts();
+        assert_eq!(transport, "transport");
+        assert_eq!(evidence.credential_status, CredentialStatus::Active);
     }
 }

@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "AuroraACP", targets: ["AuroraACP"]),
+        .library(name: "AuroraACPAppleSecurity", targets: ["AuroraACPAppleSecurity"]),
         .executable(name: "acp-framed-hello", targets: ["acp-framed-hello"]),
         .executable(name: "acp-enrollment-fixture", targets: ["acp-enrollment-fixture"]),
     ],
@@ -20,6 +21,11 @@ let package = Package(
                 .copy("Session/registry.json"),
                 .copy("Security/constants.json"),
             ]
+        ),
+        .target(
+            name: "AuroraACPAppleSecurity",
+            dependencies: ["AuroraACP"],
+            linkerSettings: [.linkedFramework("Network"), .linkedFramework("Security")]
         ),
         .executableTarget(
             name: "acp-framed-hello",
@@ -34,6 +40,11 @@ let package = Package(
             name: "AuroraACPTests",
             dependencies: ["AuroraACP"],
             path: "tests/AuroraACPTests"
+        ),
+        .testTarget(
+            name: "AuroraACPAppleSecurityTests",
+            dependencies: ["AuroraACP", "AuroraACPAppleSecurity"],
+            path: "tests/AuroraACPAppleSecurityTests"
         ),
     ]
 )

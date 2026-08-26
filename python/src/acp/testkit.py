@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import fields
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from .session import Session, Transport
 from .types import Capability, NodeIdentity, Role, new_uuid
@@ -36,7 +37,7 @@ def unsafe_replace_security_value_for_testing(value: object, **changes: object):
     from .security import TransportEvidence
     from .security_transport import FullTLSHandshake
 
-    values = {field.name: getattr(value, field.name) for field in fields(value)} | changes
+    values = {field.name: getattr(value, field.name) for field in fields(cast(Any, value))} | changes
     if isinstance(value, TransportEvidence):
         return unsafe_transport_evidence_for_testing(**values)
     if isinstance(value, FullTLSHandshake):

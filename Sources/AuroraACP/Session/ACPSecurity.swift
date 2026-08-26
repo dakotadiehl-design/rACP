@@ -32,7 +32,7 @@ public struct ACPTransportEvidence: Sendable, Equatable {
     public let zeroRTTUsed: Bool
     public let resumptionUsed: Bool
 
-    init(
+    package init(
         mode: ACPAuthenticationMode, profile: ACPSecurityProfile = .full,
         trustDomainID: String? = nil, nodeID: String? = nil,
         credentialID: String? = nil, identityKeyID: String? = nil,

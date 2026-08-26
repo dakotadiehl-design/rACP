@@ -14,6 +14,17 @@ final class ResumeBox: @unchecked Sendable {
 }
 
 public actor ACPFramedConnection: ACPTransport {
+    package static let maximumFrameLength = 8 * 1024 * 1024
+
+    package static func parseHeader(_ header: Data) throws -> (length: Int, text: Bool) {
+        guard header.count == 5 else { throw ACPSessionError("malformed_envelope", "invalid frame header") }
+        let length = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        guard length <= maximumFrameLength else { throw ACPSessionError("invalid_range", "frame too large") }
+        guard header[4] == 0 || header[4] == 1 else {
+            throw ACPSessionError("malformed_envelope", "reserved frame flags")
+        }
+        return (Int(length), header[4] == 1)
+    }
     private let connection: NWConnection
     private var started = false
 
@@ -63,7 +74,7 @@ public actor ACPFramedConnection: ACPTransport {
     }
 
     public func send(_ data: Data, text: Bool) async throws {
-        guard data.count <= 8 * 1024 * 1024 else {
+        guard data.count <= Self.maximumFrameLength else {
             throw ACPSessionError("invalid_range", "frame too large")
         }
         var frame = Data()
@@ -82,15 +93,8 @@ public actor ACPFramedConnection: ACPTransport {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             let header = try await self.receiveExact(5)
-            let length = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-            if length > 8 * 1024 * 1024 {
-                throw ACPSessionError("invalid_range", "frame too large")
-            }
-            guard header[4] == 0 || header[4] == 1 else {
-                throw ACPSessionError("malformed_envelope", "reserved frame flags")
-            }
-            let text = header[4] == 1
-            let payload = try await self.receiveExact(Int(length))
+            let (length, text) = try Self.parseHeader(header)
+            let payload = try await self.receiveExact(length)
             return (payload, text)
         } onCancel: {
             Task { await self.close() }

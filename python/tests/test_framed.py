@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from acp.codec import encode_cbor
 from acp.envelope import make_envelope
-from acp.framed import connect_framed, serve_framed
+from acp.framed import FramedTransport, connect_framed, serve_framed
 from acp.session import Session, SessionState
 from acp.testkit import default_caps, identity
 from acp.types import Endpoint, QoS, Role, new_uuid
@@ -258,3 +260,19 @@ def test_framed_python_suite() -> None:
     asyncio.run(_framed_identity_binding())
     asyncio.run(_framed_sequence_gap())
     asyncio.run(_framed_malformed_frames())
+
+
+@pytest.mark.parametrize("flag", [2, 3, 255])
+def test_reserved_frame_flags_are_rejected_explicitly(flag: int) -> None:
+    class UnusedWriter:
+        pass
+
+    async def body() -> None:
+        reader = asyncio.StreamReader()
+        reader.feed_data(bytes([0, 0, 0, 0, flag]))
+        reader.feed_eof()
+        transport = FramedTransport(reader, UnusedWriter())  # type: ignore[arg-type]
+        with pytest.raises(ConnectionError, match="reserved frame flags"):
+            await transport.recv()
+
+    asyncio.run(body())

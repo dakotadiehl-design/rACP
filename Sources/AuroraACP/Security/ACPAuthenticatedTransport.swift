@@ -15,7 +15,7 @@ public struct ACPFullTLSHandshake: Sendable {
     public let roleConstraints: Set<String>
     public let credentialState: ACPCredentialState
     public let zeroRTTUsed, resumptionUsed: Bool
-    init(
+    package init(
         protocolVersion: String, mutualAuthentication: Bool, isolatedTrustStore: Bool,
         peerCertificateValid: Bool, localCredentialSelected: Bool, peerSANExtracted: Bool,
         trustDomainID: String, nodeID: String, credentialID: String, identityKeyID: String,

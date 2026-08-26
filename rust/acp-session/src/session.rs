@@ -129,6 +129,24 @@ pub struct FramedTcp {
     stream: Mutex<TcpStream>,
 }
 
+fn decode_frame_header(header: [u8; 5]) -> Result<(usize, bool), SessionError> {
+    let n = u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
+    if n > 8 * 1024 * 1024 {
+        return Err(SessionError::new("invalid_range", "frame too large"));
+    }
+    let text = match header[4] {
+        0 => false,
+        1 => true,
+        _ => {
+            return Err(SessionError::new(
+                "malformed_envelope",
+                "reserved frame flags",
+            ))
+        }
+    };
+    Ok((n, text))
+}
+
 impl FramedTcp {
     pub async fn connect(addr: &str) -> Result<Arc<Self>, SessionError> {
         let stream = TcpStream::connect(addr)
@@ -179,25 +197,12 @@ impl FramedTcp {
             .read_exact(&mut header)
             .await
             .map_err(|e| SessionError::new("unavailable", e.to_string()))?;
-        let n = u32::from_be_bytes([header[0], header[1], header[2], header[3]]) as usize;
-        if n > 8 * 1024 * 1024 {
-            return Err(SessionError::new("invalid_range", "frame too large"));
-        }
+        let (n, text) = decode_frame_header(header)?;
         let mut buf = vec![0u8; n];
         stream
             .read_exact(&mut buf)
             .await
             .map_err(|e| SessionError::new("unavailable", e.to_string()))?;
-        let text = match header[4] {
-            0 => false,
-            1 => true,
-            _ => {
-                return Err(SessionError::new(
-                    "malformed_envelope",
-                    "reserved frame flags",
-                ))
-            }
-        };
         Ok((buf, text))
     }
 
@@ -1038,5 +1043,15 @@ mod tests {
         let ack = client.pump_once().await.expect("client recv").expect("ack");
         assert_eq!(ack.message_type, "state.snapshot");
         assert_eq!(ack.correlation_id, req.correlation_id);
+    }
+
+    #[test]
+    fn reserved_frame_flags_are_rejected_explicitly() {
+        for flag in [2, 3, 255] {
+            let error = decode_frame_header([0, 0, 0, 0, flag]).unwrap_err();
+            assert_eq!(error.code, "malformed_envelope");
+        }
+        assert_eq!(decode_frame_header([0, 0, 0, 0, 0]).unwrap(), (0, false));
+        assert_eq!(decode_frame_header([0, 0, 0, 0, 1]).unwrap(), (0, true));
     }
 }

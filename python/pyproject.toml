@@ -25,7 +25,7 @@ dev = [
 ]
 security-vectors = [
     "cbor2>=5.6,<6",
-    "cryptography>=43,<44",
+    "cryptography>=50,<51",
 ]
 
 [project.scripts]

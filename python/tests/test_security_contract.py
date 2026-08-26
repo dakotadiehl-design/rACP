@@ -12,15 +12,15 @@ from acp.codec import CodecError, decode_cbor, decode_json, encode_cbor
 from acp.constants import load
 from acp.registry import allowed_to_receive, lookup
 from acp.security import (
+    AuthenticatedPrincipal,
     AuthenticationMode,
     CredentialState,
     PrincipalState,
     SecurityAdmissionError,
+    TransportEvidence,
     bind_hello_auth,
     effective_permissions,
     profile_limits,
-    AuthenticatedPrincipal,
-    TransportEvidence,
 )
 from acp.testkit import unsafe_replace_security_value_for_testing, unsafe_transport_evidence_for_testing
 from acp.validate import ValidationError, validate_message

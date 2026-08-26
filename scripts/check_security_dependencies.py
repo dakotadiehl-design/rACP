@@ -25,7 +25,7 @@ def main() -> None:
     assert provider["status"] == "PASS" and provider["detail"] == "Botan 3.13.0 exact"
     pyproject = tomllib.loads((ROOT / "python/pyproject.toml").read_text())
     assert (
-        "cryptography>=43,<44"
+        "cryptography>=50,<51"
         in pyproject["project"]["optional-dependencies"]["security-vectors"]
     )
     licenses = {

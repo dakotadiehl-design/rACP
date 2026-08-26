@@ -502,18 +502,10 @@ mod tests {
                 state,
                 AuthenticationMode::AuroraTrust,
                 Some(SecurityProfile::Full),
-                Some(
-                    TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap(),
-                ),
-                Some(
-                    SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
-                ),
-                Some(
-                    CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
-                ),
-                Some(
-                    IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap(),
-                ),
+                Some(TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap()),
+                Some(SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap()),
+                Some(CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap()),
+                Some(IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap()),
                 Some(CredentialFormat::X509Der),
                 HashSet::new(),
             ),
