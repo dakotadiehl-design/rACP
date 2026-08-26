@@ -37,6 +37,8 @@ async fn main() {
 }
 
 fn configure(session: &mut Session, json: bool, remote: bool) {
+    // This interoperability fixture intentionally exercises legacy trusted-LAN framing.
+    session.allow_plaintext = true;
     if json {
         session.encodings = vec!["json".into()];
     }

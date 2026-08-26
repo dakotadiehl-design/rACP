@@ -141,7 +141,7 @@ final class ACPCredentialLifecycleTests: XCTestCase {
             mode: .auroraTrust, profile: .lightweight, trustDomainID: domain.rawValue,
             nodeID: node.rawValue, credentialID: "sha256:" + String(repeating: "1", count: 64),
             identityKeyID: "sha256:" + String(repeating: "2", count: 64),
-            credentialFormat: "compact_v1", credentialState: .active, channelBindingVerified: true)
+            credentialFormat: "acp-compact-credential-v1", credentialState: .active, channelBindingVerified: true)
         let credential = Data("credential".utf8)
         let preface = Data([0, UInt8(credential.count)]) + credential
         let (parsed, raw) = try ACPAuthenticatedTransport.parseLightweightPreface(preface) { _ in evidence }

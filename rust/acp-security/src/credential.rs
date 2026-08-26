@@ -11,6 +11,9 @@ use std::io::Write;
 #[cfg(unix)]
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static IDENTITY_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct X509ValidationEvidence {
@@ -263,6 +266,18 @@ pub fn validate_compact_credential(
     {
         return Err(SecurityErrorCode::CredentialInvalid);
     }
+    match fields.get("serial") {
+        Some(Json::UInt(_)) => {}
+        Some(Json::Int(value)) if *value >= 0 => {}
+        _ => return Err(SecurityErrorCode::CredentialInvalid),
+    }
+    let permission_policy_id = fields
+        .get("permission_policy_id")
+        .and_then(|value| value.as_str())
+        .ok_or(SecurityErrorCode::CredentialInvalid)?;
+    if permission_policy_id.is_empty() || permission_policy_id.len() > 128 {
+        return Err(SecurityErrorCode::CredentialInvalid);
+    }
     let issuer = fields
         .get("issuer_key_id")
         .and_then(|v| v.as_str())
@@ -289,7 +304,9 @@ pub fn validate_compact_credential(
     let mut roles: Vec<String> = Vec::new();
     for value in role_values {
         let role = value.as_str().ok_or(SecurityErrorCode::CredentialInvalid)?;
-        if !policy.allowed_roles.contains(&role)
+        if role.is_empty()
+            || role.len() > 64
+            || !policy.allowed_roles.contains(&role)
             || roles
                 .last()
                 .is_some_and(|previous| previous.as_str() >= role)
@@ -303,7 +320,7 @@ pub fn validate_compact_credential(
             .get("extensions")
             .ok_or(SecurityErrorCode::CredentialInvalid)?,
     )?;
-    if extensions.len() > 64 {
+    if extensions.len() > 16 {
         return Err(SecurityErrorCode::ResourceLimit);
     }
     for extension in extensions.values() {
@@ -311,7 +328,9 @@ pub fn validate_compact_credential(
         if values.len() != 2 || !values.contains_key("critical") || !values.contains_key("value") {
             return Err(SecurityErrorCode::CredentialInvalid);
         }
-        if matches!(values.get("critical"), Some(Json::Bool(true))) {
+        if !matches!(values.get("critical"), Some(Json::Bool(false)))
+            || !matches!(values.get("value"), Some(Json::Bytes(_)))
+        {
             return Err(SecurityErrorCode::CredentialInvalid);
         }
     }
@@ -327,14 +346,18 @@ pub fn validate_compact_credential(
         .get("expires_at")
         .and_then(|v| v.as_str())
         .ok_or(SecurityErrorCode::CredentialInvalid)?;
-    if !canonical_utc(issued_at)
-        || !canonical_utc(not_before)
-        || !canonical_utc(expires_at)
-        || !canonical_utc(policy.evaluation_time_rfc3339)
-        || issued_at > policy.evaluation_time_rfc3339
-        || not_before > policy.evaluation_time_rfc3339
-        || policy.evaluation_time_rfc3339 > expires_at
-        || not_before > expires_at
+    let (Some(issued_key), Some(not_before_key), Some(expires_key), Some(now_key)) = (
+        timestamp_key(issued_at),
+        timestamp_key(not_before),
+        timestamp_key(expires_at),
+        timestamp_key(policy.evaluation_time_rfc3339),
+    ) else {
+        return Err(SecurityErrorCode::CredentialExpired);
+    };
+    if issued_key > now_key
+        || not_before_key > now_key
+        || now_key > expires_key
+        || not_before_key > expires_key
     {
         return Err(SecurityErrorCode::CredentialExpired);
     }
@@ -358,17 +381,60 @@ pub fn validate_compact_credential(
     })
 }
 
-fn canonical_utc(value: &str) -> bool {
-    value.len() == 20
-        && value.as_bytes().get(4) == Some(&b'-')
-        && value.as_bytes().get(7) == Some(&b'-')
-        && value.as_bytes().get(10) == Some(&b'T')
-        && value.as_bytes().get(13) == Some(&b':')
-        && value.as_bytes().get(16) == Some(&b':')
-        && value.ends_with('Z')
-        && value.bytes().enumerate().all(|(index, byte)| {
-            matches!(index, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit()
-        })
+fn timestamp_key(value: &str) -> Option<[u32; 7]> {
+    let bytes = value.as_bytes();
+    if !(20..=30).contains(&bytes.len())
+        || bytes.last() != Some(&b'Z')
+        || bytes.get(4) != Some(&b'-')
+        || bytes.get(7) != Some(&b'-')
+        || bytes.get(10) != Some(&b'T')
+        || bytes.get(13) != Some(&b':')
+        || bytes.get(16) != Some(&b':')
+    {
+        return None;
+    }
+    let number = |start: usize, end: usize| -> Option<u32> {
+        std::str::from_utf8(&bytes[start..end]).ok()?.parse().ok()
+    };
+    let (year, month, day, hour, minute, second) = (
+        number(0, 4)?,
+        number(5, 7)?,
+        number(8, 10)?,
+        number(11, 13)?,
+        number(14, 16)?,
+        number(17, 19)?,
+    );
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if leap {
+                29
+            } else {
+                28
+            }
+        }
+        _ => return None,
+    };
+    if day == 0 || day > days || hour > 23 || minute > 59 || second > 59 {
+        return None;
+    }
+    let nanos = if bytes.len() == 20 {
+        0
+    } else {
+        if bytes.get(19) != Some(&b'.') || !(22..=30).contains(&bytes.len()) {
+            return None;
+        }
+        let digits = &bytes[20..bytes.len() - 1];
+        if digits.is_empty() || digits.len() > 9 || !digits.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        let mut padded = digits.to_vec();
+        padded.resize(9, b'0');
+        std::str::from_utf8(&padded).ok()?.parse().ok()?
+    };
+    Some([year, month, day, hour, minute, second, nanos])
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -410,6 +476,14 @@ impl RevocationState {
         signature: &[u8],
         verifier: &dyn CredentialSignatureVerifier,
     ) -> Result<(), SecurityErrorCode> {
+        let maximum_bytes = if self.max_entries <= 128 {
+            8192
+        } else {
+            65_536
+        };
+        if raw.is_empty() || raw.len() > maximum_bytes {
+            return Err(SecurityErrorCode::ResourceLimit);
+        }
         let body = decode_cbor_value(raw).map_err(|_| SecurityErrorCode::CredentialInvalid)?;
         if encode_cbor_value(&body).map_err(|_| SecurityErrorCode::CredentialInvalid)? != raw {
             return Err(SecurityErrorCode::CredentialInvalid);
@@ -481,7 +555,12 @@ impl RevocationState {
             .get("next_update")
             .and_then(|v| v.as_str())
             .ok_or(SecurityErrorCode::CredentialInvalid)?;
-        if next_update <= issued_at || !canonical_utc(issued_at) || !canonical_utc(next_update) {
+        let (Some(issued_key), Some(next_key)) =
+            (timestamp_key(issued_at), timestamp_key(next_update))
+        else {
+            return Err(SecurityErrorCode::CredentialInvalid);
+        };
+        if next_key <= issued_key {
             return Err(SecurityErrorCode::CredentialInvalid);
         }
         let mut signed = b"ACP revocation state v1".to_vec();
@@ -538,8 +617,32 @@ impl RevocationState {
                 return Err(SecurityErrorCode::CredentialInvalid);
             }
             previous = id_text;
+            let credential_id = CredentialId::parse(id_text)?;
+            let reason = entry
+                .get("reason")
+                .and_then(|v| v.as_str())
+                .ok_or(SecurityErrorCode::CredentialInvalid)?;
+            if ![
+                "key_compromise",
+                "superseded",
+                "retired",
+                "policy",
+                "operator_request",
+            ]
+            .contains(&reason)
+            {
+                return Err(SecurityErrorCode::CredentialInvalid);
+            }
+            if let Some(replacement) = entry.get("replacement_credential_id") {
+                let replacement = replacement
+                    .as_str()
+                    .ok_or(SecurityErrorCode::CredentialInvalid)?;
+                if CredentialId::parse(replacement)? == credential_id {
+                    return Err(SecurityErrorCode::CredentialInvalid);
+                }
+            }
             parsed.push(RevocationEntry {
-                credential_id: CredentialId::parse(id_text)?,
+                credential_id,
                 node_id: SecurityNodeId::parse(
                     entry
                         .get("node_id")
@@ -551,11 +654,7 @@ impl RevocationState {
                     .and_then(|v| v.as_str())
                     .ok_or(SecurityErrorCode::CredentialInvalid)?
                     .into(),
-                reason: entry
-                    .get("reason")
-                    .and_then(|v| v.as_str())
-                    .ok_or(SecurityErrorCode::CredentialInvalid)?
-                    .into(),
+                reason: reason.into(),
             });
         }
         if format == "acp-revocation-snapshot-v1" {
@@ -575,9 +674,10 @@ impl RevocationState {
     pub fn require_fresh(&self, now_rfc3339: &str) -> Result<(), SecurityErrorCode> {
         match (&self.issued_at, &self.next_update) {
             (Some(issued), Some(next))
-                if canonical_utc(now_rfc3339)
-                    && now_rfc3339 >= issued.as_str()
-                    && now_rfc3339 <= next.as_str() =>
+                if timestamp_key(now_rfc3339).is_some_and(|now| {
+                    timestamp_key(issued).is_some_and(|start| now >= start)
+                        && timestamp_key(next).is_some_and(|end| now <= end)
+                }) =>
             {
                 Ok(())
             }
@@ -742,7 +842,15 @@ pub struct HostIdentityStore {
 impl HostIdentityStore {
     pub fn new(root: impl Into<PathBuf>) -> Result<Self, SecurityErrorCode> {
         let root = root.into();
+        if fs::symlink_metadata(&root).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
+            return Err(SecurityErrorCode::StorageFailed);
+        }
         fs::create_dir_all(&root).map_err(|_| SecurityErrorCode::StorageFailed)?;
+        if !fs::symlink_metadata(&root)
+            .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+        {
+            return Err(SecurityErrorCode::StorageFailed);
+        }
         #[cfg(unix)]
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700))
             .map_err(|_| SecurityErrorCode::StorageFailed)?;
@@ -753,18 +861,34 @@ impl HostIdentityStore {
             return Err(SecurityErrorCode::StorageFailed);
         }
         let target = self.root.join(name);
-        let temporary = self.root.join(format!(".{name}.tmp"));
-        let mut options = OpenOptions::new();
-        options.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        options.mode(0o600);
-        let mut file = options
-            .open(&temporary)
-            .map_err(|_| SecurityErrorCode::StorageFailed)?;
-        file.write_all(data)
-            .and_then(|_| file.sync_all())
-            .map_err(|_| SecurityErrorCode::StorageFailed)?;
-        fs::rename(&temporary, &target).map_err(|_| SecurityErrorCode::StorageFailed)?;
+        let (temporary, mut file) = (0..128)
+            .find_map(|_| {
+                let nonce = IDENTITY_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+                let path = self
+                    .root
+                    .join(format!(".{name}.{}.{}.tmp", std::process::id(), nonce));
+                let mut options = OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                options.mode(0o600);
+                match options.open(&path) {
+                    Ok(file) => Some((path, file)),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => None,
+                    Err(_) => None,
+                }
+            })
+            .ok_or(SecurityErrorCode::StorageFailed)?;
+        let result = (|| {
+            file.write_all(data)
+                .and_then(|_| file.sync_all())
+                .map_err(|_| SecurityErrorCode::StorageFailed)?;
+            fs::rename(&temporary, &target).map_err(|_| SecurityErrorCode::StorageFailed)?;
+            Ok::<(), SecurityErrorCode>(())
+        })();
+        if result.is_err() {
+            let _ = fs::remove_file(&temporary);
+        }
+        result?;
         #[cfg(unix)]
         fs::set_permissions(&target, fs::Permissions::from_mode(0o600))
             .map_err(|_| SecurityErrorCode::StorageFailed)?;
@@ -899,6 +1023,21 @@ pub fn accepted_time(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn security_timestamps_are_canonical_and_calendar_valid() {
+        assert!(timestamp_key("2026-08-26T12:34:56Z").is_some());
+        assert!(timestamp_key("2024-02-29T12:34:56.123456789Z").is_some());
+        for invalid in [
+            "2026-02-29T12:34:56Z",
+            "2026-08-26T24:00:00Z",
+            "2026-08-26T12:34:60Z",
+            "2026-08-26T12:34:56+00:00",
+            "2026-08-26T12:34:56.1234567890Z",
+        ] {
+            assert!(timestamp_key(invalid).is_none(), "accepted {invalid}");
+        }
+    }
 
     struct ExpectedVerifier(Vec<u8>, Vec<u8>);
     impl CredentialSignatureVerifier for ExpectedVerifier {
@@ -1068,6 +1207,32 @@ mod tests {
         store.validate_staged(4, true).unwrap();
         store.commit(4).unwrap();
         assert_eq!(store.recover(), Some(&generation(4)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn host_identity_store_rejects_symlink_root_and_ignores_predictable_symlink() {
+        use std::os::unix::fs::symlink;
+
+        let base = std::env::temp_dir().join(format!(
+            "acp-security-store-{}-{}",
+            std::process::id(),
+            IDENTITY_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let real = base.join("real");
+        fs::create_dir_all(&real).unwrap();
+        let linked = base.join("linked");
+        symlink(&real, &linked).unwrap();
+        assert!(HostIdentityStore::new(&linked).is_err());
+
+        let store = HostIdentityStore::new(&real).unwrap();
+        let victim = base.join("victim");
+        fs::write(&victim, b"unchanged").unwrap();
+        symlink(&victim, real.join(".identity.tmp")).unwrap();
+        store.atomic_write("identity", b"credential").unwrap();
+        assert_eq!(fs::read(&victim).unwrap(), b"unchanged");
+        assert_eq!(fs::read(real.join("identity")).unwrap(), b"credential");
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]

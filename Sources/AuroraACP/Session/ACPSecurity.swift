@@ -32,7 +32,7 @@ public struct ACPTransportEvidence: Sendable, Equatable {
     public let zeroRTTUsed: Bool
     public let resumptionUsed: Bool
 
-    public init(
+    init(
         mode: ACPAuthenticationMode, profile: ACPSecurityProfile = .full,
         trustDomainID: String? = nil, nodeID: String? = nil,
         credentialID: String? = nil, identityKeyID: String? = nil,
@@ -115,6 +115,17 @@ public enum ACPSecurityAdmission {
         }
         guard evidence.nodeID != nil, evidence.trustDomainID != nil, evidence.credentialID != nil,
               evidence.identityKeyID != nil, evidence.channelBinding != nil
+        else { throw ACPSecurityAdmissionError.credentialInvalid }
+        guard let domain = evidence.trustDomainID.flatMap(ACPTrustDomainID.init(rawValue:)),
+              let node = evidence.nodeID.flatMap(ACPSecurityNodeID.init(rawValue:)),
+              evidence.credentialID.flatMap(ACPCredentialID.init(rawValue:)) != nil,
+              evidence.identityKeyID.flatMap(ACPIdentityKeyID.init(rawValue:)) != nil,
+              domain.rawValue == evidence.trustDomainID, node.rawValue == evidence.nodeID,
+              evidence.credentialFormat == (evidence.profile == .full ? "x509_der" : "acp-compact-credential-v1"),
+              evidence.roleConstraints.count <= 16,
+              evidence.roleConstraints.allSatisfy({ (1...64).contains($0.utf8.count) }),
+              let bindingText = evidence.channelBinding,
+              let binding = try? ACPSecurityContext.base64URLDecode(bindingText), binding.count == 32
         else { throw ACPSecurityAdmissionError.credentialInvalid }
         guard claimedNodeID == evidence.nodeID else { throw ACPSecurityAdmissionError.identityMismatch }
         guard auth["trust_domain_id"] == evidence.trustDomainID else { throw ACPSecurityAdmissionError.trustDomainMismatch }

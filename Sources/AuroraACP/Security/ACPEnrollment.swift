@@ -68,7 +68,8 @@ public actor ACPCandidateEnrollment {
         guard suites.contains(suite) else { throw ACPSecurityErrorCode.noCommonSuite }
         guard attempts.count < limits.concurrentAttempts else { throw ACPSecurityErrorCode.resourceLimit }
         let (deadline, overflow) = now.addingReportingOverflow(limits.attemptTimeoutNanoseconds)
-        guard !overflow, limits.concurrentAttempts > 0, limits.attemptsPerEnrollment > 0 else {
+        guard !overflow, limits.concurrentAttempts > 0, limits.attemptsPerEnrollment > 0,
+              limits.attemptTimeoutNanoseconds > 0, limits.enrollmentWindowNanoseconds > 0 else {
             throw ACPSecurityErrorCode.resourceLimit
         }
         attempts[id] = .init(deadline: deadline); state = .negotiating

@@ -5,15 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from .security_models import IdentityKeyID, SecurityNodeID, TrustDomainID
+from .security_credentials import JournaledIdentityStore
+from .security_models import CredentialID, IdentityKeyID, SecurityNodeID, TrustDomainID
 
 
 class MigrationStage(str, Enum):
@@ -63,16 +66,22 @@ def _digest(value: bytes) -> str:
 class OperationalStateStore:
     """Restricted, atomic JSON store. It persists public operational metadata only."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, max_audit_entries: int = 10_000) -> None:
+        if root.is_symlink() or max_audit_entries < 1:
+            raise ValueError("security.storage_failed")
         self.root = root
+        self.max_audit_entries = max_audit_entries
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(root, 0o700)
         self.path = root / "operations.json"
+        self.lock_path = root / "operations.lock"
 
     def load(self) -> dict[str, Any]:
+        if self.path.is_symlink():
+            raise ValueError("security.storage_failed")
         if not self.path.exists():
             return {
-                "version": 1,
+                "version": 2,
                 "domains": {},
                 "enrollments": {},
                 "nodes": {},
@@ -81,13 +90,79 @@ class OperationalStateStore:
                 "migration": {"stage": "observe", "allow_trusted_lan": False},
                 "audit": [],
             }
-        value = json.loads(self.path.read_text())
-        if not isinstance(value, dict) or value.get("version") != 1:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.path, flags)
+        try:
+            metadata = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_mode & 0o077
+                or metadata.st_size > 16 * 1024 * 1024
+            ):
+                raise ValueError("security.storage_failed")
+            with os.fdopen(descriptor, "r", encoding="utf-8") as stream:
+                descriptor = -1
+                raw = stream.read(16 * 1024 * 1024 + 1)
+                if len(raw.encode("utf-8")) > 16 * 1024 * 1024:
+                    raise ValueError("security.storage_failed")
+                value = json.loads(raw)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+        required = {
+            "version",
+            "domains",
+            "enrollments",
+            "nodes",
+            "revocation_epoch",
+            "revoked_credentials",
+            "migration",
+            "audit",
+        }
+        if (
+            not isinstance(value, dict)
+            or set(value) != required
+            or value.get("version") != 2
+            or not isinstance(value.get("audit"), list)
+        ):
             raise ValueError("security.storage_failed")
-        value.setdefault("revoked_credentials", [])
         return value
 
-    def save(self, value: dict[str, Any]) -> None:
+    @contextmanager
+    def _locked(self):
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(self.lock_path, flags, 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+                raise ValueError("security.storage_failed")
+            os.chmod(self.lock_path, 0o600)
+            if os.name == "nt":
+                import msvcrt
+
+                if os.fstat(descriptor).st_size == 0:
+                    os.write(descriptor, b"0")
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            if os.name == "nt":
+                import msvcrt
+
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+
+    def _save(self, value: dict[str, Any]) -> None:
+        if self.path.is_symlink():
+            raise ValueError("security.storage_failed")
         data = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
         descriptor, temporary = tempfile.mkstemp(prefix="operations-", suffix=".tmp", dir=self.root)
         try:
@@ -111,44 +186,81 @@ class OperationalStateStore:
     def _audit(state: dict[str, Any], event: str, fields: dict[str, Any]) -> None:
         entries = state["audit"]
         previous = entries[-1]["hash"] if entries else "sha256:" + "0" * 64
+        state_hash = _digest(
+            json.dumps(
+                {key: value for key, value in state.items() if key != "audit"}, sort_keys=True, separators=(",", ":")
+            ).encode()
+        )
         public = {
             "index": len(entries),
             "timestamp": _utc_now(),
             "event": event,
             "fields": fields,
             "previous_hash": previous,
+            "state_hash": state_hash,
         }
         encoded = json.dumps(public, sort_keys=True, separators=(",", ":")).encode()
         entries.append({**public, "hash": _digest(encoded)})
 
     def transact(self, event: str, fields: dict[str, Any], mutate: Any) -> dict[str, Any]:
-        state = self.load()
-        valid, _ = self._verify_entries(state["audit"])
-        if not valid:
-            raise ValueError("security.storage_failed")
-        result = mutate(state)
-        self._audit(state, event, fields)
-        self.save(state)
-        return result
+        with self._locked():
+            state = self.load()
+            valid, _ = self._verify_entries(state["audit"], state)
+            if not valid:
+                raise ValueError("security.storage_failed")
+            if len(state["audit"]) >= self.max_audit_entries:
+                raise ValueError("security.resource_limit")
+            result = mutate(state)
+            self._audit(state, event, fields)
+            self._save(state)
+            return result
 
     def verify_audit(self) -> tuple[bool, int]:
-        return self._verify_entries(self.load()["audit"])
+        state = self.load()
+        return self._verify_entries(state["audit"], state)
 
     @staticmethod
-    def _verify_entries(entries: list[dict[str, Any]]) -> tuple[bool, int]:
+    def _verify_entries(entries: list[dict[str, Any]], state: dict[str, Any]) -> tuple[bool, int]:
         previous = "sha256:" + "0" * 64
         for index, entry in enumerate(entries):
-            if entry.get("index") != index or entry.get("previous_hash") != previous:
+            if not isinstance(entry, dict) or entry.get("index") != index or entry.get("previous_hash") != previous:
                 return False, index
-            public = {key: entry[key] for key in ("index", "timestamp", "event", "fields", "previous_hash")}
-            if entry.get("hash") != _digest(json.dumps(public, sort_keys=True, separators=(",", ":")).encode()):
+            try:
+                public = {
+                    key: entry[key] for key in ("index", "timestamp", "event", "fields", "previous_hash", "state_hash")
+                }
+                encoded = json.dumps(public, sort_keys=True, separators=(",", ":")).encode()
+            except (KeyError, TypeError, ValueError):
+                return False, index
+            if entry.get("hash") != _digest(encoded):
                 return False, index
             previous = entry["hash"]
+        if entries:
+            current_hash = _digest(
+                json.dumps(
+                    {key: value for key, value in state.items() if key != "audit"},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            )
+            if entries[-1].get("state_hash") != current_hash:
+                return False, len(entries) - 1
+        elif state != {
+            "version": 2,
+            "domains": {},
+            "enrollments": {},
+            "nodes": {},
+            "revocation_epoch": 0,
+            "revoked_credentials": [],
+            "migration": {"stage": "observe", "allow_trusted_lan": False},
+            "audit": [],
+        }:
+            return False, 0
         return True, len(entries)
 
-    def create_domain(self, name: str) -> dict[str, Any]:
+    def create_domain(self, name: str, authority_key_id: str) -> dict[str, Any]:
         domain_id = str(uuid.uuid4())
-        authority_key_id = _digest(os.urandom(32))
+        IdentityKeyID(authority_key_id)
         record = {
             "trust_domain_id": domain_id,
             "name": name,
@@ -203,7 +315,16 @@ class OperationalStateStore:
             "security.enrollment.opened", {"enrollment_id": enrollment_id, "trust_domain_id": domain_id}, mutate
         )
 
-    def advance_enrollment(self, enrollment_id: str, role: str, node_id: str | None = None) -> dict[str, Any]:
+    def advance_enrollment(
+        self,
+        enrollment_id: str,
+        role: str,
+        node_id: str | None = None,
+        credential_id: str | None = None,
+        identity_key_id: str | None = None,
+    ) -> dict[str, Any]:
+        if role not in {"candidate", "commissioner"}:
+            raise ValueError("security.credential_invalid")
         target = "candidate_ready" if role == "candidate" else "complete"
 
         def mutate(state: dict[str, Any]) -> dict[str, Any]:
@@ -214,16 +335,24 @@ class OperationalStateStore:
                 raise ValueError("security.authentication_failed")
             enrollment["state"] = target
             if role == "commissioner":
-                actual_node = node_id or str(uuid.uuid4())
+                if node_id is None or credential_id is None or identity_key_id is None:
+                    raise ValueError("security.credential_invalid")
+                actual_node = node_id
                 SecurityNodeID(actual_node)
+                CredentialID(credential_id)
+                IdentityKeyID(identity_key_id)
                 if actual_node in state["nodes"]:
                     raise ValueError("security.identity_mismatch")
-                credential_id, key_id = _digest(os.urandom(32)), _digest(os.urandom(32))
+                if credential_id in state["revoked_credentials"] or any(
+                    node["credential_id"] == credential_id or node["identity_key_id"] == identity_key_id
+                    for node in state["nodes"].values()
+                ):
+                    raise ValueError("security.identity_mismatch")
                 state["nodes"][actual_node] = {
                     "node_id": actual_node,
                     "trust_domain_id": enrollment["trust_domain_id"],
                     "credential_id": credential_id,
-                    "identity_key_id": key_id,
+                    "identity_key_id": identity_key_id,
                     "status": "active",
                     "generation": 1,
                 }
@@ -232,7 +361,14 @@ class OperationalStateStore:
 
         return self.transact(f"security.enrollment.{role}", {"enrollment_id": enrollment_id}, mutate)
 
-    def credential_action(self, node_id: str, action: str) -> dict[str, Any]:
+    def credential_action(
+        self,
+        node_id: str,
+        action: str,
+        *,
+        credential_id: str | None = None,
+        identity_key_id: str | None = None,
+    ) -> dict[str, Any]:
         def mutate(state: dict[str, Any]) -> dict[str, Any]:
             node = state["nodes"].get(node_id)
             if node is None:
@@ -240,9 +376,27 @@ class OperationalStateStore:
             if action in {"renew", "rotate"}:
                 if node["status"] != "active":
                     raise ValueError("security.credential_revoked")
-                node["credential_id"] = _digest(os.urandom(32))
+                if credential_id is None:
+                    raise ValueError("security.credential_invalid")
+                CredentialID(credential_id)
+                if credential_id in state["revoked_credentials"] or any(
+                    other_id != node_id and other["credential_id"] == credential_id
+                    for other_id, other in state["nodes"].items()
+                ):
+                    raise ValueError("security.identity_mismatch")
+                if credential_id == node["credential_id"]:
+                    raise ValueError("security.credential_invalid")
+                node["credential_id"] = credential_id
                 if action == "rotate":
-                    node["identity_key_id"] = _digest(os.urandom(32))
+                    if identity_key_id is None:
+                        raise ValueError("security.credential_invalid")
+                    IdentityKeyID(identity_key_id)
+                    if identity_key_id == node["identity_key_id"] or any(
+                        other_id != node_id and other["identity_key_id"] == identity_key_id
+                        for other_id, other in state["nodes"].items()
+                    ):
+                        raise ValueError("security.identity_mismatch")
+                    node["identity_key_id"] = identity_key_id
                 node["generation"] += 1
                 node["status"] = "active"
             elif action == "revoke":
@@ -252,15 +406,38 @@ class OperationalStateStore:
                 state["revocation_epoch"] += 1
                 state["revoked_credentials"].append(node["credential_id"])
             elif action == "reset":
-                node["status"] = "unenrolled"
-            elif action == "recover":
                 if node["status"] != "active":
                     raise ValueError("security.credential_revoked")
+                node["status"] = "unenrolled"
+                state["revocation_epoch"] += 1
+                state["revoked_credentials"].append(node["credential_id"])
+            elif action == "recover":
+                raise ValueError("security.credential_invalid")
             else:
                 raise ValueError("security.credential_invalid")
             return dict(node)
 
         return self.transact(f"security.credential.{action}", {"node_id": node_id}, mutate)
+
+    def recover_identity(self, node_id: str, identity_store: Path) -> dict[str, Any]:
+        def mutate(state: dict[str, Any]) -> dict[str, Any]:
+            node = state["nodes"].get(node_id)
+            if node is None or node["status"] != "active":
+                raise ValueError("security.credential_revoked")
+            recovered = JournaledIdentityStore(identity_store).recover()
+            if recovered is None or str(recovered.credential_id) != node["credential_id"]:
+                raise ValueError("security.storage_failed")
+            if str(recovered.identity_key_id) != node["identity_key_id"]:
+                raise ValueError("security.identity_mismatch")
+            return {
+                "node_id": node_id,
+                "credential_id": node["credential_id"],
+                "identity_key_id": node["identity_key_id"],
+                "generation": recovered.generation,
+                "status": "recovered",
+            }
+
+        return self.transact("security.identity.recovered", {"node_id": node_id}, mutate)
 
     def set_migration(self, stage: MigrationStage, allow_trusted_lan: bool) -> dict[str, Any]:
         if stage is MigrationStage.ENFORCE and allow_trusted_lan:

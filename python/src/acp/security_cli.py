@@ -26,6 +26,7 @@ REDACT_KEYS = frozenset(
         "confirmation",
     }
 )
+MAX_BOOTSTRAP_SECRET_BYTES = 4096
 
 
 def redact(value: Any, key: str = "") -> Any:
@@ -40,12 +41,30 @@ def redact(value: Any, key: str = "") -> Any:
 
 def _secret(path: str | None) -> bytes:
     if path is None:
-        return getpass.getpass("Bootstrap secret (input hidden; never pass secrets on the command line): ").encode()
+        value = getpass.getpass("Bootstrap secret (input hidden; never pass secrets on the command line): ").encode()
+        if not value or len(value) > MAX_BOOTSTRAP_SECRET_BYTES:
+            raise ValueError("security.credential_invalid")
+        return value
     source = Path(path)
-    mode = stat.S_IMODE(source.stat().st_mode)
-    if mode & 0o077:
-        raise ValueError("secret input file must not be accessible by group or other users")
-    return source.read_bytes().rstrip(b"\r\n")
+    descriptor = os.open(source, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    try:
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+            or (hasattr(os, "getuid") and metadata.st_uid != os.getuid())
+            or metadata.st_size > MAX_BOOTSTRAP_SECRET_BYTES + 2
+        ):
+            raise ValueError("secret input file must be an owner-only regular file within the size limit")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            value = stream.read(MAX_BOOTSTRAP_SECRET_BYTES + 3).rstrip(b"\r\n")
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if not value or len(value) > MAX_BOOTSTRAP_SECRET_BYTES:
+        raise ValueError("security.credential_invalid")
+    return value
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -57,6 +76,9 @@ def _parser() -> argparse.ArgumentParser:
     domain_sub = domain.add_subparsers(dest="action", required=True)
     create = domain_sub.add_parser("create")
     create.add_argument("--name", required=True)
+    create.add_argument(
+        "--authority-key-id", required=True, help="ID of an existing provider-managed authority signing key"
+    )
     imp = domain_sub.add_parser("import")
     imp.add_argument("package")
     enrollment = commands.add_parser("enrollment")
@@ -68,7 +90,9 @@ def _parser() -> argparse.ArgumentParser:
         item = enrollment_sub.add_parser(action)
         item.add_argument("enrollment_id")
         if action == "commissioner":
-            item.add_argument("--node-id")
+            item.add_argument("--node-id", required=True)
+            item.add_argument("--credential-id", required=True)
+            item.add_argument("--identity-key-id", required=True)
     node = commands.add_parser("node")
     node_sub = node.add_subparsers(dest="action", required=True)
     node_sub.add_parser("list")
@@ -77,6 +101,12 @@ def _parser() -> argparse.ArgumentParser:
     for action in ("renew", "rotate", "revoke", "reset", "recover"):
         item = node_sub.add_parser(action)
         item.add_argument("node_id")
+        if action in {"renew", "rotate"}:
+            item.add_argument("--credential-id", required=True)
+        if action == "rotate":
+            item.add_argument("--identity-key-id", required=True)
+        if action == "recover":
+            item.add_argument("--identity-store", required=True)
     revocation = commands.add_parser("revocation")
     revocation.add_argument("action", choices=["status"])
     audit = commands.add_parser("audit")
@@ -95,20 +125,33 @@ def execute(args: argparse.Namespace, store: OperationalStateStore) -> Any:
     state = store.load()
     if args.command == "domain":
         return (
-            store.create_domain(args.name)
+            store.create_domain(args.name, args.authority_key_id)
             if args.action == "create"
             else store.import_domain(json.loads(Path(args.package).read_text()))
         )
     if args.command == "enrollment":
         if args.action == "open":
             return store.open_enrollment(args.domain_id, _secret(args.secret_file))
-        return store.advance_enrollment(args.enrollment_id, args.action, getattr(args, "node_id", None))
+        return store.advance_enrollment(
+            args.enrollment_id,
+            args.action,
+            getattr(args, "node_id", None),
+            getattr(args, "credential_id", None),
+            getattr(args, "identity_key_id", None),
+        )
     if args.command == "node":
         if args.action == "list":
             return list(state["nodes"].values())
         if args.action == "inspect":
             return state["nodes"].get(args.node_id) or _raise("security.credential_invalid")
-        return store.credential_action(args.node_id, args.action)
+        if args.action == "recover":
+            return store.recover_identity(args.node_id, Path(args.identity_store))
+        return store.credential_action(
+            args.node_id,
+            args.action,
+            credential_id=getattr(args, "credential_id", None),
+            identity_key_id=getattr(args, "identity_key_id", None),
+        )
     if args.command == "revocation":
         return {
             "epoch": state["revocation_epoch"],

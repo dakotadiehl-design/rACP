@@ -397,22 +397,26 @@ def _established_session(
         role=peer_role,
         name="pad",
     )
-    versions = capabilities if capabilities is not None else {
-        "remote.profile": "1.0",
-        "remote.control.invoke": "1.0",
-        "remote.control.momentary": "1.0",
-        "remote.layout": "1.0",
-        "cue.go": "1.0",
-        "look.global": "1.0",
-        "song.selection": "1.0",
-        "song.loading": "1.0",
-        "show.navigation": "1.0",
-        "busk.controls": "1.0",
-        "output.blackout": "1.0",
-        "output.grand_master": "1.0",
-        "remote.surfaces": "1.0",
-        "state.live": "1.0",
-    }
+    versions = (
+        capabilities
+        if capabilities is not None
+        else {
+            "remote.profile": "1.0",
+            "remote.control.invoke": "1.0",
+            "remote.control.momentary": "1.0",
+            "remote.layout": "1.0",
+            "cue.go": "1.0",
+            "look.global": "1.0",
+            "song.selection": "1.0",
+            "song.loading": "1.0",
+            "show.navigation": "1.0",
+            "busk.controls": "1.0",
+            "output.blackout": "1.0",
+            "output.grand_master": "1.0",
+            "remote.surfaces": "1.0",
+            "state.live": "1.0",
+        }
+    )
     session.negotiated_capability_versions = dict(versions)
     session.negotiated_capabilities = set(versions)
     session.negotiated_profiles = {"remote", "aurora.remote.prism.v1"}
@@ -784,13 +788,15 @@ def test_unknown_control_type_does_not_fail_surface() -> None:
     auth = authority()
     nxt = sample_layout(show_id=SHOW, layout_id=LAYOUT)
     nxt["revision"] = 9
-    nxt["controls"] = list(nxt["controls"]) + [{
-        "control_id": "future_pad",
-        "label": "Future",
-        "control_type": "hologram_well",
-        "binding": {"target": "prism", "action": "cue.go"},
-        "safety": {"class": "normal"},
-    }]
+    nxt["controls"] = list(nxt["controls"]) + [
+        {
+            "control_id": "future_pad",
+            "label": "Future",
+            "control_type": "hologram_well",
+            "binding": {"target": "prism", "action": "cue.go"},
+            "safety": {"class": "normal"},
+        }
+    ]
     ok, _ = auth.activate_layout(nxt)
     assert ok is True
     denied = run(auth, RemoteClient(SRC, show_id=SHOW, layout_id=LAYOUT, layout_revision=9).invoke("future_pad"))
@@ -1313,23 +1319,25 @@ def test_live_client_request_correlates_ack_and_lease() -> None:
 def _blinder_layout(revision: int = 9) -> dict:
     layout = sample_layout(show_id=SHOW, layout_id=LAYOUT)
     layout["revision"] = revision
-    layout["controls"] = list(layout["controls"]) + [{
-        "control_id": "blinder",
-        "label": "Blinders",
-        "control_type": "momentary",
-        "permission": "remote.busker",
-        "style": "warning",
-        "feedback": "state",
-        "concurrency": "shared",
-        "binding": {"target": "prism", "action": "busk.blinder"},
-        "safety": {
-            "class": "caution",
-            "failsafe": "release_on_disconnect",
-            "failsafe_required": True,
-            "max_hold_ms": 10000,
-            "heartbeat_required": True,
-        },
-    }]
+    layout["controls"] = list(layout["controls"]) + [
+        {
+            "control_id": "blinder",
+            "label": "Blinders",
+            "control_type": "momentary",
+            "permission": "remote.busker",
+            "style": "warning",
+            "feedback": "state",
+            "concurrency": "shared",
+            "binding": {"target": "prism", "action": "busk.blinder"},
+            "safety": {
+                "class": "caution",
+                "failsafe": "release_on_disconnect",
+                "failsafe_required": True,
+                "max_hold_ms": 10000,
+                "heartbeat_required": True,
+            },
+        }
+    ]
     layout["pages"][0]["groups"][0]["controls"] = ["cue_go", "fog_burst", "work_lights", "blinder"]
     return layout
 
@@ -1483,8 +1491,7 @@ def test_layout_change_does_not_resurrect_released_hold() -> None:
     assert hold.release_pending is True
     assert any(item.get("control_id") == released_cid and item.get("router_ok") for item in auth.last_releases)
     assert any(
-        item.get("control_id") == failed_cid and item.get("status") == "release_pending"
-        for item in auth.last_releases
+        item.get("control_id") == failed_cid and item.get("status") == "release_pending" for item in auth.last_releases
     )
     begin = run(auth, client.begin_momentary(failed_cid, invocation_id="0193f8d8-4c4e-7d8b-a2ab-0000000000f9"))
     assert begin[0].payload["error"]["code"] == "remote.control.conflict"
@@ -1519,17 +1526,19 @@ def test_recovery_migrates_legacy_record_and_eventual_success(tmp_path) -> None:
     auth = authority()
     auth.store = store
     legacy = {
-        "holds": [{
-            "control_id": "fog_burst",
-            "invocation_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
-            "session_id": SID,
-            "node_id": SRC.node_id,
-            "started_ms": 1,
-            "max_hold_ms": 10000,
-            "failsafe": "release_on_disconnect",
-            "lease_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000ab",
-            "value": 1.0,
-        }],
+        "holds": [
+            {
+                "control_id": "fog_burst",
+                "invocation_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
+                "session_id": SID,
+                "node_id": SRC.node_id,
+                "started_ms": 1,
+                "max_hold_ms": 10000,
+                "failsafe": "release_on_disconnect",
+                "lease_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000ab",
+                "value": 1.0,
+            }
+        ],
     }
     router = _FlakyReleaseRouter()
     router.bind(auth)
@@ -1548,21 +1557,23 @@ def test_recovery_timeout_exception_and_store_failure(tmp_path) -> None:
     auth = authority()
     snapshot = {
         "version": 2,
-        "holds": [{
-            "control_id": "fog_burst",
-            "invocation_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
-            "session_id": SID,
-            "node_id": SRC.node_id,
-            "started_ms": 1,
-            "max_hold_ms": 10000,
-            "failsafe": "release_on_disconnect",
-            "lease_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000ab",
-            "value": 1.0,
-            "expires_at_ms": 10001,
-            "release_pending": False,
-            "release_reason": None,
-            "physical_active": True,
-        }],
+        "holds": [
+            {
+                "control_id": "fog_burst",
+                "invocation_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
+                "session_id": SID,
+                "node_id": SRC.node_id,
+                "started_ms": 1,
+                "max_hold_ms": 10000,
+                "failsafe": "release_on_disconnect",
+                "lease_id": "0193f8d8-4c4e-7d8b-a2ab-0000000000ab",
+                "value": 1.0,
+                "expires_at_ms": 10001,
+                "release_pending": False,
+                "release_reason": None,
+                "physical_active": True,
+            }
+        ],
     }
     auth.router = _TimeoutReleaseRouter(auth)
     assert auth.recover_from_restart(snapshot) == []
@@ -1598,8 +1609,7 @@ def test_fanout_filters_subscriptions_and_capabilities() -> None:
     rec["resync_required"] = True
     run(auth, RemoteClient(SRC, show_id=SHOW, layout_id=LAYOUT).invoke("look_recall", value="slow_song"))
     assert not any(
-        m.type == "state.delta" and m.payload.get("resource") == "look.current"
-        for m in auth.take_outbound(SID_B)
+        m.type == "state.delta" and m.payload.get("resource") == "look.current" for m in auth.take_outbound(SID_B)
     )
 
 
@@ -1669,10 +1679,18 @@ async def _connected_remotes() -> tuple[Session, Session, Session, Session]:
     for name in ("a", "b"):
         ta, tb = linked_transports()
         client = Session(
-            ta, identity(Role.REMOTE, name), is_server=False, allow_plaintext=True, profiles=profiles,
+            ta,
+            identity(Role.REMOTE, name),
+            is_server=False,
+            allow_plaintext=True,
+            profiles=profiles,
         )
         server = Session(
-            tb, server_ident, is_server=True, allow_plaintext=True, profiles=profiles,
+            tb,
+            server_ident,
+            is_server=True,
+            allow_plaintext=True,
+            profiles=profiles,
         )
         await server.start_receiver()
         await asyncio.gather(server.handshake(caps), client.handshake(caps))
@@ -1699,26 +1717,36 @@ def test_live_host_two_clients_converge_and_idle_expiry() -> None:
         remote_b = RemoteClient(client_b.source(), show_id=SHOW, layout_id=LAYOUT, session=client_b)
         await remote_b.start_lifecycle()
         try:
-            await remote_a.request(make_envelope(
-                type="remote.hello",
-                source=client_a.source(),
-                destination=Endpoint(node_id=client_a.peer.node_id) if client_a.peer else None,
-                payload=hello_payload(client_a.local.node_id),
-            ))
-            await remote_b.request(make_envelope(
-                type="remote.hello",
-                source=client_b.source(),
-                destination=Endpoint(node_id=client_b.peer.node_id) if client_b.peer else None,
-                payload=hello_payload(client_b.local.node_id, device_id=new_uuid(), remote_id=new_uuid()),
-            ))
+            await remote_a.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_a.source(),
+                    destination=Endpoint(node_id=client_a.peer.node_id) if client_a.peer else None,
+                    payload=hello_payload(client_a.local.node_id),
+                )
+            )
+            await remote_b.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_b.source(),
+                    destination=Endpoint(node_id=client_b.peer.node_id) if client_b.peer else None,
+                    payload=hello_payload(client_b.local.node_id, device_id=new_uuid(), remote_id=new_uuid()),
+                )
+            )
             report_a = await remote_a.request(remote_a.layout_request())
             report_b = await remote_b.request(remote_b.layout_request())
-            await remote_a.request(remote_a.readiness_ack(
-                layout=report_a.payload["layout"], snapshot_revision=host_auth.snapshot_revision,
-            ))
-            await remote_b.request(remote_b.readiness_ack(
-                layout=report_b.payload["layout"], snapshot_revision=host_auth.snapshot_revision,
-            ))
+            await remote_a.request(
+                remote_a.readiness_ack(
+                    layout=report_a.payload["layout"],
+                    snapshot_revision=host_auth.snapshot_revision,
+                )
+            )
+            await remote_b.request(
+                remote_b.readiness_ack(
+                    layout=report_b.payload["layout"],
+                    snapshot_revision=host_auth.snapshot_revision,
+                )
+            )
             await client_b.send(remote_b.state_request())
             await remote_a.invoke_wait("look_recall", value="blue_ballad")
             for _ in range(30):
@@ -1757,12 +1785,14 @@ def test_live_surface_transfer_and_cache_hit() -> None:
         serve = asyncio.create_task(host.serve(server))
         remote = RemoteClient(client_sess.source(), show_id=SHOW, layout_id=LAYOUT, session=client_sess)
         try:
-            await remote.request(make_envelope(
-                type="remote.hello",
-                source=client_sess.source(),
-                destination=Endpoint(node_id=client_sess.peer.node_id) if client_sess.peer else None,
-                payload=hello_payload(client_sess.local.node_id),
-            ))
+            await remote.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_sess.source(),
+                    destination=Endpoint(node_id=client_sess.peer.node_id) if client_sess.peer else None,
+                    payload=hello_payload(client_sess.local.node_id),
+                )
+            )
             report = await remote.request(remote.layout_request())
             assert "layout" not in report.payload
             assert report.payload.get("cached") is False
@@ -1772,9 +1802,12 @@ def test_live_surface_transfer_and_cache_hit() -> None:
             assert not auth._surface_offers
             meta = auth._live_surface_meta.get(server.session_id or "")
             assert meta and meta.get("sha256") == layout_fingerprint(auth.layout)
-            await remote.request(remote.readiness_ack(
-                layout=remote.layout, snapshot_revision=auth.snapshot_revision,
-            ))
+            await remote.request(
+                remote.readiness_ack(
+                    layout=remote.layout,
+                    snapshot_revision=auth.snapshot_revision,
+                )
+            )
             cached = await remote.request(remote.layout_request())
             assert cached.payload.get("cached") is True
             assert "layout" not in cached.payload
@@ -1818,6 +1851,7 @@ def test_surface_transfer_corruption_oversize_and_rollback() -> None:
     auth.layout = huge
     # force oversize by shrinking the limit locally
     from acp import remote as remote_mod
+
     previous = remote_mod.SURFACE_LIMITS["max_surface_bytes"]
     remote_mod.SURFACE_LIMITS["max_surface_bytes"] = 16
     try:
@@ -1853,14 +1887,21 @@ def test_live_lease_renewal_over_multiple_periods() -> None:
         remote = RemoteClient(client_sess.source(), show_id=SHOW, layout_id=LAYOUT, session=client_sess)
         try:
             dest = Endpoint(node_id=client_sess.peer.node_id) if client_sess.peer else None
-            await remote.request(make_envelope(
-                type="remote.hello", source=client_sess.source(), destination=dest,
-                payload=hello_payload(client_sess.local.node_id),
-            ))
+            await remote.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_sess.source(),
+                    destination=dest,
+                    payload=hello_payload(client_sess.local.node_id),
+                )
+            )
             report = await remote.request(remote.layout_request())
-            await remote.request(remote.readiness_ack(
-                layout=report.payload["layout"], snapshot_revision=auth.snapshot_revision,
-            ))
+            await remote.request(
+                remote.readiness_ack(
+                    layout=report.payload["layout"],
+                    snapshot_revision=auth.snapshot_revision,
+                )
+            )
             await remote.start_lifecycle()
             begin = await remote.begin_momentary_wait("fog_burst")
             assert begin.payload["status"] == "applied"
@@ -1909,24 +1950,36 @@ def test_live_idle_failed_release_alert_and_shutdown_flush() -> None:
         remote_b = RemoteClient(client_b.source(), show_id=SHOW, layout_id=LAYOUT, session=client_b)
         await remote_b.start_lifecycle()
         try:
-            await remote_a.request(make_envelope(
-                type="remote.hello", source=client_a.source(),
-                destination=Endpoint(node_id=client_a.peer.node_id) if client_a.peer else None,
-                payload=hello_payload(client_a.local.node_id),
-            ))
-            await remote_b.request(make_envelope(
-                type="remote.hello", source=client_b.source(),
-                destination=Endpoint(node_id=client_b.peer.node_id) if client_b.peer else None,
-                payload=hello_payload(client_b.local.node_id, device_id=new_uuid(), remote_id=new_uuid()),
-            ))
+            await remote_a.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_a.source(),
+                    destination=Endpoint(node_id=client_a.peer.node_id) if client_a.peer else None,
+                    payload=hello_payload(client_a.local.node_id),
+                )
+            )
+            await remote_b.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_b.source(),
+                    destination=Endpoint(node_id=client_b.peer.node_id) if client_b.peer else None,
+                    payload=hello_payload(client_b.local.node_id, device_id=new_uuid(), remote_id=new_uuid()),
+                )
+            )
             report_a = await remote_a.request(remote_a.layout_request())
             report_b = await remote_b.request(remote_b.layout_request())
-            await remote_a.request(remote_a.readiness_ack(
-                layout=report_a.payload["layout"], snapshot_revision=auth.snapshot_revision,
-            ))
-            await remote_b.request(remote_b.readiness_ack(
-                layout=report_b.payload["layout"], snapshot_revision=auth.snapshot_revision,
-            ))
+            await remote_a.request(
+                remote_a.readiness_ack(
+                    layout=report_a.payload["layout"],
+                    snapshot_revision=auth.snapshot_revision,
+                )
+            )
+            await remote_b.request(
+                remote_b.readiness_ack(
+                    layout=report_b.payload["layout"],
+                    snapshot_revision=auth.snapshot_revision,
+                )
+            )
             await client_b.send(remote_b.state_request())
             await remote_a.begin_momentary_wait("fog_burst")
             assert auth.effect_active("fog_burst")
@@ -1964,7 +2017,9 @@ def test_live_gap_recovery_uses_state_snapshot() -> None:
         try:
             dest = Endpoint(node_id=client_sess.peer.node_id) if client_sess.peer else None
             hello = make_envelope(
-                type="remote.hello", source=client_sess.source(), destination=dest,
+                type="remote.hello",
+                source=client_sess.source(),
+                destination=dest,
                 payload=hello_payload(client_sess.local.node_id),
             )
             await remote.sync_until_ready(hello, timeout=3)
@@ -1974,7 +2029,10 @@ def test_live_gap_recovery_uses_state_snapshot() -> None:
             assert any(item.get("resource") == "cue.current" for item in snap.payload["resources"])
             await remote.sync_until_ready(hello, timeout=3)
             assert remote.ready or auth.compute_readiness(server.session_id or "") in {
-                "ready", "ready_with_warnings", "syncing_assets", "syncing_state",
+                "ready",
+                "ready_with_warnings",
+                "syncing_assets",
+                "syncing_state",
             }
         finally:
             await remote.stop_lifecycle()
@@ -1998,10 +2056,14 @@ def test_live_activation_reject_keeps_previous_layout() -> None:
         remote = RemoteClient(client_sess.source(), show_id=SHOW, layout_id=LAYOUT, session=client_sess)
         try:
             dest = Endpoint(node_id=client_sess.peer.node_id) if client_sess.peer else None
-            await remote.request(make_envelope(
-                type="remote.hello", source=client_sess.source(), destination=dest,
-                payload=hello_payload(client_sess.local.node_id),
-            ))
+            await remote.request(
+                make_envelope(
+                    type="remote.hello",
+                    source=client_sess.source(),
+                    destination=dest,
+                    payload=hello_payload(client_sess.local.node_id),
+                )
+            )
             await remote.request(remote.layout_request())
             await remote._wait_surface_transfer(timeout=3)
             kept = dict(remote.layout or {})
@@ -2037,16 +2099,25 @@ def test_repeated_transfer_and_disconnect_cleanup() -> None:
         report = run(auth, make_envelope(type="remote.layout.request", source=SRC, payload={}))
         offer = next(m for m in report if m.type == "resource.offer")
         first_tid = offer.payload["transfer_id"]
-        chunks = run(auth, make_envelope(
-            type="resource.accept", source=SRC,
-            payload={"transfer_id": first_tid, "max_chunk_bytes": 4096},
-        ))
+        chunks = run(
+            auth,
+            make_envelope(
+                type="resource.accept",
+                source=SRC,
+                payload={"transfer_id": first_tid, "max_chunk_bytes": 4096},
+            ),
+        )
         assert chunks[-1].type == "resource.complete"
         auth._surface_transfers[SID].state = TransferState.VERIFIED
         auth._surface_transfers[SID].staged = auth.surface_bytes()
-        applied = run(auth, make_envelope(
-            type="resource.activate", source=SRC, payload={"transfer_id": first_tid},
-        ))
+        applied = run(
+            auth,
+            make_envelope(
+                type="resource.activate",
+                source=SRC,
+                payload={"transfer_id": first_tid},
+            ),
+        )
         assert applied[0].payload["status"] == "applied"
         assert first_tid not in auth._surface_offers
         xfer = auth._surface_transfers[SID]

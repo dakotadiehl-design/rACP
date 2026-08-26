@@ -124,4 +124,10 @@ final class ACPEncodingTests: XCTestCase {
             XCTAssertThrowsError(try ACPEncoding.decodeCBOR(data), url.lastPathComponent)
         }
     }
+
+    func testPublicDecodersRejectOversizedDocumentsBeforeParsing() {
+        let oversized = Data(repeating: 0x20, count: 8 * 1024 * 1024 + 1)
+        XCTAssertThrowsError(try ACPEncoding.decodeJSON(oversized))
+        XCTAssertThrowsError(try ACPEncoding.decodeCBOR(oversized))
+    }
 }

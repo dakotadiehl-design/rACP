@@ -118,15 +118,23 @@ def _invoke(*, interaction: str, lease_id: str | None = None) -> dict:
 
 
 def test_momentary_end_requires_lease_id() -> None:
-    decode_json(json.dumps(_invoke(
-        interaction="momentary_end",
-        lease_id="0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
-    )))
+    decode_json(
+        json.dumps(
+            _invoke(
+                interaction="momentary_end",
+                lease_id="0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
+            )
+        )
+    )
     decode_json(json.dumps(_invoke(interaction="activate")))
-    decode_json(json.dumps(_invoke(
-        interaction="momentary_cancel",
-        lease_id="0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
-    )))
+    decode_json(
+        json.dumps(
+            _invoke(
+                interaction="momentary_cancel",
+                lease_id="0193f8d8-4c4e-7d8b-a2ab-0000000000aa",
+            )
+        )
+    )
     try:
         decode_json(json.dumps(_invoke(interaction="momentary_end")))
     except CodecError:

@@ -373,6 +373,9 @@ pub fn encode_json(env: &Envelope) -> Result<Vec<u8>, CodecError> {
 }
 
 pub fn decode_json(raw: &[u8]) -> Result<Envelope, CodecError> {
+    if raw.len() > 8 * 1024 * 1024 {
+        return Err(cerr("message too large"));
+    }
     let v: serde_json::Value = serde_json::from_slice(raw).map_err(|e| cerr(e.to_string()))?;
     let env = envelope_from_json(&json_from_serde(&v))?;
     schema::validate_envelope(&env)?;
@@ -440,6 +443,9 @@ enum Prepared {
 }
 
 pub fn decode_cbor(raw: &[u8]) -> Result<Envelope, CodecError> {
+    if raw.len() > 8 * 1024 * 1024 {
+        return Err(cerr("message too large"));
+    }
     let mut v = decode_cbor_value(raw).map_err(|e| cerr(e.0))?;
     if let Json::Object(pairs) = &mut v {
         let message_type = pairs
@@ -653,6 +659,13 @@ mod tests {
     #[test]
     fn reject_indefinite() {
         assert!(decode_cbor_value(&[0x9f, 0x01, 0xff]).is_err());
+    }
+
+    #[test]
+    fn public_decoders_reject_oversized_documents_before_parsing() {
+        let oversized = vec![b' '; 8 * 1024 * 1024 + 1];
+        assert!(decode_json(&oversized).is_err());
+        assert!(decode_cbor(&oversized).is_err());
     }
 
     #[test]

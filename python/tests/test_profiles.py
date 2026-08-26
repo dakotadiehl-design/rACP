@@ -103,26 +103,40 @@ def test_resource_transfer_hash_and_preserve() -> None:
         },
     )
     assert agent.handle(offer)[0].type == "resource.accept"
-    agent.handle(make_envelope(
-        type="resource.chunk", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid, "offset": 0, "length": len(blob), "data": blob},
-    ))
-    result = agent.handle(make_envelope(
-        type="resource.complete", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid},
-    ))[0]
+    agent.handle(
+        make_envelope(
+            type="resource.chunk",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid, "offset": 0, "length": len(blob), "data": blob},
+        )
+    )
+    result = agent.handle(
+        make_envelope(
+            type="resource.complete",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid},
+        )
+    )[0]
     assert result.payload["status"] == "verified"
-    act = agent.handle(make_envelope(
-        type="resource.activate", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid},
-    ))[0]
+    act = agent.handle(
+        make_envelope(
+            type="resource.activate",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid},
+        )
+    )[0]
     assert act.payload["status"] == "applied"
     assert agent.live_assets[asset_id] == blob
 
     # failed hash leaves previous
     tid2 = new_uuid()
     bad = make_envelope(
-        type="resource.offer", source=NODE, qos=QoS.RELIABLE,
+        type="resource.offer",
+        source=NODE,
+        qos=QoS.RELIABLE,
         payload={
             "transfer_id": tid2,
             "asset": {
@@ -136,14 +150,22 @@ def test_resource_transfer_hash_and_preserve() -> None:
         },
     )
     agent.handle(bad)
-    agent.handle(make_envelope(
-        type="resource.chunk", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid2, "offset": 0, "length": 4, "data": b"xxxx"},
-    ))
-    fail = agent.handle(make_envelope(
-        type="resource.complete", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid2},
-    ))[0]
+    agent.handle(
+        make_envelope(
+            type="resource.chunk",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid2, "offset": 0, "length": 4, "data": b"xxxx"},
+        )
+    )
+    fail = agent.handle(
+        make_envelope(
+            type="resource.complete",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid2},
+        )
+    )[0]
     assert fail.payload["status"] == "failed"
     assert agent.live_assets[asset_id] == blob
 
@@ -152,46 +174,76 @@ def test_transfer_rejects_overlap_and_holes() -> None:
     agent = TransferAgent(source=NODE)
     asset_id = new_uuid()
     tid = new_uuid()
-    agent.handle(make_envelope(
-        type="resource.offer", source=NODE, qos=QoS.RELIABLE,
-        payload={
-            "transfer_id": tid,
-            "asset": {
-                "asset_id": asset_id, "asset_type": "lyric.chart", "revision": 1,
-                "sha256": "0" * 64, "size_bytes": 8,
+    agent.handle(
+        make_envelope(
+            type="resource.offer",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={
+                "transfer_id": tid,
+                "asset": {
+                    "asset_id": asset_id,
+                    "asset_type": "lyric.chart",
+                    "revision": 1,
+                    "sha256": "0" * 64,
+                    "size_bytes": 8,
+                },
+                "locator": {"mode": "chunked"},
             },
-            "locator": {"mode": "chunked"},
-        },
-    ))
-    agent.handle(make_envelope(
-        type="resource.chunk", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid, "offset": 0, "length": 4, "data": b"aaaa"},
-    ))
-    overlap = agent.handle(make_envelope(
-        type="resource.chunk", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid, "offset": 2, "length": 4, "data": b"bbbb"},
-    ))
+        )
+    )
+    agent.handle(
+        make_envelope(
+            type="resource.chunk",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid, "offset": 0, "length": 4, "data": b"aaaa"},
+        )
+    )
+    overlap = agent.handle(
+        make_envelope(
+            type="resource.chunk",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid, "offset": 2, "length": 4, "data": b"bbbb"},
+        )
+    )
     assert overlap and overlap[0].payload["status"] == "failed"
     tid2 = new_uuid()
-    agent.handle(make_envelope(
-        type="resource.offer", source=NODE, qos=QoS.RELIABLE,
-        payload={
-            "transfer_id": tid2,
-            "asset": {
-                "asset_id": asset_id, "asset_type": "lyric.chart", "revision": 1,
-                "sha256": "0" * 64, "size_bytes": 8,
+    agent.handle(
+        make_envelope(
+            type="resource.offer",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={
+                "transfer_id": tid2,
+                "asset": {
+                    "asset_id": asset_id,
+                    "asset_type": "lyric.chart",
+                    "revision": 1,
+                    "sha256": "0" * 64,
+                    "size_bytes": 8,
+                },
+                "locator": {"mode": "chunked"},
             },
-            "locator": {"mode": "chunked"},
-        },
-    ))
-    agent.handle(make_envelope(
-        type="resource.chunk", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid2, "offset": 0, "length": 4, "data": b"aaaa"},
-    ))
-    hole = agent.handle(make_envelope(
-        type="resource.complete", source=NODE, qos=QoS.RELIABLE,
-        payload={"transfer_id": tid2},
-    ))[0]
+        )
+    )
+    agent.handle(
+        make_envelope(
+            type="resource.chunk",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid2, "offset": 0, "length": 4, "data": b"aaaa"},
+        )
+    )
+    hole = agent.handle(
+        make_envelope(
+            type="resource.complete",
+            source=NODE,
+            qos=QoS.RELIABLE,
+            payload={"transfer_id": tid2},
+        )
+    )[0]
     assert hole.payload["code"] == "incomplete"
 
 
@@ -199,10 +251,13 @@ def test_config_atomic_no_partial() -> None:
     store = ConfigStore()
     store.apply(0, [{"path": "bridge.outputs.dmx.0.universe", "value": 1}])
     before = store.revision
-    bad = store.apply(1, [
-        {"path": "bridge.outputs.dmx.0.universe", "value": 2},
-        {"path": "bridge.outputs.dmx.0.enabled", "value": "yes"},
-    ])
+    bad = store.apply(
+        1,
+        [
+            {"path": "bridge.outputs.dmx.0.universe", "value": 2},
+            {"path": "bridge.outputs.dmx.0.enabled", "value": "yes"},
+        ],
+    )
     assert bad["status"] == "rejected"
     assert store.revision == before
     assert store.values["bridge.outputs.dmx.0.universe"] == 1

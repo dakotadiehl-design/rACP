@@ -6,7 +6,9 @@ import base64
 import hashlib
 import json
 import os
+import re
 import stat
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -39,8 +41,10 @@ def _fail(code: SecurityErrorCode = SecurityErrorCode.CREDENTIAL_INVALID) -> NoR
 def _timestamp(value: object) -> datetime:
     if not isinstance(value, CborTag) or value.tag != 0 or not isinstance(value.value, str):
         _fail()
+    if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z", value.value) is None:
+        _fail()
     try:
-        parsed = datetime.strptime(value.value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+        parsed = datetime.fromisoformat(value.value.replace("Z", "+00:00"))
     except ValueError:
         _fail()
     if parsed.tzinfo is None:
@@ -235,16 +239,30 @@ def validate_compact_credential(
     public_key = body["identity_public_key"]
     roles = body["role_constraints"]
     extensions = body["extensions"]
-    if not isinstance(public_key, bytes) or not public_key or not isinstance(roles, list) or len(roles) > 64:
+    serial = body["serial"]
+    permission_policy_id = body["permission_policy_id"]
+    if (
+        not isinstance(serial, int)
+        or isinstance(serial, bool)
+        or not 0 <= serial <= 2**64 - 1
+        or not isinstance(permission_policy_id, str)
+        or not 1 <= len(permission_policy_id.encode()) <= 128
+    ):
         _fail()
+    if not isinstance(public_key, bytes) or not public_key or not isinstance(roles, list):
+        _fail()
+    if len(roles) > 16:
+        _fail(SecurityErrorCode.RESOURCE_LIMIT)
     if (
         not all(isinstance(role, str) and 0 < len(role.encode()) <= 64 for role in roles)
         or roles != sorted(set(roles), key=str.encode)
         or not set(roles) <= allowed_roles
     ):
         _fail()
-    if not isinstance(extensions, dict) or len(extensions) > 64:
+    if not isinstance(extensions, dict):
         _fail()
+    if len(extensions) > 16:
+        _fail(SecurityErrorCode.RESOURCE_LIMIT)
     for extension in extensions.values():
         if not isinstance(extension, dict) or set(extension) != {"critical", "value"}:
             _fail()
@@ -254,6 +272,8 @@ def validate_compact_credential(
             _fail()
     not_before, expires_at = _timestamp(body["not_before"]), _timestamp(body["expires_at"])
     issued_at = _timestamp(body["issued_at"])
+    if now.tzinfo is None:
+        _fail(SecurityErrorCode.CLOCK_UNTRUSTED)
     now = now.astimezone(UTC)
     if issued_at > now or now < not_before or now > expires_at or not_before > expires_at:
         _fail(SecurityErrorCode.CREDENTIAL_EXPIRED)
@@ -291,6 +311,9 @@ class RevocationState:
     next_update: datetime | None = None
 
     def ingest(self, raw_body: bytes, signature: bytes, verifier: SignatureVerifier) -> None:
+        maximum_bytes = 8192 if self.max_entries <= 128 else 65536
+        if not raw_body or len(raw_body) > maximum_bytes:
+            _fail(SecurityErrorCode.RESOURCE_LIMIT)
         try:
             body = decode(raw_body)
         except ValueError:
@@ -341,13 +364,19 @@ class RevocationState:
             }:
                 _fail()
             credential = CredentialID(value["credential_id"])
+            reason = value["reason"]
+            if reason not in {"key_compromise", "superseded", "retired", "policy", "operator_request"}:
+                _fail()
+            replacement = value.get("replacement_credential_id")
+            if replacement is not None:
+                replacement_id = CredentialID(replacement)
+                if replacement_id == credential:
+                    _fail()
             if str(credential) <= previous:
                 _fail()
             previous = str(credential)
             parsed.append(
-                RevocationEntry(
-                    credential, SecurityNodeID(value["node_id"]), _timestamp(value["revoked_at"]), value["reason"]
-                )
+                RevocationEntry(credential, SecurityNodeID(value["node_id"]), _timestamp(value["revoked_at"]), reason)
             )
         if body["format"] == "acp-revocation-snapshot-v1":
             self.entries = {}
@@ -360,7 +389,12 @@ class RevocationState:
         return credential_id in self.entries
 
     def require_fresh(self, now: datetime, maximum_snapshot_age: timedelta) -> None:
-        if self.issued_at is None or self.next_update is None or maximum_snapshot_age.total_seconds() < 0:
+        if (
+            self.issued_at is None
+            or self.next_update is None
+            or now.tzinfo is None
+            or maximum_snapshot_age.total_seconds() < 0
+        ):
             _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
         deadline = min(self.next_update, self.issued_at + maximum_snapshot_age)
         if now.astimezone(UTC) > deadline:
@@ -414,6 +448,8 @@ class JournaledIdentityStore:
     """Restricted, checksummed, fsynced two-generation file store."""
 
     def __init__(self, root: Path, *, inject: FailureInjector | None = None) -> None:
+        if root.is_symlink():
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         self.root = root
         self.inject = inject or (lambda _: None)
         root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -439,30 +475,39 @@ class JournaledIdentityStore:
         ).encode()
 
     def _atomic_write(self, path: Path, data: bytes) -> None:
+        if path.parent != self.root or path.is_symlink():
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         self.inject(PersistenceBoundary.BEFORE_WRITE)
-        temporary = path.with_suffix(".tmp")
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}-", suffix=".tmp", dir=self.root)
+        temporary = Path(temporary_name)
         try:
-            if self.inject is not None:
-                self.inject(PersistenceBoundary.PARTIAL_WRITE)
-            remaining = memoryview(data)
-            while remaining:
-                written = os.write(descriptor, remaining)
-                if written <= 0:
-                    _fail(SecurityErrorCode.STORAGE_FAILED)
-                remaining = remaining[written:]
-            os.fsync(descriptor)
+            try:
+                os.fchmod(descriptor, 0o600)
+                if self.inject is not None:
+                    self.inject(PersistenceBoundary.PARTIAL_WRITE)
+                remaining = memoryview(data)
+                while remaining:
+                    written = os.write(descriptor, remaining)
+                    if written <= 0:
+                        _fail(SecurityErrorCode.STORAGE_FAILED)
+                    remaining = remaining[written:]
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            os.replace(temporary, path)
+            os.chmod(path, 0o600)
+            directory = os.open(self.root, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
         finally:
-            os.close(descriptor)
-        os.replace(temporary, path)
-        os.chmod(path, 0o600)
-        directory = os.open(self.root, os.O_RDONLY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+            if temporary.exists():
+                temporary.unlink()
 
     def stage(self, value: CredentialGeneration) -> None:
+        if not 1 <= value.generation <= 2**64 - 1 or not value.credential or len(value.credential) > 8192:
+            _fail(SecurityErrorCode.RESOURCE_LIMIT)
         active = self.recover()
         if active is not None and value.generation <= active.generation:
             _fail(SecurityErrorCode.STORAGE_FAILED)
@@ -520,7 +565,10 @@ class JournaledIdentityStore:
                 continue
         keep = set(sorted(complete, reverse=True)[:2])
         for path in self.root.glob("identity-*.json"):
-            generation = int(path.stem.split("-")[1])
+            try:
+                generation = int(path.stem.split("-")[1])
+            except (IndexError, ValueError):
+                continue
             if generation not in keep:
                 path.unlink()
 
@@ -534,6 +582,14 @@ class JournaledIdentityStore:
                 path.unlink()
 
     def store_checkpoint(self, value: SecureTimeCheckpoint) -> None:
+        if (
+            value.authenticated_time.tzinfo is None
+            or (value.monotonic_counter is not None and value.monotonic_counter < 0)
+            or (value.boot_id is not None and not value.boot_id)
+            or not 0 <= value.credential_epoch <= 2**64 - 1
+            or not 0 <= value.revocation_epoch <= 2**64 - 1
+        ):
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         current = self.load_checkpoint()
         if current is not None and (
             value.authenticated_time < current.authenticated_time
@@ -560,10 +616,20 @@ class JournaledIdentityStore:
         path = self.root / "secure-time-checkpoint.json"
         if not path.exists():
             return None
-        document = json.loads(path.read_bytes())
+        document = json.loads(self._read_restricted(path, 4096))
+        if not isinstance(document, dict) or set(document) != {"payload", "sha256"}:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         payload = document["payload"]
+        if not isinstance(payload, dict) or set(payload) != {
+            "authenticated_time",
+            "monotonic_counter",
+            "boot_id",
+            "credential_epoch",
+            "revocation_epoch",
+        }:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-        if document["sha256"] != hashlib.sha256(encoded).hexdigest():
+        if not isinstance(document["sha256"], str) or document["sha256"] != hashlib.sha256(encoded).hexdigest():
             _fail(SecurityErrorCode.STORAGE_FAILED)
         try:
             authenticated_time = datetime.fromisoformat(payload["authenticated_time"].replace("Z", "+00:00"))
@@ -571,32 +637,90 @@ class JournaledIdentityStore:
             _fail(SecurityErrorCode.STORAGE_FAILED)
         if authenticated_time.tzinfo is None:
             _fail(SecurityErrorCode.STORAGE_FAILED)
+        monotonic = payload["monotonic_counter"]
+        boot_id = payload["boot_id"]
+        credential_epoch = payload["credential_epoch"]
+        revocation_epoch = payload["revocation_epoch"]
+        if (
+            (monotonic is not None and (not isinstance(monotonic, int) or isinstance(monotonic, bool) or monotonic < 0))
+            or (boot_id is not None and (not isinstance(boot_id, str) or not boot_id))
+            or not isinstance(credential_epoch, int)
+            or isinstance(credential_epoch, bool)
+            or not 0 <= credential_epoch <= 2**64 - 1
+            or not isinstance(revocation_epoch, int)
+            or isinstance(revocation_epoch, bool)
+            or not 0 <= revocation_epoch <= 2**64 - 1
+        ):
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         return SecureTimeCheckpoint(
             authenticated_time.astimezone(UTC),
-            payload["monotonic_counter"],
-            payload["boot_id"],
-            payload["credential_epoch"],
-            payload["revocation_epoch"],
+            monotonic,
+            boot_id,
+            credential_epoch,
+            revocation_epoch,
         )
 
     @staticmethod
     def _read(path: Path) -> tuple[CredentialGeneration, bool]:
-        if stat.S_IMODE(path.stat().st_mode) & 0o077:
+        document = json.loads(JournaledIdentityStore._read_restricted(path, 16384))
+        if not isinstance(document, dict) or set(document) != {"payload", "sha256"}:
             _fail(SecurityErrorCode.STORAGE_FAILED)
-        document = json.loads(path.read_bytes())
         payload = document["payload"]
+        if not isinstance(payload, dict) or set(payload) != {
+            "generation",
+            "credential_id",
+            "identity_key_id",
+            "credential",
+            "committed",
+        }:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         if document["sha256"] != hashlib.sha256(encoded).hexdigest():
             _fail(SecurityErrorCode.STORAGE_FAILED)
+        generation = payload["generation"]
+        committed = payload["committed"]
+        if (
+            not isinstance(generation, int)
+            or isinstance(generation, bool)
+            or not 1 <= generation <= 2**64 - 1
+            or not isinstance(committed, bool)
+        ):
+            _fail(SecurityErrorCode.STORAGE_FAILED)
+        credential = base64.b64decode(payload["credential"], validate=True)
+        if not credential or len(credential) > 8192:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
         return (
             CredentialGeneration(
-                payload["generation"],
+                generation,
                 CredentialID(payload["credential_id"]),
                 IdentityKeyID(payload["identity_key_id"]),
-                base64.b64decode(payload["credential"], validate=True),
+                credential,
             ),
-            payload["committed"],
+            committed,
         )
+
+    @staticmethod
+    def _read_restricted(path: Path, maximum_bytes: int) -> bytes:
+        if path.is_symlink():
+            _fail(SecurityErrorCode.STORAGE_FAILED)
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            metadata = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) & 0o077
+                or metadata.st_size > maximum_bytes
+            ):
+                _fail(SecurityErrorCode.STORAGE_FAILED)
+            with os.fdopen(descriptor, "rb") as stream:
+                descriptor = -1
+                data = stream.read(maximum_bytes + 1)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+        if len(data) > maximum_bytes:
+            _fail(SecurityErrorCode.STORAGE_FAILED)
+        return data
 
 
 class RotationPhase(str, Enum):
@@ -670,6 +794,8 @@ def accepted_time(
     elif state is ClockTrustState.COMMISSIONER_BOUNDED and authenticated_commissioner_time is not None:
         candidate = authenticated_commissioner_time
     else:
+        _fail(SecurityErrorCode.CLOCK_UNTRUSTED)
+    if candidate.tzinfo is None or (last_checkpoint is not None and last_checkpoint.tzinfo is None):
         _fail(SecurityErrorCode.CLOCK_UNTRUSTED)
     candidate = candidate.astimezone(UTC)
     if last_checkpoint is not None and candidate < last_checkpoint.astimezone(UTC):

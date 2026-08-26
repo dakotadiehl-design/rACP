@@ -15,21 +15,22 @@ from acp.security_authorization import (
     device_identity,
 )
 from acp.security_models import AuthenticationMode, PrincipalState, SecurityProfile
+from acp.testkit import unsafe_authenticated_principal_for_testing
 
 PERMISSION = "security.credential.revoke"
 
 
 def principal(state: PrincipalState = PrincipalState.AUTHENTICATED) -> AuthenticatedPrincipal:
-    return AuthenticatedPrincipal(
-        state,
-        AuthenticationMode.AURORA_TRUST,
-        "domain",
-        "node",
-        "credential",
-        "key",
-        "x509",
-        frozenset({"self-claimed-admin"}),
-        SecurityProfile.FULL,
+    return unsafe_authenticated_principal_for_testing(
+        state=state,
+        mode=AuthenticationMode.AURORA_TRUST,
+        trust_domain_id="domain",
+        node_id="node",
+        credential_id="credential",
+        identity_key_id="key",
+        credential_format="x509_der",
+        role_constraints=frozenset({"self-claimed-admin"}),
+        profile=SecurityProfile.FULL,
     )
 
 

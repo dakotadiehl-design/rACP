@@ -15,7 +15,7 @@ public struct ACPFullTLSHandshake: Sendable {
     public let roleConstraints: Set<String>
     public let credentialState: ACPCredentialState
     public let zeroRTTUsed, resumptionUsed: Bool
-    public init(
+    init(
         protocolVersion: String, mutualAuthentication: Bool, isolatedTrustStore: Bool,
         peerCertificateValid: Bool, localCredentialSelected: Bool, peerSANExtracted: Bool,
         trustDomainID: String, nodeID: String, credentialID: String, identityKeyID: String,
@@ -95,7 +95,7 @@ public enum ACPAuthenticatedTransport {
         return .init(
             mode: .auroraTrust, profile: .full, trustDomainID: handshake.trustDomainID,
             nodeID: handshake.nodeID, credentialID: handshake.credentialID,
-            identityKeyID: handshake.identityKeyID, credentialFormat: "x509",
+            identityKeyID: handshake.identityKeyID, credentialFormat: "x509_der",
             channelBinding: ACPSecurityContext.base64URLEncode(exported), roleConstraints: handshake.roleConstraints,
             credentialState: .active, channelBindingVerified: true
         )
@@ -111,7 +111,9 @@ public enum ACPAuthenticatedTransport {
         }
         let credential = data.dropFirst(2)
         let evidence = try validate(Data(credential))
-        guard evidence.profile == .lightweight, evidence.credentialState == .active else {
+        guard evidence.profile == .lightweight,
+              evidence.credentialFormat == "acp-compact-credential-v1",
+              evidence.credentialState == .active else {
             throw ACPSecurityAdmissionError.credentialInvalid
         }
         return (evidence, Data(credential))

@@ -19,20 +19,20 @@ pub trait TlsExporter {
 }
 
 pub struct FullTlsHandshake {
-    pub protocol: String,
-    pub mutual_authentication: bool,
-    pub isolated_trust_store: bool,
-    pub peer_certificate_valid: bool,
-    pub local_credential_selected: bool,
-    pub peer_san_extracted: bool,
-    pub trust_domain_id: TrustDomainId,
-    pub node_id: SecurityNodeId,
-    pub credential_id: CredentialId,
-    pub identity_key_id: IdentityKeyId,
-    pub role_constraints: HashSet<String>,
-    pub credential_status: CredentialStatus,
-    pub zero_rtt_used: bool,
-    pub resumption_used: bool,
+    pub(crate) protocol: String,
+    pub(crate) mutual_authentication: bool,
+    pub(crate) isolated_trust_store: bool,
+    pub(crate) peer_certificate_valid: bool,
+    pub(crate) local_credential_selected: bool,
+    pub(crate) peer_san_extracted: bool,
+    pub(crate) trust_domain_id: TrustDomainId,
+    pub(crate) node_id: SecurityNodeId,
+    pub(crate) credential_id: CredentialId,
+    pub(crate) identity_key_id: IdentityKeyId,
+    pub(crate) role_constraints: HashSet<String>,
+    pub(crate) credential_status: CredentialStatus,
+    pub(crate) zero_rtt_used: bool,
+    pub(crate) resumption_used: bool,
 }
 
 pub struct LightweightFinishedInputs<'a> {
@@ -211,6 +211,7 @@ pub fn parse_lightweight_preface(
     }
     let evidence = validate(&data[2..])?;
     if evidence.profile != SecurityProfile::Lightweight
+        || evidence.credential_format != CredentialFormat::CompactV1
         || evidence.credential_status != CredentialStatus::Active
     {
         return Err(SecurityErrorCode::CredentialInvalid);
@@ -359,6 +360,12 @@ mod tests {
         let (parsed, raw) = parse_lightweight_preface(&preface, |_| Ok(evidence.clone())).unwrap();
         assert_eq!(parsed, evidence);
         assert_eq!(raw, credential);
+        let mut wrong_format = evidence.clone();
+        wrong_format.credential_format = CredentialFormat::X509Der;
+        assert_eq!(
+            parse_lightweight_preface(&preface, |_| Ok(wrong_format)),
+            Err(SecurityErrorCode::CredentialInvalid)
+        );
         let key = [0x6b; 32];
         let inputs = LightweightFinishedInputs {
             client_credential: credential,

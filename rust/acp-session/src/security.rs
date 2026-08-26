@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use acp_security::{CredentialId, IdentityKeyId, SecurityNodeId, SecurityProfile, TrustDomainId};
+
 pub fn authorize_operation(
     operation: &str,
     context: &acp_security::AuthorizationContext,
@@ -47,18 +49,19 @@ impl AuthenticationMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportEvidence {
-    pub mode: AuthenticationMode,
-    pub trust_domain_id: Option<String>,
-    pub node_id: Option<String>,
-    pub credential_id: Option<String>,
-    pub identity_key_id: Option<String>,
-    pub credential_format: Option<String>,
-    pub channel_binding: Option<String>,
-    pub role_constraints: HashSet<String>,
-    pub credential_state: CredentialState,
-    pub channel_binding_verified: bool,
-    pub zero_rtt_used: bool,
-    pub resumption_used: bool,
+    pub(crate) mode: AuthenticationMode,
+    pub(crate) profile: SecurityProfile,
+    pub(crate) trust_domain_id: Option<String>,
+    pub(crate) node_id: Option<String>,
+    pub(crate) credential_id: Option<String>,
+    pub(crate) identity_key_id: Option<String>,
+    pub(crate) credential_format: Option<String>,
+    pub(crate) channel_binding: Option<String>,
+    pub(crate) role_constraints: HashSet<String>,
+    pub(crate) credential_state: CredentialState,
+    pub(crate) channel_binding_verified: bool,
+    pub(crate) zero_rtt_used: bool,
+    pub(crate) resumption_used: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,14 +80,15 @@ pub enum CredentialState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthenticatedPrincipal {
-    pub state: PrincipalState,
-    pub mode: AuthenticationMode,
-    pub trust_domain_id: Option<String>,
-    pub node_id: Option<String>,
-    pub credential_id: Option<String>,
-    pub identity_key_id: Option<String>,
-    pub credential_format: Option<String>,
-    pub role_constraints: HashSet<String>,
+    pub(crate) state: PrincipalState,
+    pub(crate) mode: AuthenticationMode,
+    pub(crate) profile: Option<SecurityProfile>,
+    pub(crate) trust_domain_id: Option<String>,
+    pub(crate) node_id: Option<String>,
+    pub(crate) credential_id: Option<String>,
+    pub(crate) identity_key_id: Option<String>,
+    pub(crate) credential_format: Option<String>,
+    pub(crate) role_constraints: HashSet<String>,
 }
 
 pub fn bind_hello_auth(
@@ -148,6 +152,44 @@ pub fn bind_hello_auth(
     {
         return Err("security.credential_invalid");
     }
+    let expected_format = if evidence.profile == SecurityProfile::Full {
+        "x509_der"
+    } else {
+        "acp-compact-credential-v1"
+    };
+    if evidence
+        .trust_domain_id
+        .as_deref()
+        .and_then(|value| TrustDomainId::parse(value).ok())
+        .is_none()
+        || evidence
+            .node_id
+            .as_deref()
+            .and_then(|value| SecurityNodeId::parse(value).ok())
+            .is_none()
+        || evidence
+            .credential_id
+            .as_deref()
+            .and_then(|value| CredentialId::parse(value).ok())
+            .is_none()
+        || evidence
+            .identity_key_id
+            .as_deref()
+            .and_then(|value| IdentityKeyId::parse(value).ok())
+            .is_none()
+        || evidence.credential_format.as_deref() != Some(expected_format)
+        || !evidence
+            .channel_binding
+            .as_deref()
+            .is_some_and(valid_channel_binding)
+        || evidence.role_constraints.len() > 16
+        || evidence
+            .role_constraints
+            .iter()
+            .any(|role| role.is_empty() || role.len() > 64)
+    {
+        return Err("security.credential_invalid");
+    }
     if evidence.node_id.as_deref() != Some(claimed_node_id) {
         return Err("security.identity_mismatch");
     }
@@ -166,6 +208,7 @@ pub fn bind_hello_auth(
     Ok(AuthenticatedPrincipal {
         state: PrincipalState::Authenticated,
         mode,
+        profile: Some(evidence.profile),
         trust_domain_id: evidence.trust_domain_id.clone(),
         node_id: evidence.node_id.clone(),
         credential_id: evidence.credential_id.clone(),
@@ -175,10 +218,38 @@ pub fn bind_hello_auth(
     })
 }
 
+fn valid_channel_binding(value: &str) -> bool {
+    if value.len() != 43 || value.contains('=') {
+        return false;
+    }
+    let mut accumulator = 0_u32;
+    let mut bits = 0_u8;
+    let mut decoded = 0_usize;
+    for byte in value.bytes() {
+        let digit = match byte {
+            b'A'..=b'Z' => byte - b'A',
+            b'a'..=b'z' => byte - b'a' + 26,
+            b'0'..=b'9' => byte - b'0' + 52,
+            b'-' => 62,
+            b'_' => 63,
+            _ => return false,
+        };
+        accumulator = (accumulator << 6) | u32::from(digit);
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            decoded += 1;
+            accumulator &= (1_u32 << bits) - 1;
+        }
+    }
+    decoded == 32 && bits == 2 && accumulator == 0
+}
+
 fn unauthenticated(mode: AuthenticationMode) -> AuthenticatedPrincipal {
     AuthenticatedPrincipal {
         state: PrincipalState::Unauthenticated,
         mode,
+        profile: None,
         trust_domain_id: None,
         node_id: None,
         credential_id: None,
@@ -208,22 +279,32 @@ mod tests {
     fn valid_auth() -> HashMap<String, String> {
         HashMap::from([
             ("mode".into(), "aurora_trust".into()),
-            ("trust_domain_id".into(), "domain".into()),
-            ("credential_id".into(), "credential".into()),
-            ("identity_key_id".into(), "key".into()),
-            ("channel_binding".into(), "binding".into()),
+            (
+                "trust_domain_id".into(),
+                "40516273-8495-4a6b-8a3b-4c5d6e7f8091".into(),
+            ),
+            (
+                "credential_id".into(),
+                format!("sha256:{}", "11".repeat(32)),
+            ),
+            (
+                "identity_key_id".into(),
+                format!("sha256:{}", "22".repeat(32)),
+            ),
+            ("channel_binding".into(), "A".repeat(43)),
         ])
     }
 
     fn valid_evidence() -> TransportEvidence {
         TransportEvidence {
             mode: AuthenticationMode::AuroraTrust,
-            trust_domain_id: Some("domain".into()),
-            node_id: Some("node".into()),
-            credential_id: Some("credential".into()),
-            identity_key_id: Some("key".into()),
+            profile: SecurityProfile::Full,
+            trust_domain_id: Some("40516273-8495-4a6b-8a3b-4c5d6e7f8091".into()),
+            node_id: Some("00112233-4455-4677-8899-aabbccddeeff".into()),
+            credential_id: Some(format!("sha256:{}", "11".repeat(32))),
+            identity_key_id: Some(format!("sha256:{}", "22".repeat(32))),
             credential_format: Some("x509_der".into()),
-            channel_binding: Some("binding".into()),
+            channel_binding: Some("A".repeat(43)),
             role_constraints: HashSet::new(),
             credential_state: CredentialState::Active,
             channel_binding_verified: true,
@@ -236,7 +317,13 @@ mod tests {
     fn claimed_aurora_trust_without_evidence_fails_closed() {
         let auth = HashMap::from([("mode".into(), "aurora_trust".into())]);
         assert_eq!(
-            bind_hello_auth("node", &auth, None, true, &[]),
+            bind_hello_auth(
+                "00112233-4455-4677-8899-aabbccddeeff",
+                &auth,
+                None,
+                true,
+                &[]
+            ),
             Err("security.downgrade_forbidden")
         );
     }
@@ -246,7 +333,7 @@ mod tests {
         let auth = valid_auth();
         let valid = valid_evidence();
         assert!(bind_hello_auth(
-            "node",
+            "00112233-4455-4677-8899-aabbccddeeff",
             &auth,
             Some(&valid),
             true,

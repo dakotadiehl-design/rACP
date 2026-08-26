@@ -5,11 +5,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import MISSING, dataclass
 from typing import Any, Protocol, cast
 
 from .cbor_cde import encode
-from .security import CredentialState, SecurityAdmissionError, TransportEvidence
+from .security import CredentialState, SecurityAdmissionError, TransportEvidence, _verified_transport_evidence
 from .security_context import base64url_decode, base64url_encode
 from .security_models import AuthenticationMode, SecurityProfile
 
@@ -21,7 +21,10 @@ class TLSExporter(Protocol):
     def __call__(self, label: bytes, context: bytes, length: int) -> bytes: ...
 
 
-@dataclass(frozen=True, slots=True)
+_HANDSHAKE_PROVENANCE = object()
+
+
+@dataclass(frozen=True, slots=True, init=False)
 class FullTLSHandshake:
     protocol: str
     mutual_authentication: bool
@@ -37,6 +40,23 @@ class FullTLSHandshake:
     credential_state: CredentialState
     zero_rtt_used: bool = False
     resumption_used: bool = False
+
+    def __init__(self, *, _provenance: object, **values: Any) -> None:
+        if _provenance is not _HANDSHAKE_PROVENANCE:
+            raise TypeError("TLS handshake facts may only be created by a transport provider")
+        fields = self.__dataclass_fields__
+        unknown = values.keys() - fields.keys()
+        if unknown:
+            raise TypeError(f"unknown TLS handshake fields: {sorted(unknown)!r}")
+        for name, field in fields.items():
+            if name not in values and field.default is MISSING:
+                raise TypeError(f"missing TLS handshake field: {name}")
+            object.__setattr__(self, name, values[name] if name in values else field.default)
+
+
+def _verified_full_tls_handshake(**values: Any) -> FullTLSHandshake:
+    """Transport-adapter-only factory for verified handshake facts."""
+    return FullTLSHandshake(_provenance=_HANDSHAKE_PROVENANCE, **values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,20 +150,20 @@ def full_transport_evidence(
         verified = False
     if not verified:
         raise SecurityAdmissionError("security.authentication_failed")
-    return TransportEvidence(
-        AuthenticationMode.AURORA_TRUST,
-        handshake.trust_domain_id,
-        handshake.node_id,
-        handshake.credential_id,
-        handshake.identity_key_id,
-        "x509",
-        base64url_encode(exported),
-        handshake.role_constraints,
-        handshake.credential_state,
-        True,
-        False,
-        False,
-        SecurityProfile.FULL,
+    return _verified_transport_evidence(
+        mode=AuthenticationMode.AURORA_TRUST,
+        trust_domain_id=handshake.trust_domain_id,
+        node_id=handshake.node_id,
+        credential_id=handshake.credential_id,
+        identity_key_id=handshake.identity_key_id,
+        credential_format="x509_der",
+        channel_binding=base64url_encode(exported),
+        role_constraints=handshake.role_constraints,
+        credential_state=handshake.credential_state,
+        channel_binding_verified=True,
+        zero_rtt_used=False,
+        resumption_used=False,
+        profile=SecurityProfile.FULL,
     )
 
 
@@ -157,7 +177,12 @@ def parse_lightweight_preface(
         raise SecurityAdmissionError("security.credential_invalid")
     credential = data[2:]
     evidence = validate(credential)
-    if evidence.profile is not SecurityProfile.LIGHTWEIGHT or evidence.credential_state is not CredentialState.ACTIVE:
+    if (
+        not isinstance(evidence, TransportEvidence)
+        or evidence.profile is not SecurityProfile.LIGHTWEIGHT
+        or evidence.credential_format != "acp-compact-credential-v1"
+        or evidence.credential_state is not CredentialState.ACTIVE
+    ):
         raise SecurityAdmissionError("security.credential_invalid")
     return evidence, credential
 

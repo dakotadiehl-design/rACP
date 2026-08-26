@@ -498,25 +498,25 @@ mod tests {
             .map(str::to_owned)
             .collect();
         AuthorizationContext {
-            principal: AuthenticatedPrincipal {
+            principal: acp_security::testkit::unsafe_authenticated_principal_for_testing(
                 state,
-                mode: AuthenticationMode::AuroraTrust,
-                profile: Some(SecurityProfile::Full),
-                trust_domain_id: Some(
+                AuthenticationMode::AuroraTrust,
+                Some(SecurityProfile::Full),
+                Some(
                     TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap(),
                 ),
-                node_id: Some(
+                Some(
                     SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
                 ),
-                credential_id: Some(
+                Some(
                     CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
                 ),
-                identity_key_id: Some(
+                Some(
                     IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap(),
                 ),
-                credential_format: Some(CredentialFormat::X509Der),
-                role_constraints: HashSet::new(),
-            },
+                Some(CredentialFormat::X509Der),
+                HashSet::new(),
+            ),
             credential_permissions: permissions.clone(),
             local_policy_permissions: permissions.clone(),
             capability_permissions: permissions.clone(),
@@ -778,6 +778,8 @@ mod tests {
         let (ta, tb) = Loopback::pair();
         let mut client = Session::new(ta, identity(Role::Remote, "pad"), false);
         let mut server = Session::new(tb, identity(Role::Conductor, "auth"), true);
+        client.allow_plaintext = true;
+        server.allow_plaintext = true;
         client.profiles = vec![
             "core".into(),
             "remote".into(),

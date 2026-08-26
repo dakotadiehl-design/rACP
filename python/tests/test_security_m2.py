@@ -4,6 +4,7 @@ import json
 import logging
 import pickle
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,7 +25,7 @@ from acp.security_secrets import SecretBytes
 ROOT = Path(__file__).parents[2]
 
 
-def vector(path: str) -> dict[str, object]:
+def vector(path: str) -> dict[str, Any]:
     return json.loads((ROOT / "vectors/security" / path).read_text())
 
 

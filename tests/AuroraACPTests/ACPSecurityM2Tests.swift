@@ -49,6 +49,18 @@ final class ACPSecurityM2Tests: XCTestCase {
         XCTAssertFalse(ACPDowngradePolicy.migration(allowTrustedLAN: true).permitsUnauthenticated(strongerAuthenticationAttempted: true))
         XCTAssertThrowsError(try ACPSecurityContext.base64URLDecode("AA=="))
     }
+
+    func testSecretConcurrentAccessAndClearAreSerialized() throws {
+        let secret = try XCTUnwrap(ACPSecretBytes(Data(repeating: 0xA5, count: 32)))
+        DispatchQueue.concurrentPerform(iterations: 100) { index in
+            if index.isMultiple(of: 7) {
+                secret.clear()
+            } else {
+                secret.withUnsafeBytes { XCTAssertEqual($0.count, 32) }
+            }
+        }
+        XCTAssertTrue(String(describing: secret).contains("redacted"))
+    }
 }
 
 private extension Data {

@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .cbor_cde import encode as cbor_encode
+from .security_models import CredentialID
 
 CONTEXT_KEYS = frozenset(
     {
@@ -119,7 +120,11 @@ def install_confirmation(candidate_confirm_key: bytes, values: Mapping[str, Any]
 
 
 def install_proof_digest(transcript_digest: bytes, credential_id: str) -> bytes:
-    if len(transcript_digest) != 32 or not credential_id.startswith("sha256:") or len(credential_id) != 71:
+    try:
+        CredentialID(credential_id)
+    except ValueError as exc:
+        raise ValueError("invalid installation proof inputs") from exc
+    if len(transcript_digest) != 32:
         raise ValueError("invalid installation proof inputs")
     return sha256(b"ACP enrollment install proof v1" + transcript_digest + credential_id.encode("ascii"))
 

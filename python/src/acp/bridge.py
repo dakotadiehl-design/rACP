@@ -120,9 +120,14 @@ class ConfigStore:
                 restart = True
         self.revision += 1
         if self.store:
-            self.store.save("config.json", {"revision": self.revision, "values": {
-                k: v for k, v in self.values.items()
-            }, "secrets_configured": sorted(self.secrets_configured)})
+            self.store.save(
+                "config.json",
+                {
+                    "revision": self.revision,
+                    "values": {k: v for k, v in self.values.items()},
+                    "secrets_configured": sorted(self.secrets_configured),
+                },
+            )
         return {
             "status": CommandStatus.APPLIED.value,
             "new_revision": self.revision,
@@ -170,11 +175,20 @@ class BridgeNode:
                 try:
                     cached = session.lookup_idempotent(env.type, key, request_payload=dict(env.payload))
                 except ValueError:
-                    out.append(make_ack(
-                        env, self.source, CommandStatus.REJECTED,
-                        error={"code": "conflict", "category": "conflict", "severity": "error",
-                               "message": "idempotency key reused with different body", "retryable": False},
-                    ))
+                    out.append(
+                        make_ack(
+                            env,
+                            self.source,
+                            CommandStatus.REJECTED,
+                            error={
+                                "code": "conflict",
+                                "category": "conflict",
+                                "severity": "error",
+                                "message": "idempotency key reused with different body",
+                                "retryable": False,
+                            },
+                        )
+                    )
                     return out
                 if cached:
                     result = {k: v for k, v in cached.items() if k != "status"}
@@ -182,34 +196,53 @@ class BridgeNode:
                     return out
             enabled = env.payload.get("enabled")
             if not isinstance(enabled, bool):
-                out.append(make_ack(
-                    env, self.source, CommandStatus.REJECTED,
-                    error={"code": "invalid_type", "category": "validation", "severity": "error",
-                           "message": "enabled must be a boolean", "retryable": False},
-                ))
+                out.append(
+                    make_ack(
+                        env,
+                        self.source,
+                        CommandStatus.REJECTED,
+                        error={
+                            "code": "invalid_type",
+                            "category": "validation",
+                            "severity": "error",
+                            "message": "enabled must be a boolean",
+                            "retryable": False,
+                        },
+                    )
+                )
                 return out
             scope = env.payload.get("scope", "all")
             if scope not in ALLOWED_SCOPES:
-                out.append(make_ack(
-                    env, self.source, CommandStatus.REJECTED,
-                    error={"code": "invalid_range", "category": "validation", "severity": "error",
-                           "message": "invalid blackout scope", "retryable": False},
-                ))
+                out.append(
+                    make_ack(
+                        env,
+                        self.source,
+                        CommandStatus.REJECTED,
+                        error={
+                            "code": "invalid_range",
+                            "category": "validation",
+                            "severity": "error",
+                            "message": "invalid blackout scope",
+                            "retryable": False,
+                        },
+                    )
+                )
                 return out
             self.blackout_enabled = enabled
             self.blackout_scope = scope
             self.revision += 1
             result = {"enabled": enabled, "scope": scope}
             if session and isinstance(key, str):
-                session.remember_idempotent(
-                    env.type, key, result, status="applied", request_payload=dict(env.payload)
-                )
+                session.remember_idempotent(env.type, key, result, status="applied", request_payload=dict(env.payload))
             if self.store:
-                self.store.save("blackout.json", {
-                    "enabled": self.blackout_enabled,
-                    "scope": self.blackout_scope,
-                    "revision": self.revision,
-                })
+                self.store.save(
+                    "blackout.json",
+                    {
+                        "enabled": self.blackout_enabled,
+                        "scope": self.blackout_scope,
+                        "revision": self.revision,
+                    },
+                )
             out.append(make_ack(env, self.source, CommandStatus.APPLIED, result=result))
             out.append(
                 make_envelope(

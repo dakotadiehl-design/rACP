@@ -31,8 +31,10 @@ class FramedTransport(Transport):
         length, flags = struct.unpack("!IB", header)
         if length > MAX_FRAME:
             raise ConnectionError("frame exceeds maximum")
+        if flags not in (0, 1):
+            raise ConnectionError("reserved frame flags")
         payload = await self.reader.readexactly(length)
-        return payload, bool(flags & 1)
+        return payload, flags == 1
 
     async def close(self) -> None:
         if self._closed:

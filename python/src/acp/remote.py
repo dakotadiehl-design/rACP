@@ -174,16 +174,31 @@ PERMISSION_FOR_ACTION: dict[str, str] = {
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "remote.viewer": frozenset({"observe", "remote.surface.use"}),
     "remote.show_navigation": frozenset({"observe", "remote.surface.use", "song.select", "song.load"}),
-    "remote.operator": frozenset({
-        "observe", "remote.surface.use", "song.select", "song.load",
-        "cue.execute", "look.execute", "output.grand_master",
-    }),
+    "remote.operator": frozenset(
+        {
+            "observe",
+            "remote.surface.use",
+            "song.select",
+            "song.load",
+            "cue.execute",
+            "look.execute",
+            "output.grand_master",
+        }
+    ),
     "remote.busker": frozenset({"observe", "remote.surface.use", "busk.execute"}),
-    "remote.admin": frozenset({
-        "observe", "remote.surface.use", "song.select", "song.load",
-        "cue.execute", "look.execute", "busk.execute",
-        "output.grand_master", "output.blackout",
-    }),
+    "remote.admin": frozenset(
+        {
+            "observe",
+            "remote.surface.use",
+            "song.select",
+            "song.load",
+            "cue.execute",
+            "look.execute",
+            "busk.execute",
+            "output.grand_master",
+            "output.blackout",
+        }
+    ),
 }
 
 CONTROL_TYPE_ALIASES = {
@@ -195,9 +210,17 @@ CONTROL_TYPE_ALIASES = {
     "color_control": "color",
 }
 
-DISPLAY_ONLY_TYPES = frozenset({
-    "label", "value_display", "status_indicator", "status", "meter", "group", "spacer",
-})
+DISPLAY_ONLY_TYPES = frozenset(
+    {
+        "label",
+        "value_display",
+        "status_indicator",
+        "status",
+        "meter",
+        "group",
+        "spacer",
+    }
+)
 EXECUTABLE_SURFACE_KEYS = frozenset(load_constants()["remote"]["executable_surface_keys"])
 MAX_LIVE_EPHEMERAL_AGE_MS = 5_000
 MAX_CLOCK_SKEW_MS = 2_000
@@ -324,11 +347,13 @@ SAFETY_MIN = {
 ALLOWED_TARGETS = frozenset({"prism", "conductor", "bridge"})
 NAV_KINDS = frozenset({"browse", "select", "load", "next", "previous", "go"})
 REMOTE_CLIENT_ROLES = frozenset({Role.REMOTE, Role.TOOL, Role.SIMULATOR})
-INTERACTIVE_TYPES = frozenset({
-    "remote.control.invoke",
-    "remote.momentary.refresh",
-    "remote.navigation.request",
-})
+INTERACTIVE_TYPES = frozenset(
+    {
+        "remote.control.invoke",
+        "remote.momentary.refresh",
+        "remote.navigation.request",
+    }
+)
 READY_STATES = frozenset({"ready", "ready_with_warnings"})
 CLAIM_FIELDS = ("device_id", "remote_id", "participant_id", "operator_id")
 
@@ -696,11 +721,13 @@ class RemoteAuthority:
     max_live_ephemeral_age_ms: int = MAX_LIVE_EPHEMERAL_AGE_MS
     setlist_id: str = "main"
     setlist_name: str = "Tonight"
-    songs: list[dict[str, Any]] = field(default_factory=lambda: [
-        {"song_id": "haywire", "title": "Haywire", "order": 0, "status": "current"},
-        {"song_id": "encore", "title": "Encore", "order": 1, "status": "next"},
-        {"song_id": "closer", "title": "Closer", "order": 2, "status": "queued"},
-    ])
+    songs: list[dict[str, Any]] = field(
+        default_factory=lambda: [
+            {"song_id": "haywire", "title": "Haywire", "order": 0, "status": "current"},
+            {"song_id": "encore", "title": "Encore", "order": 1, "status": "next"},
+            {"song_id": "closer", "title": "Closer", "order": 2, "status": "queued"},
+        ]
+    )
     health: dict[str, Any] = field(default_factory=lambda: {"engine": "ok", "output": "ok", "network": "ok"})
     subscriptions: dict[str, set[str]] = field(default_factory=dict)
     _outbound: dict[str, list[Envelope]] = field(default_factory=dict)
@@ -1092,9 +1119,7 @@ class RemoteAuthority:
             "client_observed_state": None,
             "features": features,
             "subscriptions": self._authorized_namespaces(node_id, features),
-            "inline_surface": self.inline_surface or (
-                features is not None and INLINE_SURFACE_CAPABILITY in features
-            ),
+            "inline_surface": self.inline_surface or (features is not None and INLINE_SURFACE_CAPABILITY in features),
             "pub_generation": self.authority_epoch,
         }
 
@@ -1396,27 +1421,31 @@ class RemoteAuthority:
         out: list[Envelope] = []
         for offset in range(0, len(blob), max_chunk):
             part = blob[offset : offset + max_chunk]
-            out.append(make_envelope(
-                type="resource.chunk",
+            out.append(
+                make_envelope(
+                    type="resource.chunk",
+                    source=self.source,
+                    destination=env.source,
+                    payload={
+                        "transfer_id": tid,
+                        "offset": offset,
+                        "length": len(part),
+                        "data": base64.b64encode(part).decode("ascii"),
+                    },
+                    correlation_id=env.correlation_id or env.message_id,
+                    causation_id=env.message_id,
+                )
+            )
+        out.append(
+            make_envelope(
+                type="resource.complete",
                 source=self.source,
                 destination=env.source,
-                payload={
-                    "transfer_id": tid,
-                    "offset": offset,
-                    "length": len(part),
-                    "data": base64.b64encode(part).decode("ascii"),
-                },
+                payload={"transfer_id": tid},
                 correlation_id=env.correlation_id or env.message_id,
                 causation_id=env.message_id,
-            ))
-        out.append(make_envelope(
-            type="resource.complete",
-            source=self.source,
-            destination=env.source,
-            payload={"transfer_id": tid},
-            correlation_id=env.correlation_id or env.message_id,
-            causation_id=env.message_id,
-        ))
+            )
+        )
         return out
 
     def _resource_reject(self, env: Envelope, session_id: str) -> list[Envelope]:
@@ -1475,41 +1504,47 @@ class RemoteAuthority:
         transfer = self._surface_transfers.get(session_id)
         if self.reject_activation or transfer is None or transfer.transfer_id != tid:
             self._finish_surface_transfer(session_id, tid, keep_live=transfer is not None)
-            return [make_envelope(
-                type="resource.activation_result",
-                source=self.source,
-                destination=env.source,
-                payload={
-                    "transfer_id": tid,
-                    "status": "failed",
-                    "code": "invalid_state" if self.reject_activation else "not_found",
-                },
-                correlation_id=env.message_id,
-            )]
+            return [
+                make_envelope(
+                    type="resource.activation_result",
+                    source=self.source,
+                    destination=env.source,
+                    payload={
+                        "transfer_id": tid,
+                        "status": "failed",
+                        "code": "invalid_state" if self.reject_activation else "not_found",
+                    },
+                    correlation_id=env.message_id,
+                )
+            ]
         previous = transfer.live
         ok = transfer.activate()
         if not ok:
             if previous is not None:
                 transfer.live = previous
-            return [make_envelope(
-                type="resource.activation_result",
-                source=self.source,
-                destination=env.source,
-                payload={"transfer_id": tid, "status": "failed", "code": "invalid_state"},
-                correlation_id=env.message_id,
-            )]
+            return [
+                make_envelope(
+                    type="resource.activation_result",
+                    source=self.source,
+                    destination=env.source,
+                    payload={"transfer_id": tid, "status": "failed", "code": "invalid_state"},
+                    correlation_id=env.message_id,
+                )
+            ]
         rec = self.sessions.get(session_id)
         if rec is not None and self.layout:
             rec["asset_ack_revision"] = self.layout.get("revision")
             rec["asset_ack_hash"] = layout_fingerprint(self.layout)
         self._finish_surface_transfer(session_id, tid, keep_live=True)
-        return [make_envelope(
-            type="resource.activation_result",
-            source=self.source,
-            destination=env.source,
-            payload={"transfer_id": tid, "status": "applied"},
-            correlation_id=env.message_id,
-        )]
+        return [
+            make_envelope(
+                type="resource.activation_result",
+                source=self.source,
+                destination=env.source,
+                payload={"transfer_id": tid, "status": "applied"},
+                correlation_id=env.message_id,
+            )
+        ]
 
     def _client_readiness(self, env: Envelope, session_id: str) -> list[Envelope]:
         rec = self.sessions[session_id]
@@ -1546,14 +1581,12 @@ class RemoteAuthority:
         if err:
             return [self._reject(env, err[0], err[1])]
         cache_type = f"remote.control.invoke:{interaction}"
-        bound = ((self.control(str(payload.get("control_id") or "")) or {}).get("binding") or {})
+        bound = (self.control(str(payload.get("control_id") or "")) or {}).get("binding") or {}
         action = str(bound.get("action") or "")
         delivery = default_delivery(action, interaction)
         dedup_scope = env.source.node_id if delivery == "live_ephemeral" else session_id
         try:
-            cached = self.idempotency.lookup(
-                dedup_scope, cache_type, invocation_id, _fingerprint(payload)
-            )
+            cached = self.idempotency.lookup(dedup_scope, cache_type, invocation_id, _fingerprint(payload))
         except ValueError:
             return [self._reject(env, "conflict", "idempotency key reused with different body")]
         if cached:
@@ -1564,7 +1597,11 @@ class RemoteAuthority:
             out = self._begin(env, session_id, control, invocation_id, payload.get("value", 1.0))
         elif interaction in {"momentary_end", "momentary_cancel"}:
             out = self._end(
-                env, session_id, control, invocation_id, payload.get("lease_id"),
+                env,
+                session_id,
+                control,
+                invocation_id,
+                payload.get("lease_id"),
                 cancel=interaction == "momentary_cancel",
             )
         else:
@@ -1947,11 +1984,13 @@ class RemoteAuthority:
     ) -> list[Envelope]:
         out: list[Envelope] = []
         if action in {"cue.go", "nav.go"}:
-            out.extend([
-                self._resource_delta(env, "cue.current", {"cue_id": self.cue_id}),
-                self._resource_delta(env, "cue.next", {"cue_id": self.next_cue_id}),
-                self._presentation(env),
-            ])
+            out.extend(
+                [
+                    self._resource_delta(env, "cue.current", {"cue_id": self.cue_id}),
+                    self._resource_delta(env, "cue.next", {"cue_id": self.next_cue_id}),
+                    self._presentation(env),
+                ]
+            )
         if action in {"show.song.select", "show.song.load", "show.song.stop"}:
             out.append(self._resource_delta(env, "show.selected_song", {"song_id": self.selected_song_id}))
             if action in {"show.song.load", "show.song.stop"}:
@@ -1962,24 +2001,34 @@ class RemoteAuthority:
             out.append(self._resource_delta(env, "show.current_section", {"section_id": self.section_id}))
             out.append(self._resource_delta(env, "show.next_section", {"section_id": self.next_section_id}))
         if action == "show.progression.hold":
-            out.append(self._resource_delta(
-                env,
-                "show.progression",
-                {"held": self.progression_held, "running": self.running},
-            ))
+            out.append(
+                self._resource_delta(
+                    env,
+                    "show.progression",
+                    {"held": self.progression_held, "running": self.running},
+                )
+            )
         if action in {"show.free_play.enter", "show.free_play.exit"}:
-            out.append(self._resource_delta(
-                env,
-                "show.mode",
-                {"mode": self.mode, "return_context": dict(self.return_context)},
-            ))
+            out.append(
+                self._resource_delta(
+                    env,
+                    "show.mode",
+                    {"mode": self.mode, "return_context": dict(self.return_context)},
+                )
+            )
             out.append(self._nav_state(env))
         if action in {"look.recall", "look.take", "look.preview", "look.preview.cancel"}:
-            out.append(self._resource_delta(env, "look.current", {
-                "look_id": self.current_look_id,
-                "preview_look_id": self.preview_look_id,
-                "transition": result_body.extra.get("transition"),
-            }))
+            out.append(
+                self._resource_delta(
+                    env,
+                    "look.current",
+                    {
+                        "look_id": self.current_look_id,
+                        "preview_look_id": self.preview_look_id,
+                        "transition": result_body.extra.get("transition"),
+                    },
+                )
+            )
             out.append(self._resource_delta(env, "look.preview", {"look_id": self.preview_look_id}))
             if action in {"look.recall", "look.take"}:
                 out.append(self._resource_delta(env, "look.catalog", {"looks": list(self.looks)}))
@@ -2039,14 +2088,16 @@ class RemoteAuthority:
             for msg in messages:
                 if not self._visible_to(rec, msg):
                     continue
-                queued.append(make_envelope(
-                    type=msg.type,
-                    source=msg.source,
-                    destination=dest,
-                    qos=msg.qos,
-                    payload=dict(msg.payload),
-                    causation_id=msg.causation_id,
-                ))
+                queued.append(
+                    make_envelope(
+                        type=msg.type,
+                        source=msg.source,
+                        destination=dest,
+                        qos=msg.qos,
+                        payload=dict(msg.payload),
+                        causation_id=msg.causation_id,
+                    )
+                )
         if any(self._outbound.values()):
             self.notify_publications()
 
@@ -2094,15 +2145,17 @@ class RemoteAuthority:
             if item is not None:
                 resources.append(item)
         rec["snapshot_delivered_revision"] = self.snapshot_revision
-        return [make_envelope(
-            type="state.snapshot",
-            source=self.source,
-            destination=env.source,
-            qos=QoS.RELIABLE,
-            payload={"resources": resources},
-            correlation_id=env.message_id,
-            causation_id=env.message_id,
-        )]
+        return [
+            make_envelope(
+                type="state.snapshot",
+                source=self.source,
+                destination=env.source,
+                qos=QoS.RELIABLE,
+                payload={"resources": resources},
+                correlation_id=env.message_id,
+                causation_id=env.message_id,
+            )
+        ]
 
     def _namespace_resource(self, ns: str) -> dict[str, Any] | None:
         value: dict[str, Any] | None = None
@@ -2160,13 +2213,15 @@ class RemoteAuthority:
                 "songs": list(self.songs),
             }
         elif ns == "remote.control_state":
-            value = {"controls": [
-                {
-                    "control_id": c["control_id"],
-                    "value": self.values.get(c["control_id"], self.effect_active(c["control_id"])),
-                }
-                for c in (self.layout.get("controls") or [])
-            ]}
+            value = {
+                "controls": [
+                    {
+                        "control_id": c["control_id"],
+                        "value": self.values.get(c["control_id"], self.effect_active(c["control_id"])),
+                    }
+                    for c in (self.layout.get("controls") or [])
+                ]
+            }
         if value is None:
             return None
         return {
@@ -2213,12 +2268,19 @@ class RemoteAuthority:
         if hold.max_hold_ms:
             hold.expires_at_ms = now + hold.max_hold_ms
         self.notify_schedule()
-        return [make_ack(env, self.source, CommandStatus.APPLIED, result={
-            "lease_id": hold.lease_id,
-            "expires_ms": hold.max_hold_ms,
-            "expires_at_ms": hold.expires_at_ms,
-            "active": True,
-        })]
+        return [
+            make_ack(
+                env,
+                self.source,
+                CommandStatus.APPLIED,
+                result={
+                    "lease_id": hold.lease_id,
+                    "expires_ms": hold.max_hold_ms,
+                    "expires_at_ms": hold.expires_at_ms,
+                    "active": True,
+                },
+            )
+        ]
 
     def _navigate(self, env: Envelope, session_id: str) -> list[Envelope]:
         roles = self.roles_for(env.source.node_id)
@@ -2256,8 +2318,12 @@ class RemoteAuthority:
             self.browsing[session_id] = song
             result = {"kind": "browse", "song_id": song}
             self.idempotency.remember(
-                dedup_scope, cache_type, key,
-                status="applied", result=result, body_fingerprint=_fingerprint(dict(env.payload)),
+                dedup_scope,
+                cache_type,
+                key,
+                status="applied",
+                result=result,
+                body_fingerprint=_fingerprint(dict(env.payload)),
             )
             return [make_ack(env, self.source, CommandStatus.APPLIED, result=result)]
         if kind == "select":
@@ -2295,8 +2361,12 @@ class RemoteAuthority:
             "snapshot_revision": self.snapshot_revision,
         }
         self.idempotency.remember(
-            dedup_scope, cache_type, key,
-            status="applied", result=out_result, body_fingerprint=_fingerprint(dict(env.payload)),
+            dedup_scope,
+            cache_type,
+            key,
+            status="applied",
+            result=out_result,
+            body_fingerprint=_fingerprint(dict(env.payload)),
         )
         nav = self._nav_state(env)
         self._fanout([nav], origin=session_id)
@@ -2463,9 +2533,7 @@ class RemoteAuthority:
             if len(str(control.get("label") or "")) > SURFACE_LIMITS["max_label_chars"]:
                 raise ValueError("control label too long")
             ctype = normalize_control_type(str(control.get("control_type") or ""))
-            if ctype in DISPLAY_ONLY_TYPES or (
-                ctype not in CONTROL_INTERACTIONS and ctype not in DISPLAY_ONLY_TYPES
-            ):
+            if ctype in DISPLAY_ONLY_TYPES or (ctype not in CONTROL_INTERACTIONS and ctype not in DISPLAY_ONLY_TYPES):
                 lo, hi = control.get("min"), control.get("max")
                 if lo is not None and hi is not None and float(lo) > float(hi):
                     raise ValueError("min greater than max")
@@ -2595,33 +2663,37 @@ class RemoteAuthority:
             return [self._reject(env, "internal", f"action router failed: {exc}")]
         if not result.ok:
             code = result.code or ("timeout" if result.status == "timeout" else "internal")
-            return [self._reject(
-                env,
-                code,
-                result.message or "action router rejected",
-                retryable=result.retryable,
-            )]
+            return [
+                self._reject(
+                    env,
+                    code,
+                    result.message or "action router rejected",
+                    retryable=result.retryable,
+                )
+            ]
         return result
 
     def export_safety_state(self) -> dict[str, Any]:
         holds = []
         for group in self.holds.values():
             for hold in group.values():
-                holds.append({
-                    "control_id": hold.control_id,
-                    "invocation_id": hold.invocation_id,
-                    "session_id": hold.session_id,
-                    "node_id": hold.node_id,
-                    "started_ms": hold.started_ms,
-                    "max_hold_ms": hold.max_hold_ms,
-                    "failsafe": hold.failsafe,
-                    "lease_id": hold.lease_id,
-                    "value": hold.value,
-                    "expires_at_ms": hold.expires_at_ms,
-                    "release_pending": hold.release_pending,
-                    "release_reason": hold.release_reason,
-                    "physical_active": hold.physical_active,
-                })
+                holds.append(
+                    {
+                        "control_id": hold.control_id,
+                        "invocation_id": hold.invocation_id,
+                        "session_id": hold.session_id,
+                        "node_id": hold.node_id,
+                        "started_ms": hold.started_ms,
+                        "max_hold_ms": hold.max_hold_ms,
+                        "failsafe": hold.failsafe,
+                        "lease_id": hold.lease_id,
+                        "value": hold.value,
+                        "expires_at_ms": hold.expires_at_ms,
+                        "release_pending": hold.release_pending,
+                        "release_reason": hold.release_reason,
+                        "physical_active": hold.physical_active,
+                    }
+                )
         return {
             "version": SAFETY_STATE_VERSION,
             "holds": holds,
@@ -2712,13 +2784,15 @@ class RemoteAuthority:
             if rec_sess.get("hello_completed"):
                 dest = Endpoint(node_id=str(rec_sess.get("node_id") or ""))
                 queued = self._outbound.setdefault(sid, [])
-                queued.append(make_envelope(
-                    type=alert.type,
-                    source=alert.source,
-                    destination=dest,
-                    qos=alert.qos,
-                    payload=dict(alert.payload),
-                ))
+                queued.append(
+                    make_envelope(
+                        type=alert.type,
+                        source=alert.source,
+                        destination=dest,
+                        qos=alert.qos,
+                        payload=dict(alert.payload),
+                    )
+                )
         self.notify_publications()
 
     def _reject(self, env: Envelope, code: str, message: str, *, retryable: bool | None = None) -> Envelope:
@@ -2749,14 +2823,16 @@ class RemoteAuthority:
         controls = []
         for control in self.layout.get("controls") or []:
             cid = control["control_id"]
-            controls.append({
-                "control_id": cid,
-                "revision": self.revisions.get(cid, 1),
-                "enabled": control.get("enabled", True),
-                "available": control.get("available", True),
-                "value": self.values.get(cid, self.effect_active(cid)),
-                "confidence": "confirmed",
-            })
+            controls.append(
+                {
+                    "control_id": cid,
+                    "revision": self.revisions.get(cid, 1),
+                    "enabled": control.get("enabled", True),
+                    "available": control.get("available", True),
+                    "value": self.values.get(cid, self.effect_active(cid)),
+                    "confidence": "confirmed",
+                }
+            )
         rec = self.sessions.get(session_id) if session_id else None
         if rec is not None:
             rec["snapshot_delivered_revision"] = self.snapshot_revision
@@ -2955,17 +3031,21 @@ def sample_layout(*, show_id: str, layout_id: str) -> dict[str, Any]:
         "max_client_schema": "1.0",
         "compatible_profile": "aurora.remote.prism.v1",
         "asset_type": "aurora.remote.surface",
-        "pages": [{
-            "page_id": "main",
-            "title": "FOH",
-            "order": 0,
-            "groups": [{
-                "group_id": "live",
-                "title": "Live",
+        "pages": [
+            {
+                "page_id": "main",
+                "title": "FOH",
                 "order": 0,
-                "controls": ["cue_go", "fog_burst", "work_lights"],
-            }],
-        }],
+                "groups": [
+                    {
+                        "group_id": "live",
+                        "title": "Live",
+                        "order": 0,
+                        "controls": ["cue_go", "fog_burst", "work_lights"],
+                    }
+                ],
+            }
+        ],
         "controls": [
             {
                 "control_id": "cue_go",
@@ -3443,12 +3523,15 @@ class RemoteClient:
                     continue
                 self._refresh_in_flight.add(inv)
                 try:
-                    ack = await self.session.request(make_envelope(
-                        type="remote.momentary.refresh",
-                        source=self.source,
-                        destination=self._dest(),
-                        payload={"control_id": control_id, "invocation_id": inv, "lease_id": lease},
-                    ), timeout=1.0)
+                    ack = await self.session.request(
+                        make_envelope(
+                            type="remote.momentary.refresh",
+                            source=self.source,
+                            destination=self._dest(),
+                            payload={"control_id": control_id, "invocation_id": inv, "lease_id": lease},
+                        ),
+                        timeout=1.0,
+                    )
                     status = str(ack.payload.get("status") or "")
                     if status in {"rejected", "failed"}:
                         self._drop_lease(inv, stale=True)
@@ -3539,12 +3622,15 @@ class RemoteClient:
         if not tid or self._staged_layout is None:
             raise SessionError("timeout", "surface transfer did not complete")
         try:
-            ack = await self.request(make_envelope(
-                type="resource.activate",
-                source=self.source,
-                destination=self._dest(),
-                payload={"transfer_id": tid},
-            ), timeout=timeout)
+            ack = await self.request(
+                make_envelope(
+                    type="resource.activate",
+                    source=self.source,
+                    destination=self._dest(),
+                    payload={"transfer_id": tid},
+                ),
+                timeout=timeout,
+            )
         except SessionError:
             self._clear_staged()
             raise
@@ -3587,7 +3673,11 @@ class RemoteClient:
         timeout: float = 5.0,
     ) -> Envelope:
         return await self.invoke_wait(
-            control_id, "momentary_begin", value, invocation_id=invocation_id, timeout=timeout,
+            control_id,
+            "momentary_begin",
+            value,
+            invocation_id=invocation_id,
+            timeout=timeout,
         )
 
     async def end_momentary_wait(

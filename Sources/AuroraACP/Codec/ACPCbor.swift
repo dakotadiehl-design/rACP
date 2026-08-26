@@ -195,7 +195,7 @@ extension ACPEncoding {
             case 27:
                 let slice = try slice(data, offset, 8)
                 offset += 8
-                let bits = slice.withUnsafeBytes { $0.load(as: UInt64.self).bigEndian }
+                let bits = slice.reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
                 let f = Double(bitPattern: bits)
                 if !f.isFinite { throw ACPCodecError.malformed("nan") }
                 return .double(f)

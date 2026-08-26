@@ -15,8 +15,7 @@ atoms = st.one_of(
 
 jsonish = st.recursive(
     atoms,
-    lambda children: st.lists(children, max_size=6)
-    | st.dictionaries(st.text(max_size=16), children, max_size=6),
+    lambda children: st.lists(children, max_size=6) | st.dictionaries(st.text(max_size=16), children, max_size=6),
     max_leaves=20,
 )
 

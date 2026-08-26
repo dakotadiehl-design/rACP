@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-26",
+  "allowed_statuses": ["PASS", "FAIL", "NOT RUN", "DEFERRED", "NOT APPLICABLE"],
+  "release_gate": "DEFERRED",
+  "criteria": [
+    {"id":"M8-PROPERTY","requirement":"Property tests cover canonical CBOR, base64url, extensions, revocation epochs, identifiers, parser robustness, and authorization intersection.","status":"PASS","evidence":["python/tests/test_security_properties.py","rust/acp-security/src/hardening.rs","tests/AuroraACPTests/ACPSecurityHardeningTests.swift",".github/workflows/ci.yml#security-hardening"]},
+    {"id":"M8-FUZZ","requirement":"Reproducible attacker-input fuzz smoke covers security parsing boundaries without process crashes.","status":"PASS","evidence":["scripts/security_fuzz_smoke.py","rust/acp-security/src/hardening.rs",".github/workflows/ci.yml#security-hardening"]},
+    {"id":"M8-BOUNDS","requirement":"Declared enrollment, replay, credential, revocation, Lightweight, session queue, and audit bounds fail closed.","status":"PASS","evidence":["python/tests/test_security_enrollment.py","python/tests/test_security_credentials.py","python/tests/test_security_transport.py","python/tests/test_security_operations.py","rust/acp-security/src/lib.rs","rust/acp-security/src/transport.rs","tests/AuroraACPTests/ACPEnrollmentTests.swift","tests/AuroraACPTests/Session/ACPReadinessTests.swift"]},
+    {"id":"M8-CONCURRENCY","requirement":"Concurrent policy, operational-state, enrollment, and session behavior is deterministic and fail closed.","status":"PASS","evidence":["tests/AuroraACPTests/ACPSecurityHardeningTests.swift","python/tests/test_security_operations.py","python/tests/test_security_enrollment.py","rust/acp-security/src/lib.rs"]},
+    {"id":"M8-ADVERSARIAL-LAN","requirement":"Host tests reject spoofing, replay, downgrade, identity mismatch, stripped metadata, exporter mismatch, revocation rollback, malformed framing, and secret disclosure.","status":"PASS","evidence":["python/tests/test_security_contract.py","python/tests/test_security_transport.py","python/tests/test_security_credentials.py","python/tests/test_framed.py","python/tests/test_session.py","python/tests/test_security_operations.py","tests/interop/test_security_enrollment.py","vectors/malformed"]},
+    {"id":"M8-DEPENDENCY-PROFILE","requirement":"Frozen provider/dependency versions and license policy are reproducibly checked.","status":"PASS","evidence":["scripts/check_security_dependencies.py","tools/security-probe/results/macos-arm64-botan-3.13.0.json","rust/Cargo.lock","python/pyproject.toml"]},
+    {"id":"M8-ADVISORIES","requirement":"Current Rust and Python vulnerability advisory databases report no release-blocking issue.","status":"NOT RUN","evidence":[".github/workflows/ci.yml#dependency-advisories"],"note":"Network-backed CI gate; no local advisory freshness claim."},
+    {"id":"M8-CI","requirement":"Security properties, fuzz smoke, malformed input, dependencies, advisories, vectors, SDK tests, and interoperability are enforced in CI.","status":"PASS","evidence":[".github/workflows/ci.yml"]},
+    {"id":"M8-MACOS-ARM64","requirement":"macOS arm64 Full-profile adapter is qualified.","status":"PASS","evidence":["tools/security-probe/results/macos-arm64-botan-3.13.0.json"]},
+    {"id":"M8-IOS-PHYSICAL","requirement":"iOS hardware-backed behaviors are qualified on physical devices.","status":"DEFERRED","evidence":[],"note":"Simulator evidence is not physical-device evidence."},
+    {"id":"M8-LIGHTWEIGHT-HIL","requirement":"Lightweight profile passes representative Pico-class hardware-in-loop qualification.","status":"DEFERRED","evidence":[],"note":"Simulator tests do not qualify production embedded hardware."},
+    {"id":"M8-OTHER-PLATFORMS","requirement":"Claimed Linux, Windows, Raspberry Pi, and additional Apple adapters pass the platform probe suite.","status":"NOT RUN","evidence":[],"note":"No claim is made for unavailable platforms."},
+    {"id":"M8-INTERNAL-REVIEW","requirement":"An independent-style internal review records findings and residual risks.","status":"PASS","evidence":["DesignDocs/ACP_Aurora_Trust_Final_Internal_Security_Review.md"]},
+    {"id":"M8-EXTERNAL-REVIEW","requirement":"An independent external cryptographic/security reviewer approves show-critical release.","status":"DEFERRED","evidence":["DesignDocs/ACP_Aurora_Trust_External_Review_Package.md"],"note":"Package prepared; review has not been performed."}
+  ]
+}

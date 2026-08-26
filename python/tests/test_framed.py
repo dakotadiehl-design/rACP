@@ -26,7 +26,11 @@ async def _framed_hello_once(encodings: list[str]) -> None:
 
     async def on_client(transport) -> None:
         server = Session(
-            transport, server_ident, is_server=True, allow_plaintext=True, encodings=encodings,
+            transport,
+            server_ident,
+            is_server=True,
+            allow_plaintext=True,
+            encodings=encodings,
             profiles=REMOTE_PROFILES,
         )
         await server.handshake(default_caps())
@@ -74,13 +78,15 @@ async def _framed_request_correlation_and_goodbye() -> None:
         await server.handshake(default_caps())
         async for env in server.subscribe():
             if env.type == "state.request":
-                await server.send(make_envelope(
-                    type="state.snapshot",
-                    source=server.source(),
-                    destination=Endpoint(node_id=env.source.node_id),
-                    payload={"resources": []},
-                    correlation_id=env.correlation_id or env.message_id,
-                ))
+                await server.send(
+                    make_envelope(
+                        type="state.snapshot",
+                        source=server.source(),
+                        destination=Endpoint(node_id=env.source.node_id),
+                        payload={"resources": []},
+                        correlation_id=env.correlation_id or env.message_id,
+                    )
+                )
                 got.set()
                 break
         await server.goodbye()
@@ -96,12 +102,15 @@ async def _framed_request_correlation_and_goodbye() -> None:
         )
         await client.handshake(default_caps())
         dest = Endpoint(node_id=client.peer.node_id) if client.peer else None
-        ack = await client.request(make_envelope(
-            type="state.request",
-            source=client.source(),
-            destination=dest,
-            payload={"resources": []},
-        ), timeout=2)
+        ack = await client.request(
+            make_envelope(
+                type="state.request",
+                source=client.source(),
+                destination=dest,
+                payload={"resources": []},
+            ),
+            timeout=2,
+        )
         assert ack.type == "state.snapshot"
         assert ack.correlation_id == ack.correlation_id
         await asyncio.wait_for(got.wait(), timeout=2)
@@ -195,6 +204,7 @@ async def _framed_sequence_gap() -> None:
             allow_plaintext=True,
         )
         await client.handshake(default_caps())
+
         def heartbeat(seq: int):
             return make_envelope(
                 type="health.heartbeat",

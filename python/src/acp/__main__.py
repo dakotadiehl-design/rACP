@@ -14,13 +14,33 @@ from .testkit import identity
 from .types import Endpoint, Role
 from .ws import connect_ws, serve_ws
 
-_SECURITY_REDACT_KEYS = frozenset({
-    "bootstrap_secret", "manual_code", "shareP", "shareV", "confirmP", "confirmV",
-    "pake_message", "candidate_confirmation", "commissioner_confirmation", "channel_binding",
-    "binding", "ciphertext", "tag", "credential", "trust_anchor", "identity_public_key",
-    "public_key", "signature", "proof_of_possession", "possession_proof", "confirmation",
-    "private_key", "key_material",
-})
+_SECURITY_REDACT_KEYS = frozenset(
+    {
+        "bootstrap_secret",
+        "manual_code",
+        "shareP",
+        "shareV",
+        "confirmP",
+        "confirmV",
+        "pake_message",
+        "candidate_confirmation",
+        "commissioner_confirmation",
+        "channel_binding",
+        "binding",
+        "ciphertext",
+        "tag",
+        "credential",
+        "trust_anchor",
+        "identity_public_key",
+        "public_key",
+        "signature",
+        "proof_of_possession",
+        "possession_proof",
+        "confirmation",
+        "private_key",
+        "key_material",
+    }
+)
 
 
 def redact_security(value, key: str = ""):

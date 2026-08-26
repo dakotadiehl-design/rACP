@@ -6,6 +6,10 @@ license.workspace = true
 description = "ACP Aurora Trust typed security and provider boundaries"
 rust-version.workspace = true
 
+[features]
+default = []
+testkit = []
+
 [dependencies]
 acp-model = { path = "../acp-model" }
 acp-codec = { path = "../acp-codec" }

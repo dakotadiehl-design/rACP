@@ -63,6 +63,9 @@ public actor ACPFramedConnection: ACPTransport {
     }
 
     public func send(_ data: Data, text: Bool) async throws {
+        guard data.count <= 8 * 1024 * 1024 else {
+            throw ACPSessionError("invalid_range", "frame too large")
+        }
         var frame = Data()
         var length = UInt32(data.count).bigEndian
         frame.append(Data(bytes: &length, count: 4))
@@ -79,11 +82,14 @@ public actor ACPFramedConnection: ACPTransport {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             let header = try await self.receiveExact(5)
-            let length = header.prefix(4).withUnsafeBytes { UInt32(bigEndian: $0.load(as: UInt32.self)) }
+            let length = header.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
             if length > 8 * 1024 * 1024 {
                 throw ACPSessionError("invalid_range", "frame too large")
             }
-            let text = header[4] != 0
+            guard header[4] == 0 || header[4] == 1 else {
+                throw ACPSessionError("malformed_envelope", "reserved frame flags")
+            }
+            let text = header[4] == 1
             let payload = try await self.receiveExact(Int(length))
             return (payload, text)
         } onCancel: {

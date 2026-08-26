@@ -59,6 +59,16 @@ class EnrollmentLimits:
     attempt_timeout_ns: int = 60_000_000_000
     enrollment_window_ns: int = 600_000_000_000
 
+    def __post_init__(self) -> None:
+        values = (
+            self.concurrent_attempts,
+            self.attempts_per_enrollment,
+            self.attempt_timeout_ns,
+            self.enrollment_window_ns,
+        )
+        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in values):
+            raise EnrollmentTransitionError(SecurityErrorCode.RESOURCE_LIMIT)
+
     @classmethod
     def for_profile(cls, profile: SecurityProfile) -> EnrollmentLimits:
         return cls(concurrent_attempts=2 if profile is SecurityProfile.FULL else 1)
@@ -118,6 +128,8 @@ class CandidateEnrollment:
             self.audit.record(event, fields)
 
     def begin(self, attempt_id: EnrollmentAttemptID, suite: SecuritySuite, now_ns: int) -> None:
+        if isinstance(now_ns, bool) or not isinstance(now_ns, int) or now_ns < 0 or self.opened_ns < 0:
+            raise EnrollmentTransitionError(SecurityErrorCode.RESOURCE_LIMIT)
         self._expire_if_needed(now_ns)
         if self.state is CandidateState.LOCKED:
             raise EnrollmentTransitionError(SecurityErrorCode.ENROLLMENT_LOCKED)
@@ -128,8 +140,6 @@ class CandidateEnrollment:
         if suite not in self.supported_suites:
             raise EnrollmentTransitionError(SecurityErrorCode.NO_COMMON_SUITE)
         if len(self.active_attempts) >= self.limits.concurrent_attempts:
-            raise EnrollmentTransitionError(SecurityErrorCode.RESOURCE_LIMIT)
-        if self.limits.concurrent_attempts <= 0 or self.limits.attempts_per_enrollment <= 0:
             raise EnrollmentTransitionError(SecurityErrorCode.RESOURCE_LIMIT)
         self.active_attempts[attempt_id] = CandidateAttempt(now_ns + self.limits.attempt_timeout_ns)
         self.state = CandidateState.NEGOTIATING
@@ -265,6 +275,8 @@ class CommissionerEnrollment:
             )
 
     def transition(self, expected: CommissionerState, target: CommissionerState, now_ns: int) -> None:
+        if isinstance(now_ns, bool) or not isinstance(now_ns, int) or now_ns < 0 or self.deadline_ns <= 0:
+            raise EnrollmentTransitionError(SecurityErrorCode.RESOURCE_LIMIT)
         if self.consumed:
             raise EnrollmentTransitionError(SecurityErrorCode.ENROLLMENT_REPLAYED)
         if now_ns >= self.deadline_ns:

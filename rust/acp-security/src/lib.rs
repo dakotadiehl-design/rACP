@@ -2,6 +2,7 @@
 
 mod authorization;
 mod credential;
+mod hardening;
 mod migration;
 mod transport;
 pub use authorization::*;
@@ -215,32 +216,67 @@ impl DowngradePolicy {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportEvidence {
-    pub mode: AuthenticationMode,
-    pub profile: SecurityProfile,
-    pub trust_domain_id: TrustDomainId,
-    pub node_id: SecurityNodeId,
-    pub credential_id: CredentialId,
-    pub identity_key_id: IdentityKeyId,
-    pub credential_format: CredentialFormat,
-    pub channel_binding: Option<[u8; 32]>,
-    pub credential_status: CredentialStatus,
-    pub channel_binding_verified: bool,
-    pub zero_rtt_used: bool,
-    pub resumption_used: bool,
-    pub role_constraints: HashSet<String>,
+    pub(crate) mode: AuthenticationMode,
+    pub(crate) profile: SecurityProfile,
+    pub(crate) trust_domain_id: TrustDomainId,
+    pub(crate) node_id: SecurityNodeId,
+    pub(crate) credential_id: CredentialId,
+    pub(crate) identity_key_id: IdentityKeyId,
+    pub(crate) credential_format: CredentialFormat,
+    pub(crate) channel_binding: Option<[u8; 32]>,
+    pub(crate) credential_status: CredentialStatus,
+    pub(crate) channel_binding_verified: bool,
+    pub(crate) zero_rtt_used: bool,
+    pub(crate) resumption_used: bool,
+    pub(crate) role_constraints: HashSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthenticatedPrincipal {
-    pub state: PrincipalState,
-    pub mode: AuthenticationMode,
-    pub profile: Option<SecurityProfile>,
-    pub trust_domain_id: Option<TrustDomainId>,
-    pub node_id: Option<SecurityNodeId>,
-    pub credential_id: Option<CredentialId>,
-    pub identity_key_id: Option<IdentityKeyId>,
-    pub credential_format: Option<CredentialFormat>,
-    pub role_constraints: HashSet<String>,
+    pub(crate) state: PrincipalState,
+    pub(crate) mode: AuthenticationMode,
+    pub(crate) profile: Option<SecurityProfile>,
+    pub(crate) trust_domain_id: Option<TrustDomainId>,
+    pub(crate) node_id: Option<SecurityNodeId>,
+    pub(crate) credential_id: Option<CredentialId>,
+    pub(crate) identity_key_id: Option<IdentityKeyId>,
+    pub(crate) credential_format: Option<CredentialFormat>,
+    pub(crate) role_constraints: HashSet<String>,
+}
+
+impl AuthenticatedPrincipal {
+    pub fn state(&self) -> PrincipalState { self.state }
+    pub fn mode(&self) -> AuthenticationMode { self.mode }
+    pub fn profile(&self) -> Option<SecurityProfile> { self.profile }
+    pub fn trust_domain_id(&self) -> Option<&TrustDomainId> { self.trust_domain_id.as_ref() }
+    pub fn node_id(&self) -> Option<&SecurityNodeId> { self.node_id.as_ref() }
+    pub fn credential_id(&self) -> Option<&CredentialId> { self.credential_id.as_ref() }
+    pub fn identity_key_id(&self) -> Option<&IdentityKeyId> { self.identity_key_id.as_ref() }
+    pub fn credential_format(&self) -> Option<CredentialFormat> { self.credential_format }
+    pub fn role_constraints(&self) -> &HashSet<String> { &self.role_constraints }
+}
+
+/// Explicitly opt-in constructors for negative-path tests. This feature must
+/// never be enabled in a production build.
+#[cfg(feature = "testkit")]
+pub mod testkit {
+    use super::*;
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn unsafe_authenticated_principal_for_testing(
+        state: PrincipalState,
+        mode: AuthenticationMode,
+        profile: Option<SecurityProfile>,
+        trust_domain_id: Option<TrustDomainId>,
+        node_id: Option<SecurityNodeId>,
+        credential_id: Option<CredentialId>,
+        identity_key_id: Option<IdentityKeyId>,
+        credential_format: Option<CredentialFormat>,
+        role_constraints: HashSet<String>,
+    ) -> AuthenticatedPrincipal {
+        AuthenticatedPrincipal { state, mode, profile, trust_domain_id, node_id, credential_id,
+            identity_key_id, credential_format, role_constraints }
+    }
 }
 
 pub struct SecretBytes(Vec<u8>);
@@ -700,7 +736,11 @@ impl CandidateEnrollment {
         if self.attempts.len() >= self.limits.concurrent_attempts {
             return Err(SecurityErrorCode::ResourceLimit);
         }
-        if self.limits.concurrent_attempts == 0 || self.limits.attempts_per_enrollment == 0 {
+        if self.limits.concurrent_attempts == 0
+            || self.limits.attempts_per_enrollment == 0
+            || self.limits.attempt_timeout_ns == 0
+            || self.limits.enrollment_window_ns == 0
+        {
             return Err(SecurityErrorCode::ResourceLimit);
         }
         let deadline_ns = now

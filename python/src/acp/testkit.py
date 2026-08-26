@@ -3,10 +3,45 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import fields
 from datetime import UTC, datetime
 
 from .session import Session, Transport
 from .types import Capability, NodeIdentity, Role, new_uuid
+
+
+def unsafe_transport_evidence_for_testing(**values: object):
+    """Construct sealed evidence in tests; never use this in a product adapter."""
+    from .security import _verified_transport_evidence
+
+    return _verified_transport_evidence(**values)
+
+
+def unsafe_authenticated_principal_for_testing(**values: object):
+    """Construct a sealed principal for authorization unit tests only."""
+    from .security import _admitted_principal
+
+    return _admitted_principal(**values)
+
+
+def unsafe_full_tls_handshake_for_testing(**values: object):
+    """Construct sealed TLS facts for deterministic transport unit tests only."""
+    from .security_transport import _verified_full_tls_handshake
+
+    return _verified_full_tls_handshake(**values)
+
+
+def unsafe_replace_security_value_for_testing(value: object, **changes: object):
+    """Copy a sealed security value with mutations for negative-path tests."""
+    from .security import TransportEvidence
+    from .security_transport import FullTLSHandshake
+
+    values = {field.name: getattr(value, field.name) for field in fields(value)} | changes
+    if isinstance(value, TransportEvidence):
+        return unsafe_transport_evidence_for_testing(**values)
+    if isinstance(value, FullTLSHandshake):
+        return unsafe_full_tls_handshake_for_testing(**values)
+    raise TypeError("unsupported sealed security value")
 
 
 class LoopbackTransport(Transport):
@@ -108,11 +143,17 @@ async def connected_pair(
     caps = capabilities or default_caps()
     ta, tb = linked_transports()
     client = Session(
-        ta, identity(left_role), is_server=False, allow_plaintext=True,
+        ta,
+        identity(left_role),
+        is_server=False,
+        allow_plaintext=True,
         profiles=["core", "remote", "aurora.remote.prism.v1"],
     )
     server = Session(
-        tb, identity(right_role), is_server=True, allow_plaintext=True,
+        tb,
+        identity(right_role),
+        is_server=True,
+        allow_plaintext=True,
         profiles=["core", "remote", "aurora.remote.prism.v1"],
     )
     await server.start_receiver()

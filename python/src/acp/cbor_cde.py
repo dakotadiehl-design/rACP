@@ -27,6 +27,8 @@ def encode(value: Any) -> bytes:
 
 
 def decode(data: bytes) -> Any:
+    if len(data) > MAX_BYTES:
+        raise CborError("CBOR document exceeds limit")
     value, offset = _decode(data, 0, 0)
     if offset != len(data):
         raise CborError("trailing bytes after CBOR item")

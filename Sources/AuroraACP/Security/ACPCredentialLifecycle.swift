@@ -1,6 +1,14 @@
 import CryptoKit
 import Foundation
 
+private func canonicalSecurityDate(_ value: String) -> Date? {
+    let pattern = #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?Z$"#
+    guard value.range(of: pattern, options: .regularExpression) != nil else { return nil }
+    let formatter = ISO8601DateFormatter()
+    if value.contains(".") { formatter.formatOptions.insert(.withFractionalSeconds) }
+    return formatter.date(from: value)
+}
+
 public struct ACPX509ValidationEvidence: Sendable {
     public var derParsed, isolatedChain, signatureValid, sanWellFormed: Bool
     public var domainMatches, nodeMatches, ekuValid, kuValid, caConstraintsValid: Bool
@@ -133,9 +141,12 @@ public func ACPValidateCompactCredential(
           body["trust_domain_id"] == .string(policy.expectedDomain.rawValue),
           body["node_id"] == .string(policy.expectedNode.rawValue),
           case .string(let issuer) = body["issuer_key_id"], ACPIdentityKeyID(rawValue: issuer) != nil,
+          case .int(let serial) = body["serial"], serial >= 0,
+          case .string(let permissionPolicyID) = body["permission_policy_id"],
+          (1...128).contains(permissionPolicyID.utf8.count),
           case .bytes(let publicKey) = body["identity_public_key"], !publicKey.isEmpty,
           case .array(let roleValues) = body["role_constraints"], roleValues.count <= 16,
-          case .object(let extensions) = body["extensions"], extensions.count <= 64,
+          case .object(let extensions) = body["extensions"], extensions.count <= 16,
           case .string(let issuedText) = body["issued_at"],
           case .string(let notBeforeText) = body["not_before"],
           case .string(let expiresText) = body["expires_at"]
@@ -143,20 +154,20 @@ public func ACPValidateCompactCredential(
     var roles: [String] = []
     for value in roleValues {
         guard case .string(let role) = value, policy.allowedRoles.contains(role),
-              roles.last.map({ $0 < role }) ?? true
+              (1...64).contains(role.utf8.count),
+              roles.last.map({ Data($0.utf8).lexicographicallyPrecedes(Data(role.utf8)) }) ?? true
         else { throw ACPSecurityErrorCode.credentialInvalid }
         roles.append(role)
     }
     for extensionValue in extensions.values {
         guard case .object(let fields) = extensionValue,
               Set(fields.keys) == Set(["critical", "value"]),
-              fields["critical"] != .bool(true), case .some(.bytes) = fields["value"]
+              fields["critical"] == .bool(false), case .some(.bytes) = fields["value"]
         else { throw ACPSecurityErrorCode.credentialInvalid }
     }
-    let formatter = ISO8601DateFormatter()
-    guard let issuedAt = formatter.date(from: issuedText),
-          let notBefore = formatter.date(from: notBeforeText),
-          let expiresAt = formatter.date(from: expiresText),
+    guard let issuedAt = canonicalSecurityDate(issuedText),
+          let notBefore = canonicalSecurityDate(notBeforeText),
+          let expiresAt = canonicalSecurityDate(expiresText),
           issuedAt <= policy.evaluationTime, notBefore <= policy.evaluationTime,
           policy.evaluationTime <= expiresAt, notBefore <= expiresAt
     else { throw ACPSecurityErrorCode.credentialExpired }
@@ -164,9 +175,9 @@ public func ACPValidateCompactCredential(
     let digest = Data(SHA256.hash(data: Data("ACP compact credential v1".utf8) + bodyBytes))
     guard verifier.verify(issuerKeyID: issuer, digest: digest, signature: signature), policy.possessionValid,
           let credentialID = ACPCredentialID(rawValue: ACPSecurityContext.digestID(raw)),
-          let identityKeyID = ACPIdentityKeyID(rawValue: ACPSecurityContext.digestID(publicKey)),
-          !revoked(credentialID)
+          let identityKeyID = ACPIdentityKeyID(rawValue: ACPSecurityContext.digestID(publicKey))
     else { throw ACPSecurityErrorCode.credentialInvalid }
+    guard !revoked(credentialID) else { throw ACPSecurityErrorCode.credentialRevoked }
     return .init(
         credentialID: credentialID, identityKeyID: identityKeyID,
         trustDomainID: policy.expectedDomain, nodeID: policy.expectedNode,
@@ -194,6 +205,8 @@ public struct ACPRevocationState: Sendable {
     public mutating func ingest(
         bodyRaw: Data, signature: Data, verifier: any ACPCredentialSignatureVerifier
     ) throws {
+        let maximumBytes = maximumEntries <= 128 ? 8192 : 65_536
+        guard !bodyRaw.isEmpty, bodyRaw.count <= maximumBytes else { throw ACPSecurityErrorCode.resourceLimit }
         guard case .object(let body) = try ACPEncoding.decodeValue(bodyRaw),
               try ACPEncoding.encodeValue(.plain(.object(body))) == bodyRaw,
               case .string(let format) = body["format"],
@@ -205,8 +218,7 @@ public struct ACPRevocationState: Sendable {
               case .string(let issuedText) = body["issued_at"],
               case .string(let nextText) = body["next_update"]
         else { throw ACPSecurityErrorCode.credentialInvalid }
-        let formatter = ISO8601DateFormatter()
-        guard let issued = formatter.date(from: issuedText), let next = formatter.date(from: nextText), next > issued
+        guard let issued = canonicalSecurityDate(issuedText), let next = canonicalSecurityDate(nextText), next > issued
         else { throw ACPSecurityErrorCode.credentialInvalid }
         let required = Set(["format", "trust_domain_id", "epoch", "issued_at", "next_update", "issuer_key_id", "entries"])
         let allowed = required.union(["base_epoch", "previous_snapshot_hash"])
@@ -243,8 +255,15 @@ public struct ACPRevocationState: Sendable {
                   case .string(let nodeText) = fields["node_id"],
                   let nodeID = ACPSecurityNodeID(rawValue: nodeText),
                   case .string(let revokedAt) = fields["revoked_at"],
-                  case .string(let reason) = fields["reason"]
+                  case .string(let reason) = fields["reason"],
+                  ["key_compromise", "superseded", "retired", "policy", "operator_request"].contains(reason)
             else { throw ACPSecurityErrorCode.credentialInvalid }
+            if let replacement = fields["replacement_credential_id"] {
+                guard case .string(let replacementText) = replacement,
+                      let replacementID = ACPCredentialID(rawValue: replacementText),
+                      replacementID != credentialID
+                else { throw ACPSecurityErrorCode.credentialInvalid }
+            }
             previous = credentialText
             parsed.append(.init(credentialID: credentialID, nodeID: nodeID, revokedAt: revokedAt, reason: reason))
         }

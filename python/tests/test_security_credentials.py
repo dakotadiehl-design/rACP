@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from acp.cbor_cde import decode
+from acp.cbor_cde import decode, encode
 from acp.security_credentials import (
     ActiveSessionRevocationPolicy,
     CredentialGeneration,
@@ -80,6 +80,36 @@ def test_compact_credential_frozen_vector_and_negative_policy() -> None:
             )
 
 
+def test_compact_credential_enforces_every_frozen_structural_bound() -> None:
+    vector = json.loads((ROOT / "vectors/security/compact_credential/primary.json").read_text())
+    original = decode(bytes.fromhex(vector["credential_cbor_hex"]))
+
+    def reject(change) -> None:
+        value = decode(encode(original))
+        change(value["body"])
+        raw = encode(value)
+        with pytest.raises(CredentialLifecycleError):
+            validate_compact_credential(
+                raw,
+                expected_domain=DOMAIN,
+                expected_node=NODE,
+                now=datetime(2026, 8, 25, tzinfo=UTC),
+                verifier=lambda *_: True,
+                revoked=lambda _: False,
+                possession_valid=True,
+                allowed_roles=frozenset({"remote", *(f"r{i:02}" for i in range(17)), "x" * 65}),
+            )
+
+    reject(lambda body: body.__setitem__("serial", -1))
+    reject(lambda body: body.__setitem__("permission_policy_id", ""))
+    reject(lambda body: body.__setitem__("role_constraints", [f"r{i:02}" for i in range(17)]))
+    reject(lambda body: body.__setitem__("role_constraints", ["x" * 65]))
+    reject(
+        lambda body: body.__setitem__("extensions", {f"e{i}": {"critical": False, "value": b"x"} for i in range(17)})
+    )
+    reject(lambda body: body.__setitem__("extensions", {"e": {"critical": "false", "value": b"x"}}))
+
+
 def test_x509_evidence_fails_each_ordered_policy_check() -> None:
     fields = list(X509ValidationEvidence.__dataclass_fields__)
     baseline = {field: True for field in fields}
@@ -123,6 +153,25 @@ def test_revocation_vector_monotonic_signature_domain_and_bounds() -> None:
         RevocationState(DOMAIN, 0).ingest(body, signature, verify)
 
 
+def test_revocation_rejects_oversize_reason_and_replacement_contract_violations() -> None:
+    vector = json.loads((ROOT / "vectors/security/revocation/snapshot_epoch_7.json").read_text())
+    original = decode(bytes.fromhex(vector["body_cbor_hex"]))
+    signature = bytes.fromhex(vector["signature_der_hex"])
+
+    def reject(change) -> None:
+        value = decode(encode(original))
+        change(value)
+        with pytest.raises(CredentialLifecycleError):
+            RevocationState(DOMAIN, 128).ingest(encode(value), signature, lambda *_: True)
+
+    reject(lambda body: body["entries"][0].__setitem__("reason", "invented"))
+    reject(
+        lambda body: body["entries"][0].__setitem__("replacement_credential_id", body["entries"][0]["credential_id"])
+    )
+    with pytest.raises(CredentialLifecycleError, match="security.resource_limit"):
+        RevocationState(DOMAIN, 128).ingest(b"x" * 8193, signature, lambda *_: True)
+
+
 def test_journal_store_recovers_only_complete_generations(tmp_path: Path) -> None:
     store = JournaledIdentityStore(tmp_path / "identities")
     first = generation(1)
@@ -140,6 +189,24 @@ def test_journal_store_recovers_only_complete_generations(tmp_path: Path) -> Non
     assert not (tmp_path / "assets").exists()
     with pytest.raises(CredentialLifecycleError, match=SecurityErrorCode.STORAGE_FAILED.value):
         store.stage(first)
+
+
+def test_journal_store_rejects_symlinks_oversize_and_invalid_runtime_values(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    with pytest.raises(CredentialLifecycleError, match="security.storage_failed"):
+        JournaledIdentityStore(link)
+
+    store = JournaledIdentityStore(tmp_path / "store")
+    with pytest.raises(CredentialLifecycleError, match="security.resource_limit"):
+        store.stage(CredentialGeneration(1, generation(1).credential_id, generation(1).identity_key_id, b"x" * 8193))
+    forged = store._path(1)
+    target = tmp_path / "target"
+    target.write_text("{}")
+    forged.symlink_to(target)
+    assert store.recover() is None
 
 
 def test_cleanup_retains_previous_complete_nonsequential_generation(tmp_path: Path) -> None:

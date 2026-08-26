@@ -149,9 +149,17 @@ class TransferAgent:
             del self.transfers[tid]
 
     def _reserved(self) -> int:
-        return sum(x.size for x in self.transfers.values() if x.state not in {
-            TransferState.FAILED, TransferState.CANCELLED, TransferState.REJECTED, TransferState.IDLE,
-        })
+        return sum(
+            x.size
+            for x in self.transfers.values()
+            if x.state
+            not in {
+                TransferState.FAILED,
+                TransferState.CANCELLED,
+                TransferState.REJECTED,
+                TransferState.IDLE,
+            }
+        )
 
     def handle(self, env: Envelope) -> list[Envelope]:
         self._purge()
@@ -167,18 +175,32 @@ class TransferAgent:
             if not xfer:
                 return out
             status = xfer.complete()
-            out.append(self._msg("resource.transfer_result", {
-                "transfer_id": xfer.transfer_id,
-                "status": "verified" if status == "verified" else "failed",
-                "code": None if status == "verified" else status,
-            }, env))
+            out.append(
+                self._msg(
+                    "resource.transfer_result",
+                    {
+                        "transfer_id": xfer.transfer_id,
+                        "status": "verified" if status == "verified" else "failed",
+                        "code": None if status == "verified" else status,
+                    },
+                    env,
+                )
+            )
             return out
         if t == "resource.activate":
             xfer = self.transfers.get(str(payload.get("transfer_id") or ""))
             if not xfer:
-                out.append(self._msg("resource.activation_result", {
-                    "transfer_id": payload.get("transfer_id"), "status": "failed", "code": "not_found",
-                }, env))
+                out.append(
+                    self._msg(
+                        "resource.activation_result",
+                        {
+                            "transfer_id": payload.get("transfer_id"),
+                            "status": "failed",
+                            "code": "not_found",
+                        },
+                        env,
+                    )
+                )
                 return out
             prev = xfer.live
             ok = xfer.activate()
@@ -186,10 +208,16 @@ class TransferAgent:
                 self.live_assets[xfer.asset["asset_id"]] = xfer.live
             elif not ok and prev is not None:
                 self.live_assets[xfer.asset["asset_id"]] = prev
-            out.append(self._msg("resource.activation_result", {
-                "transfer_id": xfer.transfer_id,
-                "status": "applied" if ok else "failed",
-            }, env))
+            out.append(
+                self._msg(
+                    "resource.activation_result",
+                    {
+                        "transfer_id": xfer.transfer_id,
+                        "status": "applied" if ok else "failed",
+                    },
+                    env,
+                )
+            )
             return out
         if t == "resource.cancel":
             xfer = self.transfers.get(str(payload.get("transfer_id") or ""))
@@ -205,9 +233,17 @@ class TransferAgent:
         if not isinstance(tid, str):
             return [self._msg("resource.reject", {"transfer_id": "", "code": "invalid_type", "message": "bad id"}, env)]
         if locator.get("mode") == "http":
-            return [self._msg("resource.reject", {
-                "transfer_id": tid, "code": "unsupported", "message": "http locator not implemented",
-            }, env)]
+            return [
+                self._msg(
+                    "resource.reject",
+                    {
+                        "transfer_id": tid,
+                        "code": "unsupported",
+                        "message": "http locator not implemented",
+                    },
+                    env,
+                )
+            ]
         if locator.get("mode") not in (None, "chunked"):
             return [self._msg("resource.reject", {"transfer_id": tid, "code": "unsupported"}, env)]
         raw_size = asset.get("size_bytes")
@@ -230,18 +266,30 @@ class TransferAgent:
             if offered_chunk_i <= 0:
                 return [self._msg("resource.reject", {"transfer_id": tid, "code": "invalid_range"}, env)]
         if not _sha256_ok(asset.get("sha256")):
-            return [self._msg(
-                "resource.reject",
-                {"transfer_id": tid, "code": "invalid_type", "message": "bad digest"},
-                env,
-            )]
+            return [
+                self._msg(
+                    "resource.reject",
+                    {"transfer_id": tid, "code": "invalid_type", "message": "bad digest"},
+                    env,
+                )
+            ]
         if tid in self.transfers and self.transfers[tid].state not in {
-            TransferState.FAILED, TransferState.CANCELLED, TransferState.IDLE,
+            TransferState.FAILED,
+            TransferState.CANCELLED,
+            TransferState.IDLE,
         }:
             return [self._msg("resource.reject", {"transfer_id": tid, "code": "conflict", "message": "active"}, env)]
-        active = sum(1 for x in self.transfers.values() if x.state in {
-            TransferState.OFFERED, TransferState.ACCEPTED, TransferState.RECEIVING, TransferState.VERIFIED,
-        })
+        active = sum(
+            1
+            for x in self.transfers.values()
+            if x.state
+            in {
+                TransferState.OFFERED,
+                TransferState.ACCEPTED,
+                TransferState.RECEIVING,
+                TransferState.VERIFIED,
+            }
+        )
         if active >= self._limits["max_concurrent_transfers"]:
             return [self._msg("resource.reject", {"transfer_id": tid, "code": "capacity"}, env)]
         xfer = Transfer(
@@ -256,9 +304,16 @@ class TransferAgent:
         xfer.live = self.live_assets.get(str(asset.get("asset_id") or ""))
         xfer.accept(self._limits["max_chunk_bytes"])
         self.transfers[tid] = xfer
-        return [self._msg("resource.accept", {
-            "transfer_id": tid, "max_chunk_bytes": xfer.max_chunk_bytes,
-        }, env)]
+        return [
+            self._msg(
+                "resource.accept",
+                {
+                    "transfer_id": tid,
+                    "max_chunk_bytes": xfer.max_chunk_bytes,
+                },
+                env,
+            )
+        ]
 
     def _chunk(self, env: Envelope, payload: dict[str, Any]) -> list[Envelope]:
         xfer = self.transfers.get(str(payload.get("transfer_id") or ""))
@@ -278,9 +333,17 @@ class TransferAgent:
             declared_i = int(declared) if declared is not None else None
             xfer.add_chunk(offset, bytes(data), declared_i)
         except (TypeError, ValueError):
-            return [self._msg("resource.transfer_result", {
-                "transfer_id": xfer.transfer_id, "status": "failed", "code": "conflict",
-            }, env)]
+            return [
+                self._msg(
+                    "resource.transfer_result",
+                    {
+                        "transfer_id": xfer.transfer_id,
+                        "status": "failed",
+                        "code": "conflict",
+                    },
+                    env,
+                )
+            ]
         return []
 
     def _msg(self, typ: str, payload: dict[str, Any], cause: Envelope) -> Envelope:

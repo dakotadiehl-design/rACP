@@ -26,9 +26,15 @@ def test_discovery_rejects_oversize() -> None:
 
 
 def test_discovery_json_accepted() -> None:
-    payload = {"type": "discovery.query", "requester": {"node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001",
-                                                       "instance_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002",
-                                                       "role": "tool", "name": "t"}}
+    payload = {
+        "type": "discovery.query",
+        "requester": {
+            "node_id": "0193f8d8-4c4e-7d8b-a2ab-000000000001",
+            "instance_id": "0193f8d8-4c4e-7d8b-a2ab-000000000002",
+            "role": "tool",
+            "name": "t",
+        },
+    }
     frame = encode_datagram(payload, encoding=1)
     enc, again = decode_datagram(frame)
     assert enc == 1

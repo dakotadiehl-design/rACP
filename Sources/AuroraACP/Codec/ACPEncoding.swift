@@ -11,6 +11,7 @@ public enum ACPEncoding {
     }
 
     public static func decodeJSON(_ data: Data) throws -> ACPEnvelope {
+        guard data.count <= 8 * 1024 * 1024 else { throw ACPCodecError.malformed("message too large") }
         let raw = try JSONSerialization.jsonObject(with: data)
         guard let dict = raw as? [String: Any] else {
             throw ACPCodecError.malformed("envelope")
@@ -27,6 +28,7 @@ public enum ACPEncoding {
     }
 
     public static func decodeCBOR(_ data: Data) throws -> ACPEnvelope {
+        guard data.count <= 8 * 1024 * 1024 else { throw ACPCodecError.malformed("message too large") }
         let value = try decodeValue(data)
         let env = try envelope(from: value, securityBytesFromCBOR: true)
         guard let dict = ns(envelopeObject(env)) as? [String: Any] else {

@@ -49,5 +49,3 @@ class AssignmentResolver:
             if chart.song_id == song_id and chart.chart_type == chart_type:
                 return chart
         return None
-
-

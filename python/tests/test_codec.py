@@ -81,7 +81,9 @@ def test_reject_non_preferred_int() -> None:
 
 def test_json_rejects_nan() -> None:
     with pytest.raises(CodecError):
-        decode_json('{"acp":"1.2","message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000002","type":"health.heartbeat","source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-000000000001"},"timestamp_utc":"2026-08-17T16:42:15.231Z","qos":"latest","flags":[],"payload":{"uptime_ms":1,"status":"ok","metrics":{"cpu_pct":NaN}}}')
+        decode_json(
+            '{"acp":"1.2","message_id":"0193f8d8-4c4e-7d8b-a2ab-000000000002","type":"health.heartbeat","source":{"node_id":"0193f8d8-4c4e-7d8b-a2ab-000000000001"},"timestamp_utc":"2026-08-17T16:42:15.231Z","qos":"latest","flags":[],"payload":{"uptime_ms":1,"status":"ok","metrics":{"cpu_pct":NaN}}}'
+        )
 
 
 def test_chunk_bytes_json_cbor_and_bad_base64() -> None:

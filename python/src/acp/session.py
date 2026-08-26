@@ -672,10 +672,15 @@ class Session:
                 return "malformed_envelope"
             if self.is_server and env.type not in {"session.hello", "error.report"}:
                 return "malformed_envelope"
-            if (not self.is_server) and self.state == SessionState.HELLO_SENT and env.type not in {
-                "session.hello_ack",
-                "error.report",
-            }:
+            if (
+                (not self.is_server)
+                and self.state == SessionState.HELLO_SENT
+                and env.type
+                not in {
+                    "session.hello_ack",
+                    "error.report",
+                }
+            ):
                 return "malformed_envelope"
             return None
         if env.session_id != self.session_id:

@@ -81,6 +81,7 @@ def _normalize_security_bytes(payload: dict[str, Any], message_type: str, *, to_
     if not _security_binary_paths(message_type):
         return payload
     import copy
+
     converted = copy.deepcopy(payload)
     for path in _security_binary_paths(message_type):
         _transform_path(converted, path, to_cbor=to_cbor)

@@ -66,6 +66,37 @@ jobs:
         working-directory: rust
         run: cargo fmt -- --check
 
+  security-hardening:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install security test dependencies
+        run: python3 -m pip install -e './python[dev,security-vectors]'
+      - name: Property and malformed-input tests
+        run: |
+          python3 -m pytest python/tests/test_security_properties.py python/tests/test_security_operations.py
+          PYTHONPATH=python/src python3 scripts/security_fuzz_smoke.py
+      - name: Dependency profile and license policy
+        run: python3 scripts/check_security_dependencies.py
+      - name: Captured-output secret redaction
+        run: python3 -m pytest python/tests/test_security_operations.py -k redacted
+
+  dependency-advisories:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rust advisory database
+        run: cargo install cargo-audit --locked && cargo audit --file rust/Cargo.lock
+      - name: Python advisory database
+        run: python3 -m pip install -e './python[dev,security-vectors]' pip-audit && python3 -m pip_audit --local
+
   rust-msrv:
     runs-on: ubuntu-latest
     steps:

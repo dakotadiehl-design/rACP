@@ -188,7 +188,17 @@ impl FramedTcp {
             .read_exact(&mut buf)
             .await
             .map_err(|e| SessionError::new("unavailable", e.to_string()))?;
-        Ok((buf, header[4] != 0))
+        let text = match header[4] {
+            0 => false,
+            1 => true,
+            _ => {
+                return Err(SessionError::new(
+                    "malformed_envelope",
+                    "reserved frame flags",
+                ))
+            }
+        };
+        Ok((buf, text))
     }
 
     pub async fn close(&self) {
@@ -229,7 +239,7 @@ impl Session {
         Self {
             local,
             is_server,
-            allow_plaintext: true,
+            allow_plaintext: false,
             auth_mode: "trusted_lan".into(),
             protocol: ProtocolRange {
                 min: "1.0".into(),
@@ -878,8 +888,12 @@ mod tests {
     #[tokio::test]
     async fn rust_loopback_handshake_and_peer_role() {
         let (ta, tb) = Loopback::pair();
-        let client = Arc::new(Session::new(ta, identity(Role::Conductor, "c"), false));
-        let server = Arc::new(Session::new(tb, identity(Role::Bridge, "b"), true));
+        let mut client = Session::new(ta, identity(Role::Conductor, "c"), false);
+        let mut server = Session::new(tb, identity(Role::Bridge, "b"), true);
+        client.allow_plaintext = true;
+        server.allow_plaintext = true;
+        let client = Arc::new(client);
+        let server = Arc::new(server);
         let caps = default_caps();
         let server_h = {
             let server = Arc::clone(&server);
@@ -906,8 +920,7 @@ mod tests {
     #[tokio::test]
     async fn plaintext_required() {
         let (ta, _tb) = Loopback::pair();
-        let mut s = Session::new(ta, identity(Role::Tool, "t"), false);
-        s.allow_plaintext = false;
+        let s = Session::new(ta, identity(Role::Tool, "t"), false);
         let err = s.handshake(vec![]).await.unwrap_err();
         assert_eq!(err.code, "authentication");
     }
@@ -917,6 +930,8 @@ mod tests {
         let (ta, tb) = Loopback::pair();
         let mut client = Session::new(ta, identity(Role::Remote, "pad"), false);
         let mut server = Session::new(tb, identity(Role::Conductor, "auth"), true);
+        client.allow_plaintext = true;
+        server.allow_plaintext = true;
         client.profiles = vec![
             "core".into(),
             "remote".into(),
@@ -978,8 +993,12 @@ mod tests {
     #[tokio::test]
     async fn request_matches_registry_response() {
         let (ta, tb) = Loopback::pair();
-        let client = Arc::new(Session::new(ta, identity(Role::Remote, "pad"), false));
-        let server = Arc::new(Session::new(tb, identity(Role::Conductor, "auth"), true));
+        let mut client = Session::new(ta, identity(Role::Remote, "pad"), false);
+        let mut server = Session::new(tb, identity(Role::Conductor, "auth"), true);
+        client.allow_plaintext = true;
+        server.allow_plaintext = true;
+        let client = Arc::new(client);
+        let server = Arc::new(server);
         let caps = default_caps();
         let server_h = {
             let server = Arc::clone(&server);

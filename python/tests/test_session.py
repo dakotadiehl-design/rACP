@@ -154,12 +154,17 @@ def test_reliable_overflow() -> None:
         client.negotiated_capabilities = {"prism.cue_control"}
         client.negotiated_capability_versions = {"prism.cue_control": "1.0"}
         for _ in range(client.limits["outbound_reliable_queue"]):
-            client._reliable_q.append((make_envelope(
-                type="cue.go",
-                source=client.source(),
-                qos=QoS.RELIABLE,
-                payload={"idempotency_key": new_uuid()},
-            ), asyncio.get_running_loop().create_future()))
+            client._reliable_q.append(
+                (
+                    make_envelope(
+                        type="cue.go",
+                        source=client.source(),
+                        qos=QoS.RELIABLE,
+                        payload={"idempotency_key": new_uuid()},
+                    ),
+                    asyncio.get_running_loop().create_future(),
+                )
+            )
         env = make_envelope(
             type="cue.go",
             source=client.source(),

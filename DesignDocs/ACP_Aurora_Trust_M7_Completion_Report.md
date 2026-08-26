@@ -7,12 +7,16 @@ Starting commit: `ccfff2e` (`Aurora Trust M6 authorization policy`)
 
 M7 offline operations, migration enforcement, safe diagnostics, audit verification, and operator documentation are implemented. The existing M5 live product-language TLS exporter-adapter qualification blocker remains unchanged and is not hidden by M7 tooling.
 
+Post-M7 review (2026-08-26) hardened this implementation before M8: provider-produced authority/credential/key IDs are now mandatory; recovery validates a committed journaled identity generation; audit entries bind the complete current state; unaudited non-empty state fails closed; writers are serialized; audit growth is bounded; filesystem link/type/mode checks are enforced; and malformed persisted structures fail closed. Operational state schema version 1 is rejected because it cannot be integrity-upgraded without trusting state that was not audit-bound.
+
+A subsequent final review also rejects unknown enrollment roles and cross-node credential/key collisions, makes reset revoke the active credential and advance the revocation epoch, prevents reset identities from being silently reactivated, and restricts bootstrap files to owner-only regular non-symlink files with a 4096-byte bound.
+
 ## Implemented
 
 - The `acp-security` Python CLI supports trust-domain create/import, enrollment open/candidate/commissioner flows, trusted-node list and inspection, renewal, rotation, revocation, revocation-state inspection, reset/unenrollment, recovery validation, audit verification, diagnostics, and migration status/change.
 - Bootstrap input is accepted only through a hidden interactive prompt or an owner-only protected file. No secret command-line option exists.
 - CLI normal/JSON output uses recursive security redaction. Tests scan for bootstrap, PAKE, derived/private key, approval, and credential material.
-- Offline operational metadata is atomically replaced, fsynced, mode `0600`, and hash-chain audited. Tampered audit history blocks subsequent mutation.
+- Offline operational metadata is atomically replaced, fsynced, mode `0600`, and hash-chain audited with full-state binding. Tampered history or state blocks subsequent mutation.
 - Revocation history is append-only. Revoked or unenrolled identities cannot be recovered, renewed, or rotated back into active status.
 - Swift, Python, and Rust implement the four explicit migration stages. `trusted_lan` requires explicit enablement, never grants control, failed stronger authentication never falls back, and Enforce rejects unauthenticated connections.
 - Migration decisions keep authentication and authorization separate; sensitive control requires both.

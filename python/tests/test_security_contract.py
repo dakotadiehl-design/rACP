@@ -16,11 +16,13 @@ from acp.security import (
     CredentialState,
     PrincipalState,
     SecurityAdmissionError,
-    TransportEvidence,
     bind_hello_auth,
     effective_permissions,
     profile_limits,
+    AuthenticatedPrincipal,
+    TransportEvidence,
 )
+from acp.testkit import unsafe_replace_security_value_for_testing, unsafe_transport_evidence_for_testing
 from acp.validate import ValidationError, validate_message
 
 ROOT_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
@@ -40,18 +42,34 @@ def authenticated_auth() -> dict[str, object]:
     }
 
 
-def evidence() -> TransportEvidence:
-    return TransportEvidence(
-        AuthenticationMode.AURORA_TRUST,
-        ROOT_ID,
-        NODE_ID,
-        DIGEST,
-        DIGEST,
-        "x509_der",
-        BINDING,
+def evidence():
+    return unsafe_transport_evidence_for_testing(
+        mode=AuthenticationMode.AURORA_TRUST,
+        trust_domain_id=ROOT_ID,
+        node_id=NODE_ID,
+        credential_id=DIGEST,
+        identity_key_id=DIGEST,
+        credential_format="x509_der",
+        channel_binding=BINDING,
         credential_state=CredentialState.ACTIVE,
         channel_binding_verified=True,
     )
+
+
+def test_security_results_cannot_be_constructed_by_application_code() -> None:
+    with pytest.raises(TypeError, match="_provenance"):
+        TransportEvidence(mode=AuthenticationMode.AURORA_TRUST)  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="_provenance"):
+        AuthenticatedPrincipal(  # type: ignore[call-arg]
+            state=PrincipalState.AUTHENTICATED,
+            mode=AuthenticationMode.AURORA_TRUST,
+            trust_domain_id=ROOT_ID,
+            node_id=NODE_ID,
+            credential_id=DIGEST,
+            identity_key_id=DIGEST,
+            credential_format="x509_der",
+            role_constraints=frozenset(),
+        )
 
 
 def test_authenticated_hello_is_bound_to_transport_evidence() -> None:
@@ -103,13 +121,11 @@ def test_claimed_authentication_without_transport_evidence_fails_closed() -> Non
     ],
 )
 def test_invalid_transport_security_state_fails_closed(change: dict[str, object], code: str) -> None:
-    from dataclasses import replace
-
     with pytest.raises(SecurityAdmissionError, match=code.replace(".", r"\.")):
         bind_hello_auth(
             NODE_ID,
             authenticated_auth(),
-            replace(evidence(), **change),
+            unsafe_replace_security_value_for_testing(evidence(), **change),
             hardened=True,
             security_capabilities=(("aurora-trust", "1.0"),),
         )
