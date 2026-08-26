@@ -4,7 +4,7 @@
     {
       "name": "AuroraACPAppleSecurity",
       "properties": [
-        {"name": "aurora:source_revision", "value": "513653d6e96051f5959ef1d7cbbe8f61ce006c5a"},
+        {"name": "aurora:source_revision", "value": "8c759132b2472749f91e0ad1cc4fb91aded4c584"},
         {"name": "aurora:key_storage", "value": "Apple Keychain"}
       ],
       "type": "library",

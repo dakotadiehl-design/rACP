@@ -27,6 +27,9 @@ No fallback, synthetic security assertion, or protocol change was introduced.
   caused a native `SecIdentityCopyPrivateKey` crash was removed.
 - Trust metadata and revocation are atomic Keychain values and are separate
   from device identity and cached assets.
+- Each authenticated transport registers a bounded credential-specific
+  revocation observer. Revocation or trust reset closes the live transport in
+  accordance with the frozen hardened-termination policy.
 - Timeout values are bounded, HELLO reads have deadlines, listener
   continuations have per-attempt cancellation ownership, and failed starts are
   terminal/fail-closed.
@@ -44,12 +47,14 @@ host restart + client reconnect -> both reject
 cleanup qualification Keychain material
 ```
 
-This passed twice during development on macOS 26.5 arm64. The checked artifact
-is `qualification/macos-arm64-apple-network-framework-full-513653d.json`.
+This passed repeatedly during development on macOS 26.5 arm64. The latest
+checked artifact is
+`qualification/macos-arm64-apple-network-framework-full-8c75913.json`.
 
 Additional passing evidence on the same source line:
 
-- Swift: 123 tests.
+- Swift: 125 tests, including active-session revocation and malformed, stale,
+  and wrong-class Keychain identity locators.
 - Python: 244 tests, 82.5% coverage; Ruff and mypy pass.
 - Rust: 64 tests; Clippy with warnings denied and rustfmt pass.
 - registry: 109 messages; frozen security vectors: 17 sets / 31 artifacts.
@@ -119,8 +124,8 @@ marking the original cases PASS.
    context are compared before the opaque connection is returned.
 6. Revocation survives process restart and rejects a new TLS connection.
 7. Tickets/resumption are disabled and accepted early data is rejected.
-8. Frozen active-session policy remains `hardenedTerminate`; the Apple adapter
-   does not invent a different policy.
+8. Frozen active-session policy is enforced as `hardenedTerminate`; real
+   revocation and trust reset close the registered live Apple transport.
 9. Restart recovery uses only Keychain identity/trust data.
 10. Product code cannot construct authenticated connections, transport
     evidence, or principals through compiled public APIs.
