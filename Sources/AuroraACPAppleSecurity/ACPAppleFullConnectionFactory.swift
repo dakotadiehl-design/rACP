@@ -12,17 +12,17 @@ public struct ACPAppleFullProviderConfiguration {
     public let trustDomainID: ACPTrustDomainID
     public let expectedPeerNodeID: ACPSecurityNodeID?
     public let providerProvenance: ACPProviderProvenance
-    public let revocation: (any ACPAppleRevocationChecking)?
+    public let trustStore: ACPAppleTrustedPeerStore
 
     public init(localIdentity: ACPAppleLocalIdentity, anchors: [SecCertificate],
                 trustDomainID: ACPTrustDomainID, expectedPeerNodeID: ACPSecurityNodeID? = nil,
                 providerProvenance: ACPProviderProvenance,
-                revocation: (any ACPAppleRevocationChecking)? = nil) {
+                trustStore: ACPAppleTrustedPeerStore) {
         self.localIdentity = localIdentity.networkIdentity
         self.localCertificateChain = localIdentity.certificateChain
         self.localACPIdentity = localIdentity.acpIdentity; self.anchors = anchors
         self.trustDomainID = trustDomainID; self.expectedPeerNodeID = expectedPeerNodeID
-        self.providerProvenance = providerProvenance; self.revocation = revocation
+        self.providerProvenance = providerProvenance; self.trustStore = trustStore
     }
 }
 
@@ -49,6 +49,7 @@ public enum ACPAppleFullConnectionFactory {
             let hello = try bind(authenticatedHello(configuration.localACPIdentity, local: local), metadata: metadata)
             try await framed.send(try ACPEncoding.encodeCBOR(hello), text: false)
             let proof = try evidence(for: peer, hello: hello.payload, metadata: metadata)
+            try configuration.trustStore.recordAuthenticated(peer, displayName: nil)
             return try result(framed, proof: proof, peer: peer, configuration: configuration,
                               role: .clientHelloSent)
         } catch { connection.cancel(); throw error }
@@ -118,6 +119,7 @@ public actor ACPAppleFullServerListener {
             let hello = text ? try ACPEncoding.decodeJSON(data) : try ACPEncoding.decodeCBOR(data)
             guard hello.type == "session.hello" else { throw ACPAppleSecurityError.invalidHello }
             let proof = try evidence(for: peer, hello: hello.payload, metadata: metadata)
+            try configuration.trustStore.recordAuthenticated(peer, displayName: helloDisplayName(hello))
             return try result(framed, proof: proof, peer: peer, configuration: configuration,
                               role: .serverHelloReceived, prefetchedHello: hello)
         } catch { connection.cancel(); throw error }
@@ -172,7 +174,7 @@ private func parameters(_ configuration: ACPAppleFullProviderConfiguration) -> N
         do {
             _ = try ACPAppleCertificatePolicy.validate(chain: certificateChain(metadata), anchors: configuration.anchors,
                 expectedDomain: configuration.trustDomainID, expectedNode: configuration.expectedPeerNodeID,
-                revocation: configuration.revocation)
+                revocation: configuration.trustStore)
             complete(true)
         } catch { complete(false) }
     }, .global(qos: .userInitiated))
@@ -185,7 +187,7 @@ private func validateLocal(_ configuration: ACPAppleFullProviderConfiguration) t
     }
     return try ACPAppleCertificatePolicy.validate(chain: configuration.localCertificateChain,
         anchors: configuration.anchors, expectedDomain: configuration.trustDomainID,
-        expectedNode: node, revocation: configuration.revocation)
+        expectedNode: node, revocation: configuration.trustStore)
 }
 
 private func authenticatedHello(_ identity: ACPIdentity,
@@ -254,7 +256,13 @@ private func validatePeer(_ metadata: sec_protocol_metadata_t,
                           _ configuration: ACPAppleFullProviderConfiguration) throws -> ACPAppleVerifiedCertificate {
     try ACPAppleCertificatePolicy.validate(chain: certificateChain(metadata), anchors: configuration.anchors,
         expectedDomain: configuration.trustDomainID, expectedNode: configuration.expectedPeerNodeID,
-        revocation: configuration.revocation)
+        revocation: configuration.trustStore)
+}
+
+private func helloDisplayName(_ hello: ACPEnvelope) -> String? {
+    guard case .object(let node) = hello.payload["node"], case .string(let name) = node["name"],
+          (1...128).contains(name.utf8.count) else { return nil }
+    return name
 }
 
 private func startConnection(_ connection: NWConnection, timeout: TimeInterval) async throws {

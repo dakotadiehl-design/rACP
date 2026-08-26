@@ -25,6 +25,8 @@ public enum ACPAppleSecurityError: String, Error, Sendable {
     case identityMissing = "security.identity_missing"
     case privateKeyUnavailable = "security.private_key_unavailable"
     case keychainFailure = "security.keychain_failure"
+    case trustStoreFailure = "security.trust_store_failure"
+    case resourceLimit = "security.resource_limit"
 }
 
 public protocol ACPAppleRevocationChecking: Sendable {
