@@ -106,7 +106,7 @@ extension ACPEncoding {
         return d
     }
 
-    static func decodeValue(_ data: Data) throws -> AnySendable {
+    package static func decodeValue(_ data: Data) throws -> AnySendable {
         var offset = 0
         let value = try readValue(data, &offset)
         if offset != data.count { throw ACPCodecError.malformed("trailing") }

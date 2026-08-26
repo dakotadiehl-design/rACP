@@ -130,4 +130,23 @@ final class ACPEncodingTests: XCTestCase {
         XCTAssertThrowsError(try ACPEncoding.decodeJSON(oversized))
         XCTAssertThrowsError(try ACPEncoding.decodeCBOR(oversized))
     }
+
+    func testPublicDecoderExactLimitIsAdmittedToParserButLimitPlusOneIsRejectedFirst() {
+        let exact = Data(repeating: 0x20, count: 8 * 1024 * 1024)
+        XCTAssertThrowsError(try ACPEncoding.decodeJSON(exact)) {
+            XCTAssertFalse(String(describing: $0).contains("message too large"))
+        }
+        let oversized = exact + Data([0x20])
+        XCTAssertThrowsError(try ACPEncoding.decodeJSON(oversized)) {
+            XCTAssertTrue(String(describing: $0).contains("message too large"))
+        }
+    }
+
+    func testCBORIntegerDecodeIsIndependentOfBackingBufferOffset() throws {
+        let encoded = Data([0x1b, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08])
+        var prefixed = Data([0xff])
+        prefixed.append(encoded)
+        let offsetView = prefixed.subdata(in: 1..<prefixed.count)
+        XCTAssertEqual(try ACPEncoding.decodeValue(offsetView), .int(0x0102_0304_0506_0708))
+    }
 }

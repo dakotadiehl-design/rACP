@@ -92,6 +92,15 @@ pub enum SecurityProfile {
     Full,
     Lightweight,
 }
+
+/// Show-critical release selection. Lightweight remains unavailable until its
+/// provider and representative hardware pass S12 HIL qualification.
+pub fn require_production_profile(profile: SecurityProfile) -> Result<(), SecurityErrorCode> {
+    match profile {
+        SecurityProfile::Full => Ok(()),
+        SecurityProfile::Lightweight => Err(SecurityErrorCode::AuthenticationFailed),
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrincipalState {
     Unauthenticated,
@@ -215,7 +224,7 @@ impl DowngradePolicy {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TransportEvidence {
     pub(crate) mode: AuthenticationMode,
     pub(crate) profile: SecurityProfile,
@@ -242,6 +251,7 @@ pub struct UnverifiedPeerObservation {
 }
 
 /// Non-cloneable provider capability bound to exactly one live transport.
+#[allow(dead_code)]
 pub struct AuthenticatedConnection<T> {
     transport: T,
     evidence: TransportEvidence,
@@ -289,7 +299,8 @@ impl<T> AuthenticatedConnection<T> {
     }
 
     /// Consumes the capability so its evidence cannot be attached to a second transport.
-    pub fn into_parts(self) -> (T, TransportEvidence) {
+    #[allow(dead_code)]
+    pub(crate) fn into_parts(self) -> (T, TransportEvidence) {
         (self.transport, self.evidence)
     }
 }
@@ -1296,6 +1307,15 @@ mod tests {
         assert!(!DowngradePolicy::HARDENED_PRODUCTION.permits_unauthenticated(false));
         assert!(!DowngradePolicy::migration(true).permits_unauthenticated(true));
     }
+
+    #[test]
+    fn lightweight_cannot_be_selected_for_production_before_hil() {
+        assert_eq!(require_production_profile(SecurityProfile::Full), Ok(()));
+        assert_eq!(
+            require_production_profile(SecurityProfile::Lightweight),
+            Err(SecurityErrorCode::AuthenticationFailed)
+        );
+    }
     #[test]
     fn frozen_context_transcript_and_schedule_match() {
         let pairs = [
@@ -1549,25 +1569,29 @@ mod tests {
 
     #[test]
     fn authenticated_connection_is_non_cloneable_provider_owned_and_consumed() {
-        let evidence = TransportEvidence {
-            mode: AuthenticationMode::AuroraTrust,
-            profile: SecurityProfile::Full,
-            trust_domain_id: TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091").unwrap(),
-            node_id: SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
-            credential_id: CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
-            identity_key_id: IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32))).unwrap(),
-            credential_format: CredentialFormat::X509Der,
-            channel_binding: Some([0; 32]),
-            credential_status: CredentialStatus::Active,
-            channel_binding_verified: true,
-            zero_rtt_used: false,
-            resumption_used: false,
-            role_constraints: HashSet::new(),
-        };
+        fn evidence() -> TransportEvidence {
+            TransportEvidence {
+                mode: AuthenticationMode::AuroraTrust,
+                profile: SecurityProfile::Full,
+                trust_domain_id: TrustDomainId::parse("40516273-8495-4a6b-8a3b-4c5d6e7f8091")
+                    .unwrap(),
+                node_id: SecurityNodeId::parse("00112233-4455-4677-8899-aabbccddeeff").unwrap(),
+                credential_id: CredentialId::parse(format!("sha256:{}", "11".repeat(32))).unwrap(),
+                identity_key_id: IdentityKeyId::parse(format!("sha256:{}", "22".repeat(32)))
+                    .unwrap(),
+                credential_format: CredentialFormat::X509Der,
+                channel_binding: Some([0; 32]),
+                credential_status: CredentialStatus::Active,
+                channel_binding_verified: true,
+                zero_rtt_used: false,
+                resumption_used: false,
+                role_constraints: HashSet::new(),
+            }
+        }
         assert_eq!(
             AuthenticatedConnection::from_provider(
                 "transport",
-                evidence.clone(),
+                evidence(),
                 "unqualified".into(),
                 Default::default()
             )
@@ -1576,7 +1600,7 @@ mod tests {
         );
         let connection = AuthenticatedConnection::from_provider(
             "transport",
-            evidence,
+            evidence(),
             format!("sha256:{}", "aa".repeat(32)),
             Default::default(),
         )

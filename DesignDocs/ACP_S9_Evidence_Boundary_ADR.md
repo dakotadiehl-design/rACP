@@ -1,6 +1,6 @@
 # ADR: S9 authenticated-evidence construction boundary
 
-Status: implemented for the ACP SDK boundary; production adapters remain S10/S11/S12 work.
+Status: ACP-local implementation complete; independent architecture review remains BLOCKED and production adapters remain S10/S11/S12 work.
 
 ## Decision
 
@@ -21,3 +21,5 @@ The wire format, frozen transcripts, identifiers, credentials, revocation object
 ## Remaining closure condition
 
 S9 removes the former normal construction paths but does not close AT-IA-001. Closure still requires shipping opaque live-connection adapters, product wiring, exact-platform qualification, hardware evidence, and independent review through S10–S15.
+
+The final ACP-local closeout additionally removes Python unsafe security factories from the wheel, denies pickle restoration of Python evidence/principals/TLS facts, makes Rust evidence non-cloneable and prevents downstream extraction from its connection, validates qualified provider manifests before Swift connection creation, and audits compiled Swift symbols, the Python wheel, and the Rust release library. Exact-limit, offset-buffer, reserved-flag, and outbound-no-partial-frame regressions are mandatory CI evidence. These facts close the repository-local S9 construction boundary; they do not qualify any provider or product.

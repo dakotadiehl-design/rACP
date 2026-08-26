@@ -57,6 +57,14 @@ def test_reject_indefinite() -> None:
         decode(b"\x9f\x01\xff")
 
 
+def test_raw_decoder_exact_limit_reaches_parser_and_limit_plus_one_is_rejected_first() -> None:
+    exact = b" " * (8 * 1024 * 1024)
+    with pytest.raises(CborError, match="trailing bytes"):
+        decode(exact)
+    with pytest.raises(CborError, match="exceeds limit"):
+        decode(exact + b" ")
+
+
 def test_reject_tag1() -> None:
     # tag 1, unsigned 0
     with pytest.raises((CborError, CodecError)):

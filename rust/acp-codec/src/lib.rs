@@ -669,6 +669,16 @@ mod tests {
     }
 
     #[test]
+    fn public_decoder_exact_limit_reaches_parser_but_limit_plus_one_does_not() {
+        let exact = vec![b' '; 8 * 1024 * 1024];
+        let exact_error = decode_json(&exact).unwrap_err();
+        assert!(!exact_error.0.contains("message too large"));
+        let mut oversized = exact;
+        oversized.push(b' ');
+        assert_eq!(decode_json(&oversized).unwrap_err().0, "message too large");
+    }
+
+    #[test]
     fn reject_shared_malformed_corpus() {
         let dir = repo_root().join("vectors/malformed");
         let mut seen = 0;

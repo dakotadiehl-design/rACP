@@ -2,6 +2,13 @@ import XCTest
 @testable import AuroraACP
 
 final class ACPAuthenticatedConnectionTests: XCTestCase {
+    private func provenance(status: String = "PASS") throws -> ACPProviderProvenance {
+        let json = """
+        {"schema_version":"1.0","adapter_id":"test.adapter","source_revision":"\(String(repeating: "a", count: 40))","provider":{"name":"test","version":"1"},"target_triple":"arm64-apple-macosx","profiles":["full"],"key_storage_classes":["keychain"],"qualification":{"status":"\(status)","artifact_sha256":"\(String(repeating: "b", count: 64))"}}
+        """
+        return try ACPProviderProvenance(jsonData: Data(json.utf8), requireQualified: status == "PASS")
+    }
+
     func testObservationCannotBecomeAuthorityAndConnectionIsOneShot() async throws {
         let (transport, _) = await acpLinkedTransports()
         let observation = ACPUnverifiedPeerObservation(
@@ -22,7 +29,7 @@ final class ACPAuthenticatedConnectionTests: XCTestCase {
         )
         let connection = try ACPAuthenticatedConnection(
             transport: transport, evidence: evidence,
-            providerManifestDigest: "sha256:" + String(repeating: "a", count: 64),
+            providerProvenance: try provenance(),
             observation: observation
         )
         XCTAssertEqual(connection.peerNodeID, evidence.nodeID)
@@ -34,12 +41,13 @@ final class ACPAuthenticatedConnectionTests: XCTestCase {
         }
     }
 
-    func testProviderManifestDigestIsMandatory() async throws {
+    func testProviderManifestMustBeValidatedAndQualified() async throws {
         let (transport, _) = await acpLinkedTransports()
         let evidence = ACPTransportEvidence(mode: .auroraTrust)
         XCTAssertThrowsError(try ACPAuthenticatedConnection(
-            transport: transport, evidence: evidence, providerManifestDigest: "unqualified"
+            transport: transport, evidence: evidence, providerProvenance: provenance(status: "BLOCKED")
         ))
+        XCTAssertThrowsError(try ACPProviderProvenance(jsonData: Data("{}".utf8)))
     }
 
     func testReservedFrameFlagsAreRejectedExplicitly() throws {
@@ -48,5 +56,17 @@ final class ACPAuthenticatedConnectionTests: XCTestCase {
         }
         XCTAssertFalse(try ACPFramedConnection.parseHeader(Data([0, 0, 0, 0, 0])).text)
         XCTAssertTrue(try ACPFramedConnection.parseHeader(Data([0, 0, 0, 0, 1])).text)
+    }
+
+    func testOversizedOutboundFrameProducesNoWritableBytes() {
+        let oversized = Data(repeating: 0, count: ACPFramedConnection.maximumFrameLength + 1)
+        var bytesMadeWritable: Data?
+        XCTAssertThrowsError(bytesMadeWritable = try ACPFramedConnection.prepareFrame(oversized, text: false))
+        XCTAssertNil(bytesMadeWritable)
+    }
+
+    func testUnqualifiedLightweightProfileCannotBeSelectedForProduction() throws {
+        XCTAssertNoThrow(try ACPProductionProfileSupport.requireSupported(.full))
+        XCTAssertThrowsError(try ACPProductionProfileSupport.requireSupported(.lightweight))
     }
 }

@@ -84,6 +84,29 @@ jobs:
       - name: Captured-output secret redaction
         run: python3 -m pytest python/tests/test_security_operations.py -k redacted
 
+  security-api-boundary:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build release artifacts
+        run: |
+          python3 -m pip install build
+          python3 -m build --wheel --outdir dist python
+          cargo build --manifest-path rust/Cargo.toml --release -p acp-security
+          swift build -c release
+          swift package dump-symbol-graph --minimum-access-level public
+      - name: Prove fabrication APIs are absent
+        run: |
+          python3 scripts/check_security_api_boundary.py
+          python3 scripts/check_security_release_artifacts.py \
+            --swift-symbol-dir "$(dirname "$(find .build -name 'AuroraACP.symbols.json' -print -quit)")" \
+            --python-wheel "$(find dist -name '*.whl' -print -quit)" \
+            --rust-library "$(find rust/target/release/deps -name 'libacp_security-*.rlib' -print -quit)"
+
   dependency-advisories:
     runs-on: ubuntu-latest
     steps:

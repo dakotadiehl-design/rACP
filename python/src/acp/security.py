@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import MISSING, dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, NoReturn, SupportsIndex
 
 from .constants import load
 from .security_context import base64url_decode
@@ -58,6 +58,10 @@ class TransportEvidence:
             value = values[name] if name in values else field.default
             object.__setattr__(self, name, value)
 
+    def __reduce_ex__(self, protocol: SupportsIndex) -> NoReturn:
+        del protocol
+        raise TypeError("transport evidence cannot be serialized")
+
 
 def _verified_transport_evidence(**values: Any) -> TransportEvidence:
     """Provider-only factory. Application code must never manufacture evidence."""
@@ -88,6 +92,10 @@ class AuthenticatedPrincipal:
                 raise TypeError(f"missing principal field: {name}")
             value = values[name] if name in values else field.default
             object.__setattr__(self, name, value)
+
+    def __reduce_ex__(self, protocol: SupportsIndex) -> NoReturn:
+        del protocol
+        raise TypeError("authenticated principals cannot be serialized")
 
 
 def _admitted_principal(**values: Any) -> AuthenticatedPrincipal:

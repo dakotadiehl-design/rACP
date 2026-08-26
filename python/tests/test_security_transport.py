@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import pickle
 from pathlib import Path
 from typing import Any
 
 import pytest
+from security_testkit import unsafe_full_tls_handshake_for_testing, unsafe_replace_security_value_for_testing
 
 from acp.security import CredentialState, SecurityAdmissionError, bind_hello_auth
 from acp.security_context import base64url_encode
@@ -20,7 +22,6 @@ from acp.security_transport import (
     parse_lightweight_preface,
     verify_lightweight_finished,
 )
-from acp.testkit import unsafe_full_tls_handshake_for_testing, unsafe_replace_security_value_for_testing
 
 replace = unsafe_replace_security_value_for_testing
 
@@ -54,6 +55,11 @@ def facts():
 def test_tls_facts_cannot_be_constructed_by_application_code() -> None:
     with pytest.raises(TypeError, match="_provenance"):
         FullTLSHandshake(protocol="TLSv1.3")  # type: ignore[call-arg]
+
+
+def test_tls_facts_cannot_be_pickled_or_restored() -> None:
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        pickle.dumps(facts())
 
 
 def test_frozen_hello_projection_and_full_admission() -> None:

@@ -74,7 +74,18 @@ public actor ACPFramedConnection: ACPTransport {
     }
 
     public func send(_ data: Data, text: Bool) async throws {
-        guard data.count <= Self.maximumFrameLength else {
+        let frame = try Self.prepareFrame(data, text: text)
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            connection.send(content: frame, completion: .contentProcessed { err in
+                if let err { cont.resume(throwing: err) } else { cont.resume() }
+            })
+        }
+    }
+
+    /// Validates the complete outbound length before producing any bytes for
+    /// the network writer. Kept package-visible for the no-partial-write gate.
+    package static func prepareFrame(_ data: Data, text: Bool) throws -> Data {
+        guard data.count <= maximumFrameLength else {
             throw ACPSessionError("invalid_range", "frame too large")
         }
         var frame = Data()
@@ -82,11 +93,7 @@ public actor ACPFramedConnection: ACPTransport {
         frame.append(Data(bytes: &length, count: 4))
         frame.append(text ? 1 : 0)
         frame.append(data)
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            connection.send(content: frame, completion: .contentProcessed { err in
-                if let err { cont.resume(throwing: err) } else { cont.resume() }
-            })
-        }
+        return frame
     }
 
     public func recv() async throws -> (Data, Bool) {

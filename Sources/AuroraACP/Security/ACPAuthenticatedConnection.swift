@@ -43,14 +43,13 @@ public final class ACPAuthenticatedConnection: @unchecked Sendable {
     package init(
         transport: any ACPTransport,
         evidence: ACPTransportEvidence,
-        providerManifestDigest: String,
+        providerProvenance: ACPProviderProvenance,
         observation: ACPUnverifiedPeerObservation = .init()
     ) throws {
-        guard providerManifestDigest.hasPrefix("sha256:"), providerManifestDigest.count == 71,
-              providerManifestDigest.dropFirst(7).allSatisfy({ $0.isHexDigit })
+        guard providerProvenance.qualificationStatus == .pass
         else { throw ACPAuthenticatedConnectionError.invalidProviderProvenance }
         self.payload = Payload(transport: transport, evidence: evidence)
-        self.providerManifestDigest = providerManifestDigest
+        self.providerManifestDigest = providerProvenance.manifestDigest
         self.observation = observation
     }
 

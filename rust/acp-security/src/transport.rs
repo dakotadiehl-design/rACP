@@ -357,10 +357,13 @@ mod tests {
         let credential = b"credential";
         let mut preface = (credential.len() as u16).to_be_bytes().to_vec();
         preface.extend_from_slice(credential);
-        let (parsed, raw) = parse_lightweight_preface(&preface, |_| Ok(evidence.clone())).unwrap();
-        assert_eq!(parsed, evidence);
+        let (parsed, raw) = parse_lightweight_preface(&preface, |_| Ok(evidence)).unwrap();
+        assert_eq!(parsed.profile, SecurityProfile::Lightweight);
+        assert_eq!(parsed.credential_format, CredentialFormat::CompactV1);
         assert_eq!(raw, credential);
-        let mut wrong_format = evidence.clone();
+        let mut wrong_format =
+            full_transport_evidence(&hello, handshake(), &FixedExporter).unwrap();
+        wrong_format.profile = SecurityProfile::Lightweight;
         wrong_format.credential_format = CredentialFormat::X509Der;
         assert_eq!(
             parse_lightweight_preface(&preface, |_| Ok(wrong_format)),

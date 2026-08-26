@@ -6,7 +6,7 @@ import hashlib
 import hmac
 from collections.abc import Callable, Mapping
 from dataclasses import MISSING, dataclass
-from typing import Any, Protocol, cast
+from typing import Any, NoReturn, Protocol, SupportsIndex, cast
 
 from .cbor_cde import encode
 from .security import CredentialState, SecurityAdmissionError, TransportEvidence, _verified_transport_evidence
@@ -52,6 +52,10 @@ class FullTLSHandshake:
             if name not in values and field.default is MISSING:
                 raise TypeError(f"missing TLS handshake field: {name}")
             object.__setattr__(self, name, values[name] if name in values else field.default)
+
+    def __reduce_ex__(self, protocol: SupportsIndex) -> NoReturn:
+        del protocol
+        raise TypeError("TLS handshake facts cannot be serialized")
 
 
 def _verified_full_tls_handshake(**values: Any) -> FullTLSHandshake:

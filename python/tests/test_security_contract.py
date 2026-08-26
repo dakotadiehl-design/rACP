@@ -2,8 +2,17 @@ from __future__ import annotations
 
 import copy
 import json
+import pickle
+from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
+from jsonschema import ValidationError as JSONSchemaValidationError
+from security_testkit import (
+    unsafe_authenticated_principal_for_testing,
+    unsafe_replace_security_value_for_testing,
+    unsafe_transport_evidence_for_testing,
+)
 
 from acp.__main__ import redact_security
 from acp.cbor_cde import decode as decode_cbor_value
@@ -22,13 +31,13 @@ from acp.security import (
     effective_permissions,
     profile_limits,
 )
-from acp.testkit import unsafe_replace_security_value_for_testing, unsafe_transport_evidence_for_testing
 from acp.validate import ValidationError, validate_message
 
 ROOT_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000090"
 NODE_ID = "0193f8d8-4c4e-7d8b-a2ab-000000000002"
 DIGEST = "sha256:" + "a" * 64
 BINDING = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+REPO_ROOT = Path(__file__).parents[2]
 
 
 def authenticated_auth() -> dict[str, object]:
@@ -40,6 +49,25 @@ def authenticated_auth() -> dict[str, object]:
         "channel_binding": BINDING,
         "security_capabilities": [{"id": "aurora-trust", "version": "1.0"}],
     }
+
+
+def test_provider_provenance_schema_accepts_closed_valid_manifest_only() -> None:
+    schema = json.loads((REPO_ROOT / "schemas/security/provider-provenance-manifest.schema.json").read_text())
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    manifest = {
+        "schema_version": "1.0",
+        "adapter_id": "test.adapter",
+        "source_revision": "a" * 40,
+        "provider": {"name": "test", "version": "1"},
+        "target_triple": "arm64-apple-macosx",
+        "profiles": ["full"],
+        "key_storage_classes": ["keychain"],
+        "qualification": {"status": "PASS", "artifact_sha256": "b" * 64},
+    }
+    validator.validate(manifest)
+    with pytest.raises(JSONSchemaValidationError):
+        validator.validate({**manifest, "caller_asserted_secure": True})
 
 
 def evidence():
@@ -70,6 +98,22 @@ def test_security_results_cannot_be_constructed_by_application_code() -> None:
             credential_format="x509_der",
             role_constraints=frozenset(),
         )
+
+
+def test_authenticated_security_results_cannot_be_pickled_or_restored() -> None:
+    principal = unsafe_authenticated_principal_for_testing(
+        state=PrincipalState.AUTHENTICATED,
+        mode=AuthenticationMode.AURORA_TRUST,
+        trust_domain_id=ROOT_ID,
+        node_id=NODE_ID,
+        credential_id=DIGEST,
+        identity_key_id=DIGEST,
+        credential_format="x509_der",
+        role_constraints=frozenset(),
+    )
+    for value in (evidence(), principal):
+        with pytest.raises(TypeError, match="cannot be serialized"):
+            pickle.dumps(value)
 
 
 def test_authenticated_hello_is_bound_to_transport_evidence() -> None:
