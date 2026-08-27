@@ -1,0 +1,14 @@
+CMD 1 cue.go
+CMD 2 output.grand_master.set 0.75
+CMD 3 fixture.update {"enabled":true,"label":"Stage Left","levels":[0,0.5,1]}
+CMD 4 test.null null
+ACK 1
+ERR 2 permission_denied
+ERR 0 malformed_message
+STATE output.grand_master 7 0.75
+STATE cue.current 18 {"number":18,"title":"Finale"}
+SUB 5 cue.current
+UNSUB 6 cue.current
+PING 7
+PONG 7
+BYE

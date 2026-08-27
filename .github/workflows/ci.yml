@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -13,190 +13,22 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
-      - name: Install and test
+      - name: Install
+        run: python3 -m pip install -e './python[dev]'
+      - name: Test
+        working-directory: python
+        run: python3 -m pytest --cov=racp --cov-fail-under=85
+      - name: Lint and type-check
+        working-directory: python
         run: |
-          python3 -m pip install -e './python[dev,security-vectors]'
-          python3 -m ruff check --config python/pyproject.toml python scripts
-          (cd python && python3 -m mypy src/acp)
-          (cd python && python3 -m pytest tests --cov=acp --cov-fail-under=70)
-      - name: Registry and vectors
-        run: |
-          python3 scripts/check_registry.py
-          python3 scripts/freeze_vectors.py
-          python3 scripts/security_vectors.py --write
-          python3 scripts/security_vectors.py
-          git diff --exit-code -- vectors/security
-      - name: Localhost WebSocket HELLO
-        run: python3 tests/interop/test_ws_hello.py
-      - name: Localhost WebSocket Remote
-        run: python3 tests/interop/test_ws_remote.py
-      - name: Worktree stays clean
-        run: |
-          git status --porcelain
-          test -z "$(git status --porcelain)"
-      - name: Wheel install outside the tree
+          python3 -m ruff check src tests
+          python3 -m mypy src/racp
+      - name: Build and verify wheel
         run: |
           python3 -m pip install build
           python3 -m build --wheel --outdir dist python
           python3 -m pip install --force-reinstall dist/*.whl
-          mkdir -p /tmp/acp-wheel-test && cd /tmp/acp-wheel-test
-          python3 - <<'PY'
-          from acp.constants import load, limits
-          from acp.registry import lookup
-          from acp.discovery import MAGIC
-          assert load()["protocol"]["baseline"] == "1.2"
-          assert limits()["max_message_bytes"] > 0
-          assert lookup("session.hello")["legal_before_handshake"]
-          assert MAGIC == b"ACP0"
-          print("wheel import ok")
-          PY
-
-  rust:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          components: rustfmt, clippy
-      - name: Test
-        run: cargo test --manifest-path rust/Cargo.toml
-      - name: Clippy
-        run: cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-      - name: rustfmt
-        working-directory: rust
-        run: cargo fmt -- --check
-
-  security-hardening:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - name: Install security test dependencies
-        run: python3 -m pip install -e './python[dev,security-vectors]'
-      - name: Property and malformed-input tests
-        run: |
-          python3 -m pytest python/tests/test_security_properties.py python/tests/test_security_operations.py
-          PYTHONPATH=python/src python3 scripts/security_fuzz_smoke.py
-      - name: Dependency profile and license policy
-        run: python3 scripts/check_security_dependencies.py
-      - name: Captured-output secret redaction
-        run: python3 -m pytest python/tests/test_security_operations.py -k redacted
-
-  security-api-boundary:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - name: Build release artifacts
-        run: |
-          python3 -m pip install build
-          python3 -m build --wheel --outdir dist python
-          cargo build --manifest-path rust/Cargo.toml --release -p acp-security
-          swift build -c release
-          swift package dump-symbol-graph --minimum-access-level public
-      - name: Prove fabrication APIs are absent
-        run: |
-          python3 scripts/check_security_api_boundary.py
-          python3 scripts/check_security_release_artifacts.py \
-            --swift-symbol-dir "$(dirname "$(find .build -name 'AuroraACP.symbols.json' -print -quit)")" \
-            --python-wheel "$(find dist -name '*.whl' -print -quit)" \
-            --rust-library "$(find rust/target/release/deps -name 'libacp_security-*.rlib' -print -quit)"
-
-  dependency-advisories:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - name: Rust advisory database
-        run: cargo install cargo-audit --locked && cargo audit --file rust/Cargo.lock
-      - name: Python advisory database
-        run: python3 -m pip install -e './python[dev,security-vectors]' pip-audit && python3 -m pip_audit --local
-
-  rust-msrv:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: dtolnay/rust-toolchain@63662b0dc43e7762f8a093c614c9992c38609792 # 1.75.0
-      - name: Prove declared Rust 1.75 MSRV
-        working-directory: rust
-        run: |
-          rustc --version | grep '^rustc 1\.75\.0 '
-          cargo --version | grep '^cargo 1\.75\.0 '
-          cargo check --workspace --locked
-          cargo test --workspace --locked
-          cargo check --workspace --all-targets --locked
-
-  framed-python-rust-hello:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - name: Python/Rust framed HELLO
-        run: |
-          python3 -m pip install -e './python[dev]'
-          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
-          python3 tests/interop/test_framed_cross.py --sdk rust --suite hello
-
-  framed-python-rust-session:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - name: Python/Rust framed session, Remote, and negatives
-        run: |
-          python3 -m pip install -e './python[dev]'
-          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
-          python3 tests/interop/test_framed_cross.py --sdk rust --suite session
-          python3 tests/interop/test_framed_cross.py --sdk rust --suite remote
-          python3 tests/interop/test_framed_cross.py --sdk rust --suite negative
-
-  hygiene:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: No generated artifacts in the worktree
-        run: |
-          test ! -d rust/target
-          test ! -d tmp
-          test -z "$(git ls-files -z -- '**/__pycache__/**' '**/*.pyc' '**/*.egg-info/**' | tr -d '\0')"
-          git status --porcelain
-          test -z "$(git status --porcelain)"
-
-  swift:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Test
-        run: swift test
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-      - name: Python/Swift framed HELLO
-        run: |
-          python3 -m pip install -e './python[dev]'
-          swift build --product acp-framed-hello
-          python3 tests/interop/test_framed_cross.py --sdk swift --suite hello
-      - name: Python/Swift framed session and Remote
-        run: |
-          python3 tests/interop/test_framed_cross.py --sdk swift --suite session
-          python3 tests/interop/test_framed_cross.py --sdk swift --suite remote
-          python3 tests/interop/test_framed_cross.py --sdk swift --suite negative
-      - name: Rust/Swift framed session
-        run: |
-          cargo build --manifest-path rust/Cargo.toml -p acp-session --example framed_hello
-          python3 tests/interop/test_framed_cross.py --sdk rust-swift --suite session
+          cd /tmp
+          python3 -c 'import racp; assert racp.MAX_LINE_BYTES == 16384'
+      - name: Worktree stays clean
+        run: test -z "$(git status --porcelain)"

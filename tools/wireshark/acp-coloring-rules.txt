@@ -1,8 +1,0 @@
-# @name ACP coloring
-# @enabled 1
-acp.error.code @[65535,0,0][65535,65535,65535]
-acp.health.status == "critical" @[65535,0,0][65535,65535,65535]
-acp.health.status == "degraded" || acp.health.status == "warning" @[65535,42405,0][0,0,0]
-acp.type == "cue.go" || acp.type == "cue.fire" || acp.type == "bridge.blackout" @[0,20000,65535][65535,65535,65535]
-acp.type == "health.heartbeat" || acp.type == "telemetry.metric" @[40000,40000,40000][0,0,0]
-acp.type == "discovery.advertisement" || acp.type == "session.hello" @[20000,40000,20000][0,0,0]

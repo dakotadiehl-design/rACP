@@ -1,13 +1,12 @@
-# acp (Python)
+# racp
 
-Status: **Current package guide**
-Protocol documentation: [`../docs/README.md`](../docs/README.md)
+Dependency-free Python 3.11+ reference implementation of rACP v1.
 
-Python 3.11+ reference SDK for the Aurora Communications Protocol.
-
-This package is the reference encoder for ACP-CDE-1.2 golden vectors, the home of `acp-inspect` / `acp-sim`, and the **only amendment-conformant production Remote authority** (`RemoteHost` + `RemoteAuthority`). The Rust and Swift packages ship codecs, models, and non-production Remote simulators.
-
-```bash
+```sh
 python3 -m pip install -e '.[dev]'
 python3 -m pytest
 ```
+
+The package provides strict message parsing and encoding, a transport-independent
+session core, and a bounded asyncio plain-TCP adapter. See the repository's
+[`docs/RACP_SPEC_V1.md`](../docs/RACP_SPEC_V1.md) for the wire protocol and trust model.

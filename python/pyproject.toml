@@ -3,17 +3,14 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aurora-acp"
-version = "1.2.0"
-description = "Aurora Communications Protocol — Python reference SDK"
+name = "reasonable-acp"
+version = "1.0.0"
+description = "rACP v1 plain-text show-control protocol reference implementation"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "LicenseRef-Proprietary"
 authors = [{ name = "Aurora" }]
-dependencies = [
-    "jsonschema>=4.23",
-    "referencing>=0.35",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -21,27 +18,11 @@ dev = [
     "pytest-cov>=4.1",
     "ruff>=0.6",
     "mypy>=1.11",
-    "hypothesis>=6.100",
 ]
-security-vectors = [
-    "cbor2>=5.6,<6",
-    "cryptography>=50,<51",
-]
-
-[project.scripts]
-acp = "acp.__main__:main"
-acp-inspect = "acp.__main__:main"
-acp-sim = "acp.__main__:main"
-acp-security = "acp.security_cli:main"
-
-[project.urls]
-Repository = "https://github.com/aurora/acp"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-acp = ["data/*.json", "data/schema/**/*.json"]
+include = ["racp*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -57,20 +38,18 @@ select = ["E", "F", "I", "UP", "B"]
 ignore = ["UP042"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["acp"]
+known-first-party = ["racp"]
 
 [tool.mypy]
 python_version = "3.11"
 mypy_path = "src"
-packages = ["acp"]
+packages = ["racp"]
 explicit_package_bases = true
 warn_unused_ignores = true
-ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["acp"]
-omit = ["*/tests/*", "*/acp/__main__.py"]
+source = ["racp"]
 
 [tool.coverage.report]
-fail_under = 70
+fail_under = 85
 show_missing = true

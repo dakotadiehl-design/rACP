@@ -6,8 +6,6 @@
 **/.pytest_cache/
 **/.ruff_cache/
 **/*.egg-info/
-tools/acp-workbench/artifacts/*
-!tools/acp-workbench/artifacts/.gitkeep
 .idea/
 .vscode/
 *.swp
@@ -25,16 +23,7 @@ venv/
 dist/
 build/
 
-# Rust
-rust/target/
-**/*.rs.bk
-
-# Swift
-.swiftpm/
-.build/
-xcuserdata/
-
-# Local scratch (PDF extraction, etc.)
+# Local scratch
 tmp/
 
 # Tooling

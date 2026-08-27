@@ -1,0 +1,7 @@
+RACP/1 HELLO
+PEER device prism-main
+CAP cue.current
+CAP cue.go
+CAP output.grand_master.set
+CAP state.subscribe
+END
