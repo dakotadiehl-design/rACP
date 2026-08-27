@@ -78,6 +78,10 @@ public struct ACPStoragePosture: Codable, Equatable, Sendable {
     public let storageClass: ACPStorageClass
     public let hardwareBacked: Bool
     public let privateKeyExportable: Bool
+    public init(storageClass: ACPStorageClass, hardwareBacked: Bool, privateKeyExportable: Bool) {
+        self.storageClass = storageClass; self.hardwareBacked = hardwareBacked
+        self.privateKeyExportable = privateKeyExportable
+    }
     enum CodingKeys: String, CodingKey {
         case storageClass = "class"
         case hardwareBacked = "hardware_backed"

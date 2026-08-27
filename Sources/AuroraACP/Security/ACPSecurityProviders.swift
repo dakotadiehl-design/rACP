@@ -53,7 +53,6 @@ public protocol ACPIdentityStore: Sendable {
     func commit(credentialID: ACPCredentialID) throws
     func rollback() throws
 }
-public protocol ACPTrustDomainAuthority: Sendable { func issue(request: Data) throws -> Data }
 public protocol ACPEnrollmentPolicy: Sendable { func approve(request: Data) throws -> Bool }
 public protocol ACPAuthorizationPolicy: Sendable { func permissions(for principal: ACPAuthenticatedPrincipal) -> Set<String> }
 public protocol ACPAuditSink: Sendable { func record(event: String, publicFields: [String: String]) }

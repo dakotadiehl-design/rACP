@@ -34,6 +34,10 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         XCTAssertThrowsError(try state.requireFresh(at: ISO8601DateFormatter().date(from: "2026-08-23T12:00:00Z")!, maximumSnapshotAge: 172_800))
         XCTAssertEqual(ACPRevocationAction(revoked: true), .terminate)
         XCTAssertEqual(ACPRevocationAction(revoked: true, policy: .explicitAuditedGrace), .auditedGrace)
+        XCTAssertEqual(ACPActiveSessionRevocationPolicy.resolve(persistedValue: nil), .hardenedTerminate)
+        XCTAssertEqual(ACPActiveSessionRevocationPolicy.resolve(persistedValue: "unknown"), .hardenedTerminate)
+        XCTAssertEqual(ACPActiveSessionRevocationPolicy.resolve(
+            persistedValue: "explicit_audited_grace"), .explicitAuditedGrace)
         XCTAssertEqual(state.epoch, 7); XCTAssertEqual(state.entries.count, 1)
         XCTAssertThrowsError(try state.ingest(bodyRaw: body, signature: signature, verifier: revocationVerifier))
     }

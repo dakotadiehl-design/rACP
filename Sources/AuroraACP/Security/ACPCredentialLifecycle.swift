@@ -36,10 +36,6 @@ public struct ACPTrustDomainIdentity: Sendable, Equatable {
     }
 }
 
-public protocol ACPX509IssuanceProvider: Sendable {
-    func issueNodeCertificate(domain: ACPTrustDomainID, node: ACPSecurityNodeID, publicKeySPKI: Data) throws -> Data
-}
-
 public struct ACPCredentialAuthority: Sendable {
     public let identity: ACPTrustDomainIdentity
     private let signingKey: any ACPSigningKeyHandle
@@ -64,11 +60,6 @@ public struct ACPCredentialAuthority: Sendable {
         return try ACPEncoding.encodeValue(.plain(.object([
             "body": .object(body), "algorithm": .string("ecdsa_p256_sha256"), "signature": .bytes(signature),
         ])))
-    }
-    public func issueX509(
-        provider: any ACPX509IssuanceProvider, node: ACPSecurityNodeID, publicKeySPKI: Data
-    ) throws -> Data {
-        try provider.issueNodeCertificate(domain: identity.trustDomainID, node: node, publicKeySPKI: publicKeySPKI)
     }
 }
 
@@ -280,7 +271,16 @@ public struct ACPRevocationState: Sendable {
     }
 }
 
-public enum ACPActiveSessionRevocationPolicy: Sendable, Equatable { case hardenedTerminate, explicitAuditedGrace }
+public enum ACPActiveSessionRevocationPolicy: String, Codable, Sendable, Equatable {
+    case hardenedTerminate = "hardened_terminate"
+    case explicitAuditedGrace = "explicit_audited_grace"
+
+    /// Missing, corrupt, and unknown persisted policy values select the frozen
+    /// fail-closed version-1 behavior. Grace is enabled only by its exact value.
+    public static func resolve(persistedValue: String?) -> Self {
+        persistedValue == Self.explicitAuditedGrace.rawValue ? .explicitAuditedGrace : .hardenedTerminate
+    }
+}
 public enum ACPRevocationSessionAction: Sendable, Equatable { case retain, terminate, auditedGrace }
 public func ACPRevocationAction(
     revoked: Bool, policy: ACPActiveSessionRevocationPolicy = .hardenedTerminate

@@ -69,14 +69,6 @@ pub struct TrustDomainIdentity {
     pub trust_domain_id: TrustDomainId,
     pub authority_key_id: IdentityKeyId,
 }
-pub trait X509IssuanceProvider {
-    fn issue_node_certificate(
-        &self,
-        domain: &TrustDomainId,
-        node: &SecurityNodeId,
-        public_key_spki: &[u8],
-    ) -> Result<Vec<u8>, SecurityErrorCode>;
-}
 pub struct CredentialAuthority<'a> {
     pub identity: TrustDomainIdentity,
     signing_key: &'a dyn SigningKeyHandle,
@@ -124,14 +116,6 @@ impl<'a> CredentialAuthority<'a> {
             ("signature".into(), Json::Bytes(signature)),
         ]))
         .map_err(|_| SecurityErrorCode::CredentialInvalid)
-    }
-    pub fn issue_x509(
-        &self,
-        provider: &dyn X509IssuanceProvider,
-        node: &SecurityNodeId,
-        public_key_spki: &[u8],
-    ) -> Result<Vec<u8>, SecurityErrorCode> {
-        provider.issue_node_certificate(&self.identity.trust_domain_id, node, public_key_spki)
     }
 }
 
@@ -692,6 +676,27 @@ pub enum ActiveSessionRevocationPolicy {
     ExplicitAuditedGrace,
 }
 
+impl ActiveSessionRevocationPolicy {
+    pub const HARDENED_TERMINATE_ID: &'static str = "hardened_terminate";
+    pub const EXPLICIT_AUDITED_GRACE_ID: &'static str = "explicit_audited_grace";
+
+    /// Unknown or absent persisted values resolve to the frozen fail-closed
+    /// version-1 policy. Grace requires an exact, explicit selection.
+    pub fn resolve(persisted_value: Option<&str>) -> Self {
+        match persisted_value {
+            Some(Self::EXPLICIT_AUDITED_GRACE_ID) => Self::ExplicitAuditedGrace,
+            _ => Self::HardenedTerminate,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::HardenedTerminate => Self::HARDENED_TERMINATE_ID,
+            Self::ExplicitAuditedGrace => Self::EXPLICIT_AUDITED_GRACE_ID,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RevocationSessionAction {
     Retain,
@@ -1137,6 +1142,18 @@ mod tests {
         assert_eq!(
             revocation_session_action(true, ActiveSessionRevocationPolicy::ExplicitAuditedGrace),
             RevocationSessionAction::AuditedGrace
+        );
+        assert_eq!(
+            ActiveSessionRevocationPolicy::resolve(None),
+            ActiveSessionRevocationPolicy::HardenedTerminate
+        );
+        assert_eq!(
+            ActiveSessionRevocationPolicy::resolve(Some("unknown")),
+            ActiveSessionRevocationPolicy::HardenedTerminate
+        );
+        assert_eq!(
+            ActiveSessionRevocationPolicy::resolve(Some("explicit_audited_grace")),
+            ActiveSessionRevocationPolicy::ExplicitAuditedGrace
         );
         assert_eq!(
             state.ingest(&body, signature, &verifier),

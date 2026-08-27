@@ -1,0 +1,12 @@
+{
+  "attempt_id": "60718293-a4b5-4c6d-aa5b-6c7d8e9fa0b1",
+  "authority_key_id": "sha256:61cce05a7af2c2bd1f436f7de3e394fd863204fdd78f8328a2195c6265259735",
+  "authorization_id": "10000000-0000-4000-8000-000000000001",
+  "candidate_node_id": "00112233-4455-4677-8899-aabbccddeeff",
+  "commissioner_node_id": "10213243-5465-4768-9a0b-1c2d3e4f5061",
+  "credential_id": "sha256:6d183afc0cb65d87533a54764cf2f15af2be0dd424843f3b14de69846c10ecc9",
+  "enrollment_id": "50617283-94a5-4b6c-9a4b-5c6d7e8f90a1",
+  "identity_key_id": "sha256:f3c9d135604346824a568ba09251f3118e0184b417fae972a66668ff3f93d75d",
+  "purpose": "initial",
+  "trust_domain_id": "40516273-8495-4a6b-8a3b-4c5d6e7f8091"
+}

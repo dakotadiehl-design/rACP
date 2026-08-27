@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aurora.example/acp/security/trust-domain-authority.schema.json",
+  "title": "ACP portable trust-domain authority models",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "digest_id": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "authority_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_domain_id", "authority_key_id", "trust_anchor_credential_id"],
+      "properties": {
+        "trust_domain_id": { "$ref": "#/$defs/uuid" },
+        "authority_key_id": { "$ref": "#/$defs/digest_id" },
+        "trust_anchor_credential_id": { "$ref": "#/$defs/digest_id" }
+      }
+    },
+    "commissioner_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_id", "instance_id", "credential_id", "identity_key_id"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/uuid" },
+        "instance_id": { "$ref": "#/$defs/uuid" },
+        "credential_id": { "$ref": "#/$defs/digest_id" },
+        "identity_key_id": { "$ref": "#/$defs/digest_id" }
+      }
+    },
+    "issuance_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorization_id", "enrollment_id", "attempt_id", "trust_domain_id",
+        "authority_key_id", "commissioner_node_id", "candidate_node_id",
+        "identity_key_id", "credential_id", "purpose"
+      ],
+      "properties": {
+        "authorization_id": { "$ref": "#/$defs/uuid" },
+        "enrollment_id": { "$ref": "#/$defs/uuid" },
+        "attempt_id": { "$ref": "#/$defs/uuid" },
+        "trust_domain_id": { "$ref": "#/$defs/uuid" },
+        "authority_key_id": { "$ref": "#/$defs/digest_id" },
+        "commissioner_node_id": { "$ref": "#/$defs/uuid" },
+        "candidate_node_id": { "$ref": "#/$defs/uuid" },
+        "identity_key_id": { "$ref": "#/$defs/digest_id" },
+        "credential_id": { "$ref": "#/$defs/digest_id" },
+        "purpose": { "enum": ["initial", "renewal", "key_rotation"] },
+        "replaces_credential_id": { "$ref": "#/$defs/digest_id" }
+      }
+    },
+    "revocation_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_domain_id", "authority_key_id", "epoch", "snapshot_id"],
+      "properties": {
+        "trust_domain_id": { "$ref": "#/$defs/uuid" },
+        "authority_key_id": { "$ref": "#/$defs/digest_id" },
+        "epoch": { "type": "integer", "minimum": 1 },
+        "snapshot_id": { "$ref": "#/$defs/digest_id" },
+        "previous_snapshot_id": { "$ref": "#/$defs/digest_id" }
+      }
+    }
+  }
+}

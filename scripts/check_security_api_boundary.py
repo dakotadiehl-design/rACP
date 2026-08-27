@@ -22,6 +22,11 @@ swift_evidence = read("Sources/AuroraACP/Session/ACPSecurity.swift")
 swift_handshake = read("Sources/AuroraACP/Security/ACPAuthenticatedTransport.swift")
 swift_connection = read("Sources/AuroraACP/Security/ACPAuthenticatedConnection.swift")
 swift_provenance = read("Sources/AuroraACP/Security/ACPProviderProvenance.swift")
+swift_issuance = read("Sources/AuroraACP/Security/ACPCredentialIssuance.swift")
+swift_providers = read("Sources/AuroraACP/Security/ACPSecurityProviders.swift")
+swift_lifecycle = read("Sources/AuroraACP/Security/ACPCredentialLifecycle.swift")
+swift_apple_coordinator = read("Sources/AuroraACPAppleSecurity/ACPAppleEnrollmentCoordinator.swift")
+swift_apple_identity = read("Sources/AuroraACPAppleSecurity/ACPAppleIdentityStore.swift")
 rust_security = read("rust/acp-security/src/lib.rs")
 rust_manifest = read("rust/acp-security/Cargo.toml")
 python_security = read("python/src/acp/security.py")
@@ -47,6 +52,44 @@ require("providerProvenance: ACPProviderProvenance" in swift_connection,
         "Swift connection accepts an unvalidated provider digest")
 require("requireQualified: Bool = true" in swift_provenance,
         "Swift provider manifests do not fail closed on qualification status")
+
+require("package final class ACPIssuanceAuthorization" in swift_issuance,
+        "issuance authorization is not package-sealed")
+require("package init(validated facts:" in swift_issuance and "stillValid:" in swift_issuance,
+        "issuance authorization lacks its validated package initializer")
+require("public init(" not in re.search(
+    r"package final class ACPIssuanceAuthorization.*?\n}", swift_issuance, re.DOTALL
+).group(0), "issuance authorization gained a public initializer")
+require("package struct ACPIssuedCredentialPackage" in swift_issuance,
+        "issued credential package is not package-sealed")
+for type_name, source in (
+    ("ACPVerifiedEnrollmentInstallResult", swift_issuance),
+    ("ACPAppleVerifiedInstallReceipt", swift_apple_coordinator),
+    ("ACPAppleDurableInstallEvidence", swift_apple_identity),
+):
+    body = re.search(rf"package final class {type_name}\b.*?\n}}", source, re.DOTALL)
+    require(body is not None, f"{type_name} sealed evidence declaration missing")
+    require("public init(" not in body.group(0), f"{type_name} gained a public initializer")
+require("confirmationValid: Bool" not in swift_apple_coordinator
+        and "attemptLiveAndUnconsumed: Bool" not in swift_apple_coordinator,
+        "Apple install verification accepts caller-fabricated validity booleans")
+require("ACPVerifiedEnrollmentInstallResult" in swift_apple_coordinator,
+        "Apple install verification is not bound to sealed PAKE confirmation evidence")
+require("ACPTrustDomainAuthority" not in swift_providers,
+        "raw Data-to-Data trust-domain authority API remains available")
+require("ACPX509IssuanceProvider" not in swift_lifecycle and "issueX509(" not in swift_lifecycle,
+        "caller-controlled X.509 issuance provider remains available")
+require("X509IssuanceProvider" not in rust_security
+        and "X509IssuanceProvider" not in read("rust/acp-security/src/credential.rs")
+        and "issue_x509(" not in read("rust/acp-security/src/credential.rs"),
+        "Rust caller-controlled X.509 issuance provider remains available")
+require("ACPTrustDomainAuthorityIdentity" in read(
+    "Sources/AuroraACP/Security/ACPTrustDomainAuthorityModels.swift"),
+    "Swift portable authority identity model missing")
+require("TrustDomainAuthorityIdentity" in read("rust/acp-security/src/authority.rs"),
+        "Rust portable authority identity model missing")
+require("TrustDomainAuthorityIdentity" in read("python/src/acp/security_authority.py"),
+        "Python portable authority identity model missing")
 
 require("pub struct TransportEvidence" in rust_security, "Rust evidence declaration missing")
 rust_evidence = re.search(r"pub struct TransportEvidence \{(.*?)\n}", rust_security, re.DOTALL)

@@ -405,6 +405,13 @@ class ActiveSessionRevocationPolicy(str, Enum):
     HARDENED_TERMINATE = "hardened_terminate"
     EXPLICIT_AUDITED_GRACE = "explicit_audited_grace"
 
+    @classmethod
+    def resolve(cls, persisted_value: object) -> "ActiveSessionRevocationPolicy":
+        """Resolve absent/corrupt policy to the frozen fail-closed v1 default."""
+        if persisted_value == cls.EXPLICIT_AUDITED_GRACE.value:
+            return cls.EXPLICIT_AUDITED_GRACE
+        return cls.HARDENED_TERMINATE
+
 
 def revocation_session_action(*, revoked: bool, policy: ActiveSessionRevocationPolicy) -> str:
     if not revoked:

@@ -1,0 +1,13 @@
+{
+  "report_version": "1.0",
+  "protocol_version": "1.2.0",
+  "consumer_language": "rust",
+  "fixture_manifest": "vectors/security/conformance/manifest.json",
+  "foreign_producers_validated": ["python", "swift"],
+  "command": "cargo test --workspace --offline",
+  "result": "pass",
+  "tests_executed": 65,
+  "tests_skipped": 0,
+  "conformance_tests_executed": 1,
+  "recorded_at": "2026-08-27"
+}

@@ -1,0 +1,9 @@
+{
+  "base_fixture": "issuance.rust.primary",
+  "expected_error": "security.trust_domain_mismatch",
+  "mutation": {
+    "field": "trust_domain_id",
+    "operation": "replace",
+    "value": "41516273-8495-4a6b-8a3b-4c5d6e7f8091"
+  }
+}

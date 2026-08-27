@@ -14,6 +14,10 @@ let package = Package(
         .executable(name: "acp-enrollment-fixture", targets: ["acp-enrollment-fixture"]),
         .executable(name: "acp-apple-full-qualification", targets: ["acp-apple-full-qualification"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-certificates.git", exact: "1.19.4"),
+        .package(url: "https://github.com/apple/swift-asn1.git", exact: "1.7.1"),
+    ],
     targets: [
         .target(
             name: "AuroraACP",
@@ -25,7 +29,11 @@ let package = Package(
         ),
         .target(
             name: "AuroraACPAppleSecurity",
-            dependencies: ["AuroraACP", "AuroraACPSPAKE2"],
+            dependencies: [
+                "AuroraACP", "AuroraACPSPAKE2",
+                .product(name: "X509", package: "swift-certificates"),
+                .product(name: "SwiftASN1", package: "swift-asn1"),
+            ],
             linkerSettings: [
                 .linkedFramework("Network"), .linkedFramework("Security"),
                 .linkedLibrary("c++"),
@@ -56,7 +64,11 @@ let package = Package(
         ),
         .testTarget(
             name: "AuroraACPAppleSecurityTests",
-            dependencies: ["AuroraACP", "AuroraACPAppleSecurity"],
+            dependencies: [
+                "AuroraACP", "AuroraACPAppleSecurity",
+                .product(name: "X509", package: "swift-certificates"),
+                .product(name: "SwiftASN1", package: "swift-asn1"),
+            ],
             path: "tests/AuroraACPAppleSecurityTests"
         ),
     ]

@@ -144,6 +144,12 @@ def test_revocation_vector_monotonic_signature_domain_and_bounds() -> None:
         revocation_session_action(revoked=True, policy=ActiveSessionRevocationPolicy.EXPLICIT_AUDITED_GRACE)
         == "audited_grace"
     )
+    assert ActiveSessionRevocationPolicy.resolve(None) is ActiveSessionRevocationPolicy.HARDENED_TERMINATE
+    assert ActiveSessionRevocationPolicy.resolve("unknown") is ActiveSessionRevocationPolicy.HARDENED_TERMINATE
+    assert (
+        ActiveSessionRevocationPolicy.resolve("explicit_audited_grace")
+        is ActiveSessionRevocationPolicy.EXPLICIT_AUDITED_GRACE
+    )
     with pytest.raises(CredentialLifecycleError, match="security.authentication_failed"):
         state.ingest(body, signature, verify)
     wrong = RevocationState(TrustDomainID("50516273-8495-4a6b-8a3b-4c5d6e7f8091"), 128)
