@@ -58,8 +58,8 @@ private func acp_spake2_verifier_verify_confirmation_and_consume_key(
 @_silgen_name("acp_spake2_destroy")
 private func acp_spake2_destroy(_ context: UnsafeMutablePointer<OpaquePointer?>?)
 
-public enum ACPAppleSPAKE2PlusRegistration {
-    public static func record(proverSecret: ACPSecretBytes) throws -> Data {
+package enum ACPAppleSPAKE2PlusRegistration {
+    package static func record(proverSecret: ACPSecretBytes) throws -> Data {
         var record = Data(repeating: 0, count: ACP_SPAKE2_REGISTRATION_RECORD_BYTES)
         let status = proverSecret.withUnsafeBytes { secret in
             guard secret.count == ACP_SPAKE2_PROVER_SECRET_BYTES else {
@@ -80,7 +80,7 @@ public enum ACPAppleSPAKE2PlusRegistration {
     }
 }
 
-public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
+package final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
     private let lock = NSLock()
     private var context: OpaquePointer?
     private var generated = false
@@ -88,7 +88,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
     private let transcriptContext: Data
     private var proverShare: Data?
 
-    public init(
+    package init(
         proverSecret: ACPSecretBytes,
         proverIdentity: Data,
         verifierIdentity: Data,
@@ -127,7 +127,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
 
     deinit { destroy() }
 
-    public func generateShare() throws -> Data {
+    package func generateShare() throws -> Data {
         lock.lock(); defer { lock.unlock() }
         guard !generated, !terminal, let context else {
             failLocked(); throw ACPSecurityErrorCode.authenticationFailed
@@ -146,7 +146,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
         return share
     }
 
-    public func processResponseAndConsumeKey(
+    package func processResponseAndConsumeKey(
         _ response: Data
     ) throws -> (confirmation: Data, key: ACPConfirmedSPAKE2PlusKey) {
         lock.lock(); defer { lock.unlock() }
@@ -199,7 +199,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
 }
 
 /// Apple Full-profile verifier backed by ACP's restricted native provider.
-public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecked Sendable {
+package final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecked Sendable {
     private let lock = NSLock()
     private var context: OpaquePointer?
     private var peerShareProcessed = false
@@ -208,7 +208,7 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
     private var proverShare: Data?
     private var verifierResponse: Data?
 
-    public init(
+    package init(
         registrationRecord: Data,
         proverIdentity: Data,
         verifierIdentity: Data,
@@ -245,7 +245,7 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
 
     deinit { destroy() }
 
-    public func receive(peerShare: Data) throws -> Data {
+    package func receive(peerShare: Data) throws -> Data {
         lock.lock(); defer { lock.unlock() }
         guard !terminal, !peerShareProcessed, peerShare.count == ACP_SPAKE2_SHARE_BYTES,
               let context else {
@@ -273,7 +273,7 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
         return response
     }
 
-    public func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey {
+    package func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey {
         lock.lock(); defer { lock.unlock() }
         guard !terminal, peerShareProcessed,
               confirmation.count == ACP_SPAKE2_CONFIRMATION_BYTES, let context,

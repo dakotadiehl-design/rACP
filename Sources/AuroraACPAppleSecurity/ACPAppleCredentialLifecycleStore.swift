@@ -106,7 +106,13 @@ package actor ACPAppleCredentialLifecycleStore {
     }
 
     package func recover() async throws -> ACPAppleActiveCredential? {
+        try await recoverReportingDiscardedStaging().active
+    }
+
+    package func recoverReportingDiscardedStaging() async throws
+        -> (active: ACPAppleActiveCredential?, discardedStaging: Bool) {
         var snapshot = try load()
+        let discardedStaging = snapshot.staged != nil
         if let staged = snapshot.staged {
             try await identityStore.reset(label: staged.label)
             snapshot.staged = nil
@@ -116,13 +122,13 @@ package actor ACPAppleCredentialLifecycleStore {
         // independently validated authoritative active identity.
         try? await cleanRetired()
         snapshot = try load()
-        guard let active = snapshot.active else { return nil }
+        guard let active = snapshot.active else { return (nil, discardedStaging) }
         let durable = try await identityStore.load(label: active.label, identity: identity)
         guard durable.metadata.credentialID == active.credentialID,
               durable.metadata.identityKeyID == active.identityKeyID else {
             throw ACPAppleSecurityError.localIdentityMismatch
         }
-        return .init(generation: active.generation, identity: durable)
+        return (.init(generation: active.generation, identity: durable), discardedStaging)
     }
 
     package func reset() async throws {

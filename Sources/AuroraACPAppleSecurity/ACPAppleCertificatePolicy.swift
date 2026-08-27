@@ -3,12 +3,12 @@ import CryptoKit
 import Foundation
 import Security
 
-public struct ACPAppleVerifiedCertificate: Sendable, Equatable {
-    public let trustDomainID: ACPTrustDomainID
-    public let nodeID: ACPSecurityNodeID
-    public let credentialID: ACPCredentialID
-    public let identityKeyID: ACPIdentityKeyID
-    public let leafDER: Data
+package struct ACPAppleVerifiedCertificate: Sendable, Equatable {
+    package let trustDomainID: ACPTrustDomainID
+    package let nodeID: ACPSecurityNodeID
+    package let credentialID: ACPCredentialID
+    package let identityKeyID: ACPIdentityKeyID
+    package let leafDER: Data
 
     package init(trustDomainID: ACPTrustDomainID, nodeID: ACPSecurityNodeID,
                  credentialID: ACPCredentialID, identityKeyID: ACPIdentityKeyID,
@@ -41,12 +41,12 @@ public enum ACPAppleSecurityError: String, Error, Sendable {
     case helloReceive = "security.hello_receive"
 }
 
-public protocol ACPAppleRevocationChecking: Sendable {
+package protocol ACPAppleRevocationChecking: Sendable {
     func isRevoked(_ credentialID: ACPCredentialID) -> Bool
 }
 
-public enum ACPAppleCertificatePolicy {
-    public static func validate(
+package enum ACPAppleCertificatePolicy {
+    package static func validate(
         chain: [SecCertificate],
         anchors: [SecCertificate],
         expectedDomain: ACPTrustDomainID,

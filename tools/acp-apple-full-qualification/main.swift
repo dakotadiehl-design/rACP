@@ -16,13 +16,18 @@ enum ACPAppleFullQualificationHost {
     private static func run(_ arguments: [String]) async throws {
         guard arguments.count >= 2 else { throw UsageError() }
         let mode = arguments[0]
-        if mode == "authority-bootstrap" {
+        if mode == "authority-bootstrap" || mode == "authority-reset" {
             guard arguments.count == 2 else { throw UsageError() }
             let service = arguments[1]
             let store = try ACPAppleTrustDomainAuthorityStore(
                 applicationTag: Data("\(service).authority".utf8),
                 metadataService: service + ".authority",
                 keyMetadataService: service + ".authority-key")
+            if mode == "authority-reset" {
+                try await store.reset()
+                emit(["status": "reset"])
+                return
+            }
             let authority = try await store.openOrCreate()
             emit([
                 "status": "active",

@@ -30,6 +30,7 @@ package final class ACPAppleIssuanceJournalBackend: ACPIssuanceJournalBackend, @
     }
     package func load() throws -> Data? { try backend.read(name: account) }
     package func replace(with data: Data) throws { try backend.write(name: account, data: data) }
+    package func reset() throws { try backend.delete(name: account) }
 }
 
 package enum ACPAppleSigningKeyCustody: String, Codable, Sendable, Equatable {

@@ -218,6 +218,12 @@ package final class ACPAppleAuthorityKeyStore: @unchecked Sendable {
         }
     }
 
+    package func reset() throws {
+        Self.creationLock.lock(); defer { Self.creationLock.unlock() }
+        for key in try findKeys() { try delete(key: key) }
+        try metadata.delete(name: metadataAccount)
+    }
+
     private func findKeys() throws -> [SecKey] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassKey,

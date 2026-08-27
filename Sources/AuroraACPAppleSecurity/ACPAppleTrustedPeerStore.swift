@@ -38,9 +38,9 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
     private var revocationObservers: [String: [UUID: @Sendable () -> Void]] = [:]
     private var revocationObserverCount = 0
 
-    public init(service: String = "com.aurora.acp.trust", account: String,
-                accessGroup: String? = nil, maximumPeers: Int = 1024,
-                activeSessionRevocationPolicy persistedPolicy: String? = nil) throws {
+    package init(service: String = "com.aurora.acp.trust", account: String,
+                 accessGroup: String? = nil, maximumPeers: Int = 1024,
+                 activeSessionRevocationPolicy persistedPolicy: String? = nil) throws {
         guard (1...128).contains(account.utf8.count), (1...4096).contains(maximumPeers) else {
             throw ACPAppleSecurityError.trustStoreFailure
         }
@@ -58,7 +58,7 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
         } else { snapshot = Snapshot() }
     }
 
-    public func trustedPeers() -> [ACPAppleTrustedPeer] {
+    package func trustedPeers() -> [ACPAppleTrustedPeer] {
         lock.withLock { snapshot.peers.sorted { $0.nodeID < $1.nodeID } }
     }
 
@@ -68,7 +68,7 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
         }
     }
 
-    public func revoke(_ credentialID: ACPCredentialID, at date: Date = Date()) throws
+    package func revoke(_ credentialID: ACPCredentialID, at date: Date = Date()) throws
         -> ACPAppleRevocationResult {
         let (result, callbacks): (ACPAppleRevocationResult, [@Sendable () -> Void]) = try lock.withLock {
             guard let index = snapshot.peers.firstIndex(where: { $0.credentialID == credentialID.rawValue })
@@ -93,7 +93,7 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
 
     /// Removes ACP trust-display and revocation state without touching cached
     /// show assets or local device identities.
-    public func reset() throws {
+    package func reset() throws {
         let callbacks: [@Sendable () -> Void] = try lock.withLock {
             do { try backend.delete(name: account) }
             catch { throw ACPAppleSecurityError.trustStoreFailure }

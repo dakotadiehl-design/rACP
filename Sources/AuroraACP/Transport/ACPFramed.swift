@@ -26,10 +26,20 @@ public actor ACPFramedConnection: ACPTransport {
         return (Int(length), header[4] == 1)
     }
     private let connection: NWConnection
+    private let maximumFrameLength: Int
     private var started = false
 
     public init(connection: NWConnection) {
         self.connection = connection
+        maximumFrameLength = Self.maximumFrameLength
+    }
+
+    package init(connection: NWConnection, maximumFrameLength: Int) throws {
+        guard (1...Self.maximumFrameLength).contains(maximumFrameLength) else {
+            throw ACPSessionError("invalid_range", "invalid frame limit")
+        }
+        self.connection = connection
+        self.maximumFrameLength = maximumFrameLength
     }
 
     public static func connect(host: String, port: UInt16, timeout: TimeInterval = 10) async throws -> ACPFramedConnection {
@@ -101,6 +111,9 @@ public actor ACPFramedConnection: ACPTransport {
             try Task.checkCancellation()
             let header = try await self.receiveExact(5)
             let (length, text) = try Self.parseHeader(header)
+            guard length <= maximumFrameLength else {
+                throw ACPSessionError("invalid_range", "frame too large for connection")
+            }
             let payload = try await self.receiveExact(length)
             return (payload, text)
         } onCancel: {

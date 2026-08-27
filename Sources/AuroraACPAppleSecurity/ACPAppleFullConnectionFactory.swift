@@ -7,17 +7,18 @@ import Security
 public struct ACPAppleFullProviderConfiguration {
     package let localIdentity: sec_identity_t
     package let localCertificateChain: [SecCertificate]
-    public let localACPIdentity: ACPIdentity
-    public let anchors: [SecCertificate]
-    public let trustDomainID: ACPTrustDomainID
-    public let expectedPeerNodeID: ACPSecurityNodeID?
-    public let providerProvenance: ACPProviderProvenance
-    public let trustStore: ACPAppleTrustedPeerStore
+    package let localACPIdentity: ACPIdentity
+    package let anchors: [SecCertificate]
+    package let trustDomainID: ACPTrustDomainID
+    package let expectedPeerNodeID: ACPSecurityNodeID?
+    package let providerProvenance: ACPProviderProvenance
+    package let trustStore: ACPAppleTrustedPeerStore
 
-    public init(localIdentity: ACPAppleLocalIdentity, anchors: [SecCertificate],
-                trustDomainID: ACPTrustDomainID, expectedPeerNodeID: ACPSecurityNodeID? = nil,
-                providerProvenance: ACPProviderProvenance,
-                trustStore: ACPAppleTrustedPeerStore) {
+    package init(localIdentity: ACPAppleLocalIdentity, anchors: [SecCertificate],
+                 trustDomainID: ACPTrustDomainID,
+                 expectedPeerNodeID: ACPSecurityNodeID? = nil,
+                 providerProvenance: ACPProviderProvenance,
+                 trustStore: ACPAppleTrustedPeerStore) {
         self.localIdentity = localIdentity.networkIdentity
         self.localCertificateChain = localIdentity.certificateChain
         self.localACPIdentity = localIdentity.acpIdentity; self.anchors = anchors

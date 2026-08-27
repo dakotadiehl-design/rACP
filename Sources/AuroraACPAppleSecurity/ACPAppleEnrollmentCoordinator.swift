@@ -10,8 +10,8 @@ package final class ACPAppleVerifiedInstallReceipt: @unchecked Sendable {
     package let package: ACPIssuedCredentialPackage
     package let certificate: ACPAppleVerifiedCertificate
 
-    fileprivate init(authorizationID: UUID, package: ACPIssuedCredentialPackage,
-                     certificate: ACPAppleVerifiedCertificate) {
+    package init(authorizationID: UUID, package: ACPIssuedCredentialPackage,
+                 certificate: ACPAppleVerifiedCertificate) {
         self.authorizationID = authorizationID; self.package = package; self.certificate = certificate
     }
 }
@@ -19,7 +19,18 @@ package final class ACPAppleVerifiedInstallReceipt: @unchecked Sendable {
 /// Narrow orchestration boundary. It carries issuer and installation
 /// capabilities but has no signing key, SecKey, serial, SAN, validity, or EKU
 /// input surface.
-package actor ACPAppleEnrollmentCoordinator {
+package protocol ACPAppleEnrollmentCoordinating: Sendable {
+    func issue(authorization: ACPIssuanceAuthorization) async throws
+        -> ACPIssuedCredentialPackage
+    func markDelivered(package: ACPIssuedCredentialPackage) async throws
+    func verifyInstallReceipt(package: ACPIssuedCredentialPackage,
+                              confirmation: ACPVerifiedEnrollmentInstallResult) async throws
+        -> ACPAppleVerifiedInstallReceipt
+    func commitTrust(_ receipt: ACPAppleVerifiedInstallReceipt,
+                     displayName: String?) async throws
+}
+
+package actor ACPAppleEnrollmentCoordinator: ACPAppleEnrollmentCoordinating {
     private let issuer: any ACPCredentialIssuing
     private let journal: ACPIssuanceJournal
     private let trustStore: ACPAppleTrustedPeerStore

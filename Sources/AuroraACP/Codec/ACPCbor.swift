@@ -6,6 +6,10 @@ enum CborValue {
 }
 
 extension ACPEncoding {
+    package static func encodeCanonicalValue(_ value: AnySendable) throws -> Data {
+        try encodeValue(.plain(value))
+    }
+
     static func requiresTag0(_ key: String) -> Bool {
         [
             "timestamp_utc", "effective_at", "expires_at", "issued_at", "next_update",

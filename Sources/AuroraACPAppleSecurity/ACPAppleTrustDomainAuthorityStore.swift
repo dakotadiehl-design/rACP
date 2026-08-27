@@ -88,6 +88,12 @@ package actor ACPAppleTrustDomainAuthorityStore {
         return try openOrCreateLocked()
     }
 
+    package func reset() throws {
+        Self.bootstrapLock.lock(); defer { Self.bootstrapLock.unlock() }
+        try keyStore.reset()
+        try metadata.delete(name: metadataAccount)
+    }
+
     private func openOrCreateLocked() throws -> ACPAppleTrustDomainAuthority {
         var record = try loadRecord()
         if record == nil {

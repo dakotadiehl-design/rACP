@@ -6,6 +6,9 @@ public enum ACPCodecError: Error {
 
 public enum ACPEncoding {
     public static func encodeJSON(_ env: ACPEnvelope) throws -> Data {
+        var env = env
+        env.payload = try normalizeSecurityBytes(
+            type: env.type, payload: env.payload, toCBOR: false)
         let obj = envelopeObject(env)
         return try JSONSerialization.data(withJSONObject: ns(obj), options: [.sortedKeys])
     }
@@ -17,7 +20,10 @@ public enum ACPEncoding {
             throw ACPCodecError.malformed("envelope")
         }
         try ACPSchema.validateEnvelopeObject(dict)
-        return try envelope(from: fromNS(dict), securityBytesFromCBOR: false)
+        var envelope = try envelope(from: fromNS(dict), securityBytesFromCBOR: false)
+        envelope.payload = try normalizeSecurityBytes(
+            type: envelope.type, payload: envelope.payload, toCBOR: true)
+        return envelope
     }
 
     public static func encodeCBOR(_ env: ACPEnvelope) throws -> Data {
@@ -30,8 +36,11 @@ public enum ACPEncoding {
     public static func decodeCBOR(_ data: Data) throws -> ACPEnvelope {
         guard data.count <= 8 * 1024 * 1024 else { throw ACPCodecError.malformed("message too large") }
         let value = try decodeValue(data)
-        let env = try envelope(from: value, securityBytesFromCBOR: true)
-        guard let dict = ns(envelopeObject(env)) as? [String: Any] else {
+        let env = try envelope(from: value, securityBytesFromCBOR: false)
+        var schemaEnvelope = env
+        schemaEnvelope.payload = try normalizeSecurityBytes(
+            type: env.type, payload: env.payload, toCBOR: false)
+        guard let dict = ns(envelopeObject(schemaEnvelope)) as? [String: Any] else {
             throw ACPCodecError.malformed("envelope")
         }
         try ACPSchema.validateEnvelopeObject(dict)
@@ -156,6 +165,7 @@ public enum ACPEncoding {
             return
         }
         if toCBOR {
+            if case .bytes = value { return }
             guard case .string(let text) = value, !text.isEmpty, !text.contains("=") else {
                 throw ACPCodecError.malformed("security bytes require unpadded base64url")
             }
@@ -166,6 +176,18 @@ public enum ACPEncoding {
             }
             object[first] = .bytes(data)
         } else {
+            if case .string(let text) = value {
+                guard !text.isEmpty, !text.contains("=") else {
+                    throw ACPCodecError.malformed("security bytes require unpadded base64url")
+                }
+                var standard = text.replacingOccurrences(of: "-", with: "+")
+                    .replacingOccurrences(of: "_", with: "/")
+                standard += String(repeating: "=", count: (4 - standard.count % 4) % 4)
+                guard let data = Data(base64Encoded: standard), base64url(data) == text else {
+                    throw ACPCodecError.malformed("invalid security base64url")
+                }
+                return
+            }
             guard case .bytes(let data) = value else {
                 throw ACPCodecError.malformed("security field must be CBOR byte string")
             }

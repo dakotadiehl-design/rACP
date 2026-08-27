@@ -3,17 +3,17 @@ import CryptoKit
 import Foundation
 import Security
 
-public struct ACPAppleLocalIdentityMetadata: Sendable, Equatable {
-    public let nodeID: String
-    public let trustDomainID: String
-    public let credentialID: String
-    public let identityKeyID: String
+package struct ACPAppleLocalIdentityMetadata: Sendable, Equatable {
+    package let nodeID: String
+    package let trustDomainID: String
+    package let credentialID: String
+    package let identityKeyID: String
 }
 
 /// Opaque Keychain identity capability. It exposes display metadata only;
 /// private-key and `SecIdentity` references remain inside the Apple adapter.
-public final class ACPAppleLocalIdentity: @unchecked Sendable {
-    public let metadata: ACPAppleLocalIdentityMetadata
+package final class ACPAppleLocalIdentity: @unchecked Sendable {
+    package let metadata: ACPAppleLocalIdentityMetadata
     package let networkIdentity: sec_identity_t
     package let certificateChain: [SecCertificate]
     package let acpIdentity: ACPIdentity
@@ -65,17 +65,21 @@ package final class ACPAppleDurableInstallEvidence: @unchecked Sendable {
     }
 }
 
-public actor ACPAppleIdentityStore {
+package actor ACPAppleIdentityStore {
     private let anchors: [SecCertificate]
     private let trustDomainID: ACPTrustDomainID
     private let revocation: (any ACPAppleRevocationChecking)?
     private let references: ACPKeychainCredentialBackend
+    private let accessGroup: String?
 
-    public init(anchors: [SecCertificate], trustDomainID: ACPTrustDomainID,
+    package init(anchors: [SecCertificate], trustDomainID: ACPTrustDomainID,
                 revocation: (any ACPAppleRevocationChecking)? = nil,
-                referenceService: String = "com.aurora.acp.identity-reference") {
+                referenceService: String = "com.aurora.acp.identity-reference",
+                accessGroup: String? = nil) {
         self.anchors = anchors; self.trustDomainID = trustDomainID; self.revocation = revocation
-        references = ACPKeychainCredentialBackend(service: referenceService)
+        self.accessGroup = accessGroup
+        references = ACPKeychainCredentialBackend(
+            service: referenceService, accessGroup: accessGroup)
     }
 
     package func prepareCandidateKey(
@@ -86,13 +90,15 @@ public actor ACPAppleIdentityStore {
         let tag = Data("\(applicationTagPrefix).\(attemptID.rawValue)".utf8)
         guard tag.count <= 128 else { throw ACPAppleSecurityError.resourceLimit }
         var existing: CFTypeRef?
-        let existingStatus = SecItemCopyMatching([
+        var existingQuery: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecAttrApplicationTag as String: tag,
             kSecReturnRef as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-        ] as CFDictionary, &existing)
+        ]
+        if let accessGroup { existingQuery[kSecAttrAccessGroup as String] = accessGroup }
+        let existingStatus = SecItemCopyMatching(existingQuery as CFDictionary, &existing)
         if existingStatus == errSecSuccess, let existing,
            CFGetTypeID(existing) == SecKeyGetTypeID() {
             let key = unsafeBitCast(existing, to: SecKey.self)
@@ -111,6 +117,7 @@ public actor ACPAppleIdentityStore {
             kSecAttrApplicationTag as String: tag,
             kSecAttrIsExtractable as String: false,
         ]
+        if let accessGroup { privateAttributes[kSecAttrAccessGroup as String] = accessGroup }
         if let access { privateAttributes[kSecAttrAccessControl as String] = access }
         var attributes: [String: Any] = [
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
@@ -261,7 +268,7 @@ public actor ACPAppleIdentityStore {
 
     /// Loads a certificate/private-key pair by its Keychain label and verifies
     /// the complete ACP local certificate policy before returning a capability.
-    public func load(label: String, identity: ACPIdentity) throws -> ACPAppleLocalIdentity {
+    package func load(label: String, identity: ACPIdentity) throws -> ACPAppleLocalIdentity {
         guard (1...128).contains(label.utf8.count), !reservedReferenceName(label),
               let expected = ACPSecurityNodeID(rawValue: identity.nodeID) else {
             throw ACPAppleSecurityError.localIdentityMismatch
@@ -292,7 +299,7 @@ public actor ACPAppleIdentityStore {
     }
 
     /// Deletes only the selected ACP Keychain identity. Missing is idempotent.
-    public func reset(label: String) throws {
+    package func reset(label: String) throws {
         guard (1...128).contains(label.utf8.count), !reservedReferenceName(label)
         else { throw ACPAppleSecurityError.keychainFailure }
         guard let locatorData = try references.read(name: label) else { return }
