@@ -74,6 +74,8 @@
     let run = Task { await connection.run() }
     let peer = try await connection.waitUntilReady()
     #expect(peer.peerID == "server")
+    var currentState = (await connection.stateUpdates()).makeAsyncIterator()
+    #expect(await currentState.next() == .ready(peer))
 
     try await connection.command("cue.go", arguments: .object([JSONMember("number", .integer(7))]))
     await #expect(throws: RACPRemoteError(requestID: 2, code: "unsupported_capability")) {
@@ -89,6 +91,9 @@
 
     await connection.close(reason: "test_complete")
     await run.value
+    await #expect(throws: RACPConnectionError.disconnected("test_complete")) {
+      try await connection.waitUntilReady()
+    }
     var observedReady = false
     var observedDisconnect = false
     for await state in states {
@@ -163,7 +168,17 @@
     await #expect(throws: RACPConnectionError.requestTimeout) {
       try await connection.command("cue.go", timeout: .milliseconds(20))
     }
+    let cancelled = Task { try await connection.command("cue.go", timeout: .seconds(1)) }
+    try await Task.sleep(for: .milliseconds(10))
+    cancelled.cancel()
+    await #expect(throws: RACPConnectionError.cancelled) { try await cancelled.value }
+
+    let locallyDisconnected = Task { try await connection.command("cue.go", timeout: .seconds(1)) }
+    try await Task.sleep(for: .milliseconds(10))
     await connection.close(reason: "test_complete")
+    await #expect(throws: RACPConnectionError.disconnected("test_complete")) {
+      try await locallyDisconnected.value
+    }
     await run.value
     listener.cancel()
   }

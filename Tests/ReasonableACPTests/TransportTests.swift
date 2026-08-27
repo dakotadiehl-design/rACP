@@ -60,6 +60,25 @@ private actor MemoryByteStream: RACPByteStream {
   #expect(await stream.isClosed)
 }
 
+@Test func publicSendRejectsManualRequestIDs() async throws {
+  let stream = MemoryByteStream(reads: [])
+  let session = RACPSession(local: try RACPHello(peerType: "device", peerID: "x"))
+  for line in ["RACP/1 HELLO", "PEER remote desk", "END"] {
+    _ = try session.receive(line: line)
+  }
+  let connection = RACPConnection(stream: stream, session: session)
+  for message in [
+    RACPMessage.command(Command(requestID: 17, name: "cue.go")),
+    .subscribe(17, "cue.current"),
+    .unsubscribe(17, "cue.current"),
+  ] {
+    await #expect(throws: RACPConnectionError.manualRequestIDNotAllowed) {
+      try await connection.send(message)
+    }
+  }
+  #expect(await stream.output.isEmpty)
+}
+
 @Test func oversizedBatchIsRejectedAtomically() async throws {
   let stream = MemoryByteStream(reads: [])
   let session = RACPSession(local: try RACPHello(peerType: "device", peerID: "x"))

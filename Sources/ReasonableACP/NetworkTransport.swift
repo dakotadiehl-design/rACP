@@ -5,12 +5,30 @@
   private final class ResumeGate: @unchecked Sendable {
     private let lock = NSLock()
     private var resumed = false
+    private var timeout: DispatchWorkItem?
+
+    func install(timeout: DispatchWorkItem) {
+      lock.lock()
+      if resumed {
+        lock.unlock()
+        timeout.cancel()
+      } else {
+        self.timeout = timeout
+        lock.unlock()
+      }
+    }
 
     func claim() -> Bool {
       lock.lock()
-      defer { lock.unlock() }
-      guard !resumed else { return false }
+      guard !resumed else {
+        lock.unlock()
+        return false
+      }
       resumed = true
+      let timeout = timeout
+      self.timeout = nil
+      lock.unlock()
+      timeout?.cancel()
       return true
     }
   }
@@ -53,11 +71,13 @@
           }
         }
         connection.start(queue: DispatchQueue(label: "org.aurora.racp.connection"))
-        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+        let timeout = DispatchWorkItem {
           guard gate.claim() else { return }
           self.connection.cancel()
           continuation.resume(throwing: RACPConnectionError.connectionLost)
         }
+        gate.install(timeout: timeout)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: timeout)
       }
     }
 
@@ -142,11 +162,13 @@
           }
         }
         listener.start(queue: queue)
-        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+        let timeout = DispatchWorkItem {
           guard gate.claim() else { return }
           self.listener.cancel()
           continuation.resume(throwing: RACPConnectionError.connectionLost)
         }
+        gate.install(timeout: timeout)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: timeout)
       }
     }
 

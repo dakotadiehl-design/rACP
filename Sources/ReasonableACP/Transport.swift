@@ -15,6 +15,8 @@ public enum RACPConnectionError: Error, Sendable, Equatable {
   case tooManyPendingRequests
   case cancelled
   case disconnected(String)
+  case manualRequestIDNotAllowed
+  case requestIDExhausted
 }
 
 public struct RACPRemoteError: Error, Sendable, Equatable {
@@ -140,7 +142,7 @@ public actor RACPConnection {
   private var publishedRevisions: [String: UInt64] = [:]
   private let allowUnsolicitedState: Bool
   private let maximumPendingRequests: Int
-  private var nextRequestID: UInt64 = 1
+  private var nextRequestID: UInt64? = 1
   private var pendingRequests: [UInt64: PendingRequest] = [:]
   private var observers: [UUID: AsyncStream<RACPConnectionState>.Continuation] = [:]
   public private(set) var lifecycleState: RACPConnectionState = .connecting
@@ -186,6 +188,10 @@ public actor RACPConnection {
     throw RACPConnectionError.disconnected("state_stream_ended")
   }
 
+  /// Sends a command and waits for its ACK or ERR terminal response.
+  ///
+  /// Timeout or task cancellation only stops the local caller from waiting. Once
+  /// bytes have been written, the remote peer may already have executed the command.
   public func command(
     _ name: String, arguments: JSONValue? = nil, timeout: Duration = .seconds(5)
   ) async throws {
@@ -194,15 +200,35 @@ public actor RACPConnection {
     }
   }
 
+  /// Requests a subscription. Local timeout or cancellation does not retract a
+  /// request that may already have reached the peer.
   public func subscribe(_ name: String, timeout: Duration = .seconds(5)) async throws {
     try await terminalRequest(timeout: timeout) { .subscribe($0, name) }
   }
 
+  /// Requests unsubscription. Local timeout or cancellation does not prove the
+  /// peer did not process the request.
   public func unsubscribe(_ name: String, timeout: Duration = .seconds(5)) async throws {
     try await terminalRequest(timeout: timeout) { .unsubscribe($0, name) }
   }
 
+  /// Sends messages that do not create correlated requests.
+  ///
+  /// Use `command`, `subscribe`, or `unsubscribe` for request-bearing messages.
   public func send(_ messages: RACPMessage...) async throws {
+    guard !messages.contains(where: \._isRequest) else {
+      throw RACPConnectionError.manualRequestIDNotAllowed
+    }
+    try await enqueue(messages)
+  }
+
+  /// Sends manual request IDs for wire-conformance tooling only.
+  @_spi(RACPTesting)
+  public func sendRawRequests(_ messages: RACPMessage...) async throws {
+    try await enqueue(messages)
+  }
+
+  private func enqueue(_ messages: [RACPMessage]) async throws {
     guard !closing else { throw RACPSessionError.closed(closeReason ?? "closing") }
     guard session.state == .established else { throw RACPProtocolError.handshakeRequired }
     var revisions = publishedRevisions
@@ -348,7 +374,7 @@ public actor RACPConnection {
     guard pendingRequests.count < maximumPendingRequests else {
       throw RACPConnectionError.tooManyPendingRequests
     }
-    let id = allocateRequestID()
+    let id = try allocateRequestID()
     try await withTaskCancellationHandler {
       try await withCheckedThrowingContinuation {
         (continuation: CheckedContinuation<Void, any Error>) in
@@ -363,7 +389,7 @@ public actor RACPConnection {
         }
         pendingRequests[id] = PendingRequest(continuation: continuation, timeout: timeoutTask)
         Task {
-          do { try await self.send(message(id)) } catch { self.failRequest(id, with: error) }
+          do { try await self.enqueue([message(id)]) } catch { self.failRequest(id, with: error) }
         }
       }
     } onCancel: {
@@ -371,12 +397,9 @@ public actor RACPConnection {
     }
   }
 
-  private func allocateRequestID() -> UInt64 {
-    while pendingRequests[nextRequestID] != nil {
-      nextRequestID = nextRequestID == racpMaximumSafeInteger ? 1 : nextRequestID + 1
-    }
-    let id = nextRequestID
-    nextRequestID = nextRequestID == racpMaximumSafeInteger ? 1 : nextRequestID + 1
+  private func allocateRequestID() throws -> UInt64 {
+    guard let id = nextRequestID else { throw RACPConnectionError.requestIDExhausted }
+    nextRequestID = id == racpMaximumSafeInteger ? nil : id + 1
     return id
   }
 

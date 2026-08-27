@@ -149,6 +149,15 @@ public enum RACPMessage: Sendable, Equatable {
   }
 }
 
+extension RACPMessage {
+  var _isRequest: Bool {
+    switch self {
+    case .command, .subscribe, .unsubscribe: true
+    default: false
+    }
+  }
+}
+
 func validateName(_ value: String) throws {
   guard value.utf8.count <= 128, let first = value.utf8.first, (0x61...0x7A).contains(first) else {
     throw RACPProtocolError.malformedMessage()

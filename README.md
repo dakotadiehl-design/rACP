@@ -57,6 +57,12 @@ requests are bounded and fail on timeout, cancellation, or disconnect. Hosts can
 `RACPNetworkServer`'s `connectionHandler` to retain ready-capable connections for
 authoritative state publication.
 
+Ordinary `send()` rejects CMD, SUB, and UNSUB messages with manual request IDs; use
+the correlated high-level APIs instead. A request timeout or Swift task cancellation
+only means the local caller stopped waiting. If TCP bytes were already sent, the peer
+may still receive and execute the operation; rACP does not provide remote rollback or
+cancellation.
+
 Network.framework `.waiting` is treated as recoverable during startup because path
 changes can resolve it. Startup remains bounded to five seconds; `.failed` and
 `.cancelled` are terminal before readiness. Once connected, stream read/write errors

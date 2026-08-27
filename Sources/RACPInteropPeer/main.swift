@@ -1,5 +1,5 @@
 import Foundation
-import ReasonableACP
+@_spi(RACPTesting) import ReasonableACP
 
 final class InteropRecorder: @unchecked Sendable {
   private let lock = NSLock()
@@ -50,9 +50,9 @@ enum InteropPeer {
     guard recorder.states.last?.revision == 3 else { throw RACPConnectionError.connectionLost }
     try await connection.unsubscribe("cue.current")
     try await connection.send(.ping(7))
-    try await connection.send(.command(Command(requestID: 99, name: "cue.go")))
-    try await connection.send(.command(Command(requestID: 99, name: "cue.go")))
-    try await connection.send(
+    try await connection.sendRawRequests(.command(Command(requestID: 99, name: "cue.go")))
+    try await connection.sendRawRequests(.command(Command(requestID: 99, name: "cue.go")))
+    try await connection.sendRawRequests(
       .command(Command(requestID: 99, name: "cue.null", value: .null, hasValue: true)))
     try await Task.sleep(for: .milliseconds(50))
     try await connection.send(.bye)
