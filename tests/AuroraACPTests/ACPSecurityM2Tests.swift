@@ -59,6 +59,8 @@ final class ACPSecurityM2Tests: XCTestCase {
                 secret.withUnsafeBytes { XCTAssertEqual($0.count, 32) }
             }
         }
+        secret.clear()
+        secret.withUnsafeBytes { XCTAssertTrue($0.allSatisfy { $0 == 0 }) }
         XCTAssertTrue(String(describing: secret).contains("redacted"))
     }
 }
