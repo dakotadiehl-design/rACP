@@ -21,7 +21,9 @@ with appropriate VLANs, ACLs, firewalls, physical isolation, or a VPN.
 docs/             normative specification and operational guidance
 python/src/racp/  dependency-free Python reference implementation
 python/tests/     parser, session, bounds, lifecycle, and TCP tests
-vectors/racp-v1/ canonical wire transcripts for future implementations
+Sources/           Swift 6 ReasonableACP implementation and Network.framework adapter
+Tests/             Swift codec, session, bounds, lifecycle, and transport tests
+vectors/racp-v1/ canonical cross-language wire transcripts
 ```
 
 ## Test
@@ -35,6 +37,17 @@ python3 -m pytest
 python3 -m ruff check src tests
 python3 -m mypy src/racp
 ```
+
+The Swift package requires Swift 6 or newer:
+
+```sh
+swift test
+```
+
+Add the repository as a Swift Package dependency and depend on the
+`ReasonableACP` product. The portable core exposes `JSONValue`, `RACPMessage`,
+`RACPLineDecoder`, `RACPSession`, and `RACPConnection`. Apple platforms also expose
+`NetworkByteStream` and `RACPNetworkServer` for bounded plain-TCP connections.
 
 The implementation is transport-independent above its byte-stream adapter. A future
 TLS/TCP transport can wrap the same rACP messages without changing application

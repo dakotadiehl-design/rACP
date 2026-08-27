@@ -53,6 +53,15 @@ def test_command_dispatch_capability_and_duplicate_ledger() -> None:
     assert session.receive(Command(2, "cue.back")) == [Error(2, "unsupported_capability")]
 
 
+def test_duplicate_command_uses_canonical_json_identity() -> None:
+    applied = []
+    session = established(lambda cmd: applied.append(cmd) or None)
+    assert session.receive(Command(1, "cue.go", {"a": 1, "b": 2}, True)) == [Ack(1)]
+    assert session.receive(Command(1, "cue.go", {"b": 2, "a": 1}, True)) == [Ack(1)]
+    assert session.receive(Command(1, "cue.go", {"a": True, "b": 2}, True)) == [Error(1, "request_id_conflict")]
+    assert len(applied) == 1
+
+
 def test_ledger_is_bounded_and_handler_errors_are_structured() -> None:
     session = established(lambda _cmd: (_ for _ in ()).throw(RuntimeError()), ledger_size=1)
     assert session.receive(Command(1, "cue.go")) == [Error(1, "application_error")]

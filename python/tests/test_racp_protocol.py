@@ -40,6 +40,14 @@ def test_no_value_is_distinct_from_null() -> None:
     assert parse_message("CMD 1 cue.go null") == Command(1, "cue.go", None, True)
 
 
+def test_json_may_contain_spaces_without_weakening_token_grammar() -> None:
+    assert parse_message('CMD 1 cue.go {"label":"Stage  Left",  "level": 1}') == Command(
+        1, "cue.go", {"label": "Stage  Left", "level": 1}, True
+    )
+    with pytest.raises(ProtocolError, match="malformed_message"):
+        parse_message("SUB  1 cue.current")
+
+
 def test_json_is_deterministic_and_rejects_unsafe_values() -> None:
     assert encode_value({"z": 1, "a": "line\nvalue"}) == '{"a":"line\\nvalue","z":1}'
     for text in ('{"a":1,"a":2}', "NaN", "9007199254740992"):

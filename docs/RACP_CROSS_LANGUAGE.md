@@ -2,29 +2,26 @@
 
 ## Decision
 
-The initial rACP v1 release has one implementation, in Python, and one language-neutral
-wire contract. Swift and Rust ports should follow concrete application needs rather
-than being created only for language symmetry. This keeps lifecycle and parser review
-focused while the protocol contract is still young.
+The rACP v1 release has Python and Swift implementations plus one language-neutral
+wire contract. The Python implementation remains the reference oracle; the Swift 6
+`ReasonableACP` product consumes the same canonical vectors and implements the strict
+codec, session core, bounded byte-stream connection, and Network.framework TCP adapter.
 
-This is a reduction in implementation scope, not in interoperability commitment.
 `vectors/racp-v1/hello.txt` and `vectors/racp-v1/messages.txt` freeze canonical bytes.
-The Python suite parses and exactly re-encodes every line. Each future implementation
-must consume these files directly and add malformed, partial-frame, bounds, duplicate
-ID, version, heartbeat, and TCP reconnect tests equivalent to the reference suite.
+Both suites parse and exactly re-encode every line. Each future implementation must
+consume these files directly and add malformed, partial-frame, bounds, duplicate-ID,
+version, heartbeat, and TCP reconnect tests equivalent to the reference suites.
 
 ## Recommended order
 
-1. **Swift**: implement the value types, line codec, and transport-independent session
-   as a new `ReasonableACP` product. Add a Network.framework TCP byte-stream adapter.
-   Prism and Remote adapters must route `Command` through their existing normal command
-   and safety APIs and publish only authoritative state.
+1. **Product integration**: Prism and Remote adapters should use `ReasonableACP`, route
+   `Command` through their existing normal command and safety APIs, and publish only
+   authoritative state.
 2. **Rust**: implement a small `racp-core` crate without Tokio, then an optional
    `racp-tokio` adapter when Bridge has a concrete integration. Keep the core free of
    transport and application policy dependencies.
-3. Run a bidirectional matrix using the golden transcripts first, then Python↔Swift,
-   Python↔Rust, and Swift↔Rust TCP sessions including fragmented writes and malformed
-   peers.
+3. Extend the bidirectional matrix from golden-transcript conformance to live
+   Python↔Swift TCP sessions, then Python↔Rust and Swift↔Rust sessions when Rust exists.
 
 ## Semantic checklist for every port
 
@@ -51,6 +48,6 @@ These are application integration tasks, not additions to the rACP core protocol
 ## Checkpoint review
 
 The golden files contain only normative v1 forms and no security credentials, encoding
-negotiation, profiles, or generated schemas. The language recommendation preserves a
-single transport-independent semantic shape. Deferring Swift and Rust avoids claiming
-false cross-language confidence while still making exact conformance measurable.
+negotiation, profiles, or generated schemas. Python and Swift now preserve the same
+transport-independent semantic shape. Rust remains deferred until Bridge has a concrete
+integration need.

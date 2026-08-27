@@ -6,6 +6,15 @@ on:
   pull_request:
 
 jobs:
+  swift:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Build and test Swift package
+        run: swift test
+      - name: Worktree stays clean
+        run: test -z "$(git status --porcelain)"
+
   python:
     runs-on: ubuntu-latest
     steps:

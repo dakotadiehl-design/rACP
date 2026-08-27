@@ -157,7 +157,7 @@ def encode_value(value: Any) -> str:
 
 
 def parse_message(line: str) -> Message:
-    if not line or line.startswith(" ") or line.endswith(" ") or "  " in line:
+    if not line or line.startswith(" ") or line.endswith(" "):
         raise ProtocolError("malformed_message")
     if any(ord(char) < 0x20 for char in line):
         raise ProtocolError("malformed_message", fatal=True)

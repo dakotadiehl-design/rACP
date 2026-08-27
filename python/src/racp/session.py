@@ -23,6 +23,7 @@ from .protocol import (
     Subscribe,
     Unsubscribe,
     encode_message,
+    encode_value,
     parse_message,
 )
 
@@ -151,7 +152,12 @@ class Session:
     def _command(self, command: Command) -> Ack | Error:
         previous = self._ledger.get(command.request_id)
         if previous is not None:
-            return previous[1] if previous[0] == command else Error(command.request_id, "request_id_conflict")
+            identical = (
+                previous[0].name == command.name
+                and previous[0].has_value == command.has_value
+                and (not command.has_value or encode_value(previous[0].value) == encode_value(command.value))
+            )
+            return previous[1] if identical else Error(command.request_id, "request_id_conflict")
         assert self.peer is not None
         if command.name not in self.local.capabilities:
             response: Ack | Error = Error(command.request_id, "unsupported_capability")
