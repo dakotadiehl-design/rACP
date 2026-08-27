@@ -60,6 +60,11 @@ def test_ledger_is_bounded_and_handler_errors_are_structured() -> None:
     assert len(session._ledger) == 1
 
 
+def test_invalid_handler_error_code_becomes_application_error() -> None:
+    session = established(lambda _cmd: "Invalid Code")
+    assert session.receive(Command(1, "cue.go")) == [Error(1, "application_error")]
+
+
 def test_subscriptions_and_state_revision_filter() -> None:
     session = established()
     assert session.receive(Subscribe(1, "cue.current")) == [Ack(1)]

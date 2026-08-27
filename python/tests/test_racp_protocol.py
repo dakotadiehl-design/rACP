@@ -47,6 +47,11 @@ def test_json_is_deterministic_and_rejects_unsafe_values() -> None:
             parse_message(f"CMD 1 test.value {text}")
     with pytest.raises(ProtocolError):
         encode_value(math.inf)
+    for value in ("\ud800", {"\udfff": 1}):
+        with pytest.raises(ProtocolError, match="invalid_value"):
+            encode_value(value)
+    with pytest.raises(ProtocolError, match="invalid_value"):
+        parse_message(r'CMD 1 test.value "\ud800"')
 
 
 @pytest.mark.parametrize(
@@ -84,3 +89,10 @@ def test_decoder_bounds_and_utf8() -> None:
     with pytest.raises(ProtocolError) as caught:
         LineDecoder().feed(b"\xff\n")
     assert caught.value.fatal
+
+
+def test_decoder_allows_maximum_line_with_crlf() -> None:
+    decoder = LineDecoder(4)
+    assert decoder.feed(b"1234\r\n") == ["1234"]
+    with pytest.raises(ProtocolError, match="line_too_long"):
+        LineDecoder(4).feed(b"12345\n")

@@ -105,7 +105,11 @@ def _pairs_no_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _validate_value(value: Any) -> None:
-    if isinstance(value, bool) or value is None or isinstance(value, str):
+    if isinstance(value, bool) or value is None:
+        return
+    if isinstance(value, str):
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            raise ProtocolError("invalid_value")
         return
     if isinstance(value, int):
         if abs(value) > MAX_SAFE_INTEGER:
@@ -123,6 +127,7 @@ def _validate_value(value: Any) -> None:
         for key, item in value.items():
             if not isinstance(key, str):
                 raise ProtocolError("invalid_value")
+            _validate_value(key)
             _validate_value(item)
         return
     raise ProtocolError("invalid_value")
@@ -241,7 +246,12 @@ class LineDecoder:
                 lines.append(line)
             else:
                 self._buffer.append(byte)
-                if len(self._buffer) > self.maximum:
+                # A maximum-length line may have one additional CR as part of
+                # an accepted CRLF terminator. Any other additional byte is an
+                # overlong line.
+                overlong = len(self._buffer) > self.maximum
+                possible_crlf = len(self._buffer) == self.maximum + 1 and byte == 0x0D
+                if overlong and not possible_crlf:
                     self._buffer.clear()
                     self._discarding = True
                     raise ProtocolError("line_too_long", fatal=True)

@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import random
+import socket
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from .protocol import Error, LineDecoder, Message, ProtocolError
+from .protocol import Error, LineDecoder, Message, ProtocolError, State
 from .session import Session, SessionClosed, SessionState
 
 READ_CHUNK_BYTES = 4096
@@ -76,6 +77,7 @@ class Connection:
         output_messages: int = DEFAULT_OUTPUT_MESSAGES,
         hello_timeout: float = HELLO_TIMEOUT_SECONDS,
         write_timeout: float = WRITE_TIMEOUT_SECONDS,
+        allow_unsolicited_state: bool = False,
     ) -> None:
         if output_messages < 1 or hello_timeout <= 0 or write_timeout <= 0:
             raise ValueError("transport bounds and timeouts must be positive")
@@ -83,27 +85,42 @@ class Connection:
         self.session = session
         self.hello_timeout = hello_timeout
         self.write_timeout = write_timeout
+        self.allow_unsolicited_state = allow_unsolicited_state
         self.output: asyncio.Queue[bytes | None] = asyncio.Queue(output_messages)
         self.decoder = LineDecoder()
         self.closed = asyncio.Event()
         self.close_reason: str | None = None
         self._next_nonce = 1
         self._closing = False
+        self._published_revisions: dict[str, int] = {}
 
     async def send(self, *messages: Message) -> None:
         if self._closing:
             raise SessionClosed(self.close_reason or "closing")
-        data = Session.encode(list(messages))
-        if self.output.full():
+        if self.session.state is not SessionState.ESTABLISHED:
+            raise ProtocolError("handshake_required")
+        pending_revisions = dict(self._published_revisions)
+        for message in messages:
+            if isinstance(message, State):
+                if not self.allow_unsolicited_state and message.name not in self.session.subscriptions:
+                    raise ProtocolError("unsupported_capability")
+                if message.revision <= pending_revisions.get(message.name, -1):
+                    raise ProtocolError("invalid_value")
+                pending_revisions[message.name] = message.revision
+        encoded = [Session.encode([message]) for message in messages]
+        if len(encoded) > self.output.maxsize - self.output.qsize():
             await self.close("output_queue_full")
             raise SessionClosed("output_queue_full")
-        self.output.put_nowait(data)
+        for data in encoded:
+            self.output.put_nowait(data)
+        self._published_revisions = pending_revisions
 
     async def run(self) -> None:
         writer = asyncio.create_task(self._write_loop())
         heartbeat = asyncio.create_task(self._heartbeat_loop())
         try:
             await self._enqueue_raw(self.session.hello_bytes())
+            await self._flush_output()
             async with asyncio.timeout(self.hello_timeout):
                 await self._read_until_established()
             await self._read_established()
@@ -132,8 +149,9 @@ class Connection:
         self.close_reason = self.close_reason or reason
         self.session.state = SessionState.CLOSED
         self.stream.close()
-        with contextlib.suppress(ConnectionError, OSError):
-            await self.stream.wait_closed()
+        with contextlib.suppress(ConnectionError, OSError, TimeoutError):
+            async with asyncio.timeout(self.write_timeout):
+                await self.stream.wait_closed()
         self.closed.set()
 
     async def _read_until_established(self) -> None:
@@ -160,16 +178,20 @@ class Connection:
         return True
 
     async def _write_loop(self) -> None:
-        while True:
-            data = await self.output.get()
-            try:
-                if data is None:
-                    return
-                self.stream.write(data)
-                async with asyncio.timeout(self.write_timeout):
-                    await self.stream.drain()
-            finally:
-                self.output.task_done()
+        try:
+            while True:
+                data = await self.output.get()
+                try:
+                    if data is None:
+                        return
+                    self.stream.write(data)
+                    async with asyncio.timeout(self.write_timeout):
+                        await self.stream.drain()
+                finally:
+                    self.output.task_done()
+        except (ConnectionError, OSError, TimeoutError):
+            await self.close("write_failed")
+            raise
 
     async def _heartbeat_loop(self) -> None:
         while True:
@@ -177,12 +199,14 @@ class Connection:
             try:
                 messages = self.session.heartbeat(self._next_nonce)
             except SessionClosed:
-                self.close_reason = "heartbeat_timeout"
-                self.stream.close()
+                await self.close("heartbeat_timeout")
                 return
             if messages:
                 self._next_nonce = self._next_nonce + 1 if self._next_nonce < 9_007_199_254_740_991 else 1
-                await self.send(*messages)
+                try:
+                    await self.send(*messages)
+                except SessionClosed:
+                    return
 
     async def _enqueue_raw(self, data: bytes) -> None:
         if self.output.full():
@@ -195,27 +219,72 @@ class Connection:
 
     async def _stop_writer(self, task: asyncio.Task[None]) -> None:
         if not task.done():
-            with contextlib.suppress(asyncio.QueueFull):
-                self.output.put_nowait(None)
             try:
                 async with asyncio.timeout(self.write_timeout):
-                    await task
+                    await self.output.join()
             except TimeoutError:
-                task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
-        elif task.exception() is not None:
+                self.close_reason = self.close_reason or "write_timeout"
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, ConnectionError, OSError, TimeoutError):
+                await task
+        if not task.cancelled() and task.done() and task.exception() is not None:
             self.close_reason = "write_failed"
 
+    async def _flush_output(self) -> None:
+        async with asyncio.timeout(self.write_timeout):
+            await self.output.join()
+        if self._closing:
+            raise SessionClosed(self.close_reason or "closing")
 
-async def connect_tcp(host: str, port: int, session: Session, **options: object) -> Connection:
+
+def _enable_keepalive(writer: asyncio.StreamWriter) -> None:
+    stream_socket = writer.get_extra_info("socket")
+    if stream_socket is not None:
+        with contextlib.suppress(OSError):
+            stream_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+
+
+async def connect_tcp(
+    host: str, port: int, session: Session, *, keepalive: bool = True, **options: object
+) -> Connection:
     reader, writer = await asyncio.open_connection(host, port)
+    if keepalive:
+        _enable_keepalive(writer)
     return Connection(AsyncioStream(reader, writer), session, **options)  # type: ignore[arg-type]
 
 
-async def serve_tcp(host: str, port: int, session_factory: Callable[[], Session], **options: object) -> asyncio.Server:
-    async def client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-        connection = Connection(AsyncioStream(reader, writer), session_factory(), **options)  # type: ignore[arg-type]
-        await connection.run()
+async def serve_tcp(
+    host: str,
+    port: int,
+    session_factory: Callable[[], Session],
+    *,
+    max_connections: int = 64,
+    backlog: int = 100,
+    keepalive: bool = True,
+    **options: object,
+) -> asyncio.Server:
+    if max_connections < 1 or backlog < 1:
+        raise ValueError("server bounds must be positive")
+    connections = asyncio.Semaphore(max_connections)
 
-    return await asyncio.start_server(client, host, port, limit=READ_CHUNK_BYTES)
+    async def client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        if connections.locked():
+            writer.close()
+            await writer.wait_closed()
+            return
+        await connections.acquire()
+        try:
+            if keepalive:
+                _enable_keepalive(writer)
+            try:
+                session = session_factory()
+            except Exception:
+                writer.close()
+                with contextlib.suppress(ConnectionError, OSError):
+                    await writer.wait_closed()
+                raise
+            await Connection(AsyncioStream(reader, writer), session, **options).run()  # type: ignore[arg-type]
+        finally:
+            connections.release()
+
+    return await asyncio.start_server(client, host, port, limit=READ_CHUNK_BYTES, backlog=backlog)

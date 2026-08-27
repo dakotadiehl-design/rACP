@@ -158,6 +158,11 @@ class Session:
         else:
             try:
                 code = self.handler(command)
+                if code:
+                    try:
+                        _validate_cap(code)
+                    except ValueError:
+                        code = "application_error"
                 response = Error(command.request_id, code) if code else Ack(command.request_id)
             except Exception:
                 response = Error(command.request_id, "application_error")

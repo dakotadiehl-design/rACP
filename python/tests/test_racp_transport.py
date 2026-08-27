@@ -2,7 +2,21 @@ import asyncio
 
 import pytest
 
-from racp import Ack, Command, Connection, Hello, ReconnectPolicy, Session, SessionClosed, connect_tcp, serve_tcp
+from racp import (
+    Ack,
+    Command,
+    Connection,
+    Hello,
+    ProtocolError,
+    ReconnectPolicy,
+    Session,
+    SessionClosed,
+    SessionState,
+    State,
+    Subscribe,
+    connect_tcp,
+    serve_tcp,
+)
 
 
 class MemoryStream:
@@ -60,11 +74,62 @@ def test_handshake_timeout_is_bounded() -> None:
 
 def test_output_queue_is_bounded() -> None:
     async def body() -> None:
-        connection = Connection(MemoryStream([]), Session(Hello("device", "x")), output_messages=1)
+        session = Session(Hello("device", "x"))
+        session.state = SessionState.ESTABLISHED
+        connection = Connection(MemoryStream([]), session, output_messages=1)
         await connection.send(Ack(1))
         with pytest.raises(SessionClosed, match="output_queue_full"):
             await connection.send(Ack(2))
         assert connection.closed.is_set()
+
+    asyncio.run(body())
+
+
+def test_output_queue_counts_each_message_in_a_batch() -> None:
+    async def body() -> None:
+        session = Session(Hello("device", "x"))
+        session.state = SessionState.ESTABLISHED
+        connection = Connection(MemoryStream([]), session, output_messages=2)
+        with pytest.raises(SessionClosed, match="output_queue_full"):
+            await connection.send(Ack(1), Ack(2), Ack(3))
+        assert connection.output.empty()
+
+    asyncio.run(body())
+
+
+def test_send_requires_handshake_and_state_subscription() -> None:
+    async def body() -> None:
+        session = Session(Hello("device", "x", ("cue.current", "state.subscribe")))
+        connection = Connection(MemoryStream([]), session)
+        with pytest.raises(ProtocolError, match="handshake_required"):
+            await connection.send(Ack(1))
+        session.state = SessionState.ESTABLISHED
+        with pytest.raises(ProtocolError, match="unsupported_capability"):
+            await connection.send(State("cue.current", 1, "A"))
+        assert session.receive(Subscribe(1, "cue.current")) == [Ack(1)]
+        await connection.send(State("cue.current", 1, "A"))
+        with pytest.raises(ProtocolError, match="invalid_value"):
+            await connection.send(State("cue.current", 1, "B"))
+        await connection.send(State("cue.current", 2, "B"))
+
+    asyncio.run(body())
+
+
+def test_full_queue_does_not_deadlock_shutdown() -> None:
+    class BlockedStream(MemoryStream):
+        async def drain(self) -> None:
+            await asyncio.Event().wait()
+
+    async def body() -> None:
+        session = Session(Hello("device", "x"))
+        session.state = SessionState.ESTABLISHED
+        connection = Connection(BlockedStream([]), session, output_messages=1, write_timeout=0.01)
+        writer = asyncio.create_task(connection._write_loop())
+        await connection.send(Ack(1))
+        await asyncio.sleep(0)
+        await connection.send(Ack(2))
+        await connection._stop_writer(writer)
+        assert writer.done()
 
     asyncio.run(body())
 
