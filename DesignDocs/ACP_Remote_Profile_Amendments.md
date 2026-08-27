@@ -1,4 +1,6 @@
 # Aurora Communications Protocol (ACP)
+
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
 ## Remote Profile & App-Store-Safe Control Surface Amendments
 
 **Status:** Implementation handoff / protocol amendment  

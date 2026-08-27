@@ -1,5 +1,7 @@
 # Aurora Trust Milestone 0 Decision and Qualification Record
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-21
 **Milestone:** M0 — Security profile freeze
 **Status:** CONDITIONALLY CLOSED — shared Full-profile protocol development may proceed to M1; deferred platform and hardware evidence remains release-blocking on each affected target

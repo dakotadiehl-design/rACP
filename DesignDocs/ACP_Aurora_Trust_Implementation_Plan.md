@@ -1,5 +1,7 @@
 # ACP Aurora Trust Implementation Plan
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Source design:** `DesignDocs/ACP_Aurora_Trust_Authentication_Implementation_Design.md`
 **Target:** ACP 1.2 additive security extension
 **SDKs:** Swift, Python 3.11+, Rust 1.75+

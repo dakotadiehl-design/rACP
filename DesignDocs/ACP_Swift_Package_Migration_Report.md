@@ -1,5 +1,7 @@
 # AuroraACP Swift Package Migration Report
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-19
 **Handoff:** `DesignDocs/ACP_Swift_Package_Grok_Handoff.md`
 **Scope:** Packaging conversion only. ACP itself did not change.

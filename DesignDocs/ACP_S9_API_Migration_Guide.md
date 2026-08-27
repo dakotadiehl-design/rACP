@@ -1,5 +1,7 @@
 # S9 authenticated connection API migration
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Product code must no longer construct handshake facts, transport evidence, or authenticated principals. Diagnostic certificate and discovery values belong in `ACPUnverifiedPeerObservation` and have no authorization meaning.
 
 Swift products will receive `ACPAuthenticatedConnection` from a qualified ACP-owned provider target and consume it through the authenticated session initializer added with the completed adapter. The capability is non-Codable, owns one live transport/evidence pair, and is one-shot. Raw `ACPSession(transport:)` remains a trusted-LAN/testing path and defaults to plaintext denial.

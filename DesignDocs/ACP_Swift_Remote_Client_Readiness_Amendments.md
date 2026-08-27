@@ -1,5 +1,7 @@
 # ACP Swift Remote Client Readiness Amendments
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Purpose
 
 This document defines the ACP-side changes required before beginning production implementation of **Aurora Remote** against the **Prism Remote profile**.

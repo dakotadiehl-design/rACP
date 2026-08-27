@@ -1,5 +1,7 @@
 # ACP Constants
 
+Status: **Normative generated-catalog companion**
+
 Single source of truth: [`schema/constants.json`](../schema/constants.json).
 
 Every SDK copies or generates from that file. Product code must not hard-code multicast addresses, ports, magic bytes, or queue limits.
@@ -19,7 +21,7 @@ Discovery group, UDP port, and WebSocket port are **provisional** until a real-n
 | Discovery magic | `ACP0` (`41 43 50 30`) |
 | Discovery datagram version | `1` |
 | Preferred session encoding | CBOR |
-| Default auth mode | `trusted_lan` |
+| Legacy/default decoded auth mode | `trusted_lan` (unauthenticated; forbidden for hardened control) |
 | Full-profile heartbeat | 1000 ms |
 | Lightweight heartbeat | 5000 ms |
 | Offline | 3 missed intervals; recover after 2 consecutive goods |

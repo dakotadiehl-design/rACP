@@ -1,5 +1,7 @@
 # ACP Aurora Trust Conformance Matrix
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Status:** M0–M8 implementation evidence assembled; production release gate remains deferred.
 
 The normative machine-readable index is `DesignDocs/ACP_Aurora_Trust_Conformance_Matrix.json`. It uses only `PASS`, `FAIL`, `NOT RUN`, `DEFERRED`, and `NOT APPLICABLE`.

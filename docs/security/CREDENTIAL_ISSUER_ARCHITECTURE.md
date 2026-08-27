@@ -1,13 +1,13 @@
 # ACP Credential Issuer and Trust-Domain Authority Architecture
 
-Status: architecture revision complete; implementation impact identified  
-Scope: ACP Full-profile credential issuance across all applications and language families  
-Baseline reviewed: `834d78542aaeba2cc3d38f8a331bbe5b8f7d5d24` plus the uncommitted issuer work present on 2026-08-27  
+Status: **Current normative architecture; implementation baseline completed and reviewed 2026-08-27**
+Scope: ACP Full-profile credential issuance across all applications and language families
+Implementation baseline: `4f611d071893fc9ab78a4f4c4ac485d2d33bfa53`
 Decision date: 2026-08-27
 
 This record is normative for ACP version 1 credential issuance. It replaces the earlier assumption that production ACP requires an external HSM, dedicated macOS authority host, separately signed authority daemon, recoverable identical CA private key, or Prism-owned certificate authority. Those remain possible host-hardening choices; none is an ACP interoperability requirement.
 
-This revision changes architecture and qualification requirements only. It authorizes no wire change and makes no claim that the implementation-impact items in section 28 are complete.
+This architecture is implemented across the portable Swift/Rust/Python models and the Apple host adapter. Sections 28–30 preserve the pre-implementation gap analysis and sequence for traceability; the current status is summarized in section 32.
 
 ## 1. Security objective
 
@@ -635,4 +635,10 @@ The following are explicitly not version-1 open questions: authority transfer, c
 12. Version 1 adds no authority migration or delegation wire mechanism.
 13. Revoked credentials never establish future sessions; active sessions follow the frozen `hardened_terminate` or explicitly configured `explicit_audited_grace` policy identically in every language.
 
-**ARCHITECTURE REVISION COMPLETE — READY FOR IMPLEMENTATION PLANNING**
+## 32. Current implementation disposition
+
+The application-neutral authority models, cross-producer conformance corpus, strict consumers, Apple fail-closed custody selector, sealed transcript-bound issuance capability, transactional lifecycle recovery, revocation hash continuity, and boundary/release audits are implemented at baseline `4f611d0`. The raw Rust caller-controlled X.509 issuance surface identified in section 28 has been removed. Swift issuance no longer accepts a caller-fabricated cryptography-confirmed Boolean.
+
+Remaining work is product qualification rather than architecture completion: signed Prism and Remote targets must demonstrate Secure Enclave or non-exportable Keychain custody with production entitlements and complete their all-up integration tests. Future authority transfer/delegation and Lightweight representative-hardware qualification remain outside this baseline.
+
+**CURRENT ARCHITECTURE IMPLEMENTED — PRODUCT INTEGRATION AND TARGET QUALIFICATION NEXT**

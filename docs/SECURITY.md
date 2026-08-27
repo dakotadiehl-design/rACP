@@ -1,10 +1,10 @@
 # ACP 1.2 Aurora Trust Security Profile
 
-**Status:** Candidate Freeze 2.1.1 — independent document-level GO; execution qualification required
+**Status:** Normative ACP 1.2 security extension; Swift/Rust/Python implementation baseline verified 2026-08-27. Product-target qualification remains artifact-specific.
 **Extension version:** 1.0
 **Source design:** `DesignDocs/ACP_Aurora_Trust_Authentication_Implementation_Design.md`
 
-This document is the proposed normative security profile for Aurora Trust. It resolves the wire-level choices that must be common to Swift, Python, and Rust. It MUST NOT be represented as production-approved until the review gates in the Milestone 0 decision record are closed.
+This document is the normative security profile for Aurora Trust. It resolves wire and lifecycle semantics shared by Swift, Python, and Rust. Implementation availability is recorded in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md); a provider or application is production-qualified only by evidence for its exact signed artifact and environment.
 
 ## 1. Protocol separation
 
@@ -14,7 +14,7 @@ The authenticated device principal and current human/operator/participant assign
 
 ## 2. Mandatory algorithms
 
-| Purpose | Candidate Freeze 2.1.1 choice |
+| Purpose | ACP 1.2 / extension 1.0 choice |
 |---|---|
 | Enrollment PAKE | RFC 9383 SPAKE2+, `P256-SHA256-HKDF-HMAC-SHA256` |
 | Identity signature | ECDSA P-256 with SHA-256 |
@@ -258,7 +258,7 @@ The compact credential is a signed deterministic-CBOR object `{body, algorithm, 
 
 TLS 1.3 0-RTT and resumption are disabled. Maximum preface/credential size is 2 KiB; maximum security message is 8 KiB; nesting is 8; collection elements are 64; concurrent enrollment attempts are 1; active credentials are 2 during rotation. If Raw Public Key support or these bounds cannot be demonstrated on the target stack, that target is nonconforming and may not substitute a custom or unauthenticated channel.
 
-This byte contract remains Candidate Freeze 2.1.1 until representative Pico-class hardware demonstrates CSPRNG readiness, bounded RAM/flash/time, Raw Public Key mutual authentication, and transactional protected storage, and an independent reviewer approves the composition.
+This Lightweight byte contract is normative, but no target may claim production conformance until representative hardware demonstrates CSPRNG readiness, bounded RAM/flash/time, Raw Public Key mutual authentication, transactional protected storage, and independent approval.
 
 ## 11. Revocation
 
@@ -295,9 +295,11 @@ Enrollment uses a dedicated restricted pre-session state on the ACP endpoint. Th
 
 Normal Full enrollment concurrency is capped at 2, not 8, because password processing is attacker-triggerable. Each enrollment ID permits five total failed attempts; attempt IDs are globally unique within the candidate's replay-retention window and are consumed on success or any cryptographic failure. Full security messages are capped at 64 KiB, credentials/anchors at 8 KiB, nesting at 16, and collection elements at 4096.
 
-## 14. Authority recovery
+## 14. Authority recovery and application-neutral ownership
 
 Trust-domain identity is the tuple `(trust_domain_id, authority_key_id)`. Recovery must restore both. A newly generated authority key is a new trust domain even if the display name is reused. Authority backups are encrypted, integrity-protected, versioned, and require explicit operator restoration. Quorum signing is out of scope for version 1.
+
+Trust domains are application-neutral. Prism, Remote, Conductor, Bridge, and future peers receive ordinary enrolled identities and local policy. Conductor may join an existing domain as an authenticated controller without changing certificates or resetting the domain. It cannot inherit the non-exportable authority key from Prism in version 1. Absent a future separately reviewed transfer protocol, a Conductor that becomes an authority creates a new trust domain and requires explicit re-enrollment. Authority transfer, delegation, intermediates, and cross-signing are outside version 1.
 
 ## 15. Compatibility revisions
 
@@ -323,4 +325,19 @@ Every provider/version/profile combination requires:
 - target build/run proof; and
 - independent security approval.
 
-See `DesignDocs/ACP_Aurora_Trust_M0_Decision_Record.md` for current qualification status and blockers.
+## 17. Apple key custody
+
+Apple authority and identity keys use one explicit, fail-closed selection:
+
+```text
+Secure Enclave available + supported + qualified
+        -> Secure Enclave non-exportable key
+Secure Enclave unavailable/unsupported
+        -> non-exportable Keychain-backed key
+Neither secure custody path available
+        -> FAIL CLOSED
+```
+
+Fallback is allowed only for a typed unsupported-platform or unsupported-required-operation result. Entitlement, access-control, persistence, integrity, or classification failure is fatal. There is no fallback to an exportable software key, file-backed key, ephemeral key, removable token, or HSM. Candidate keys are independently reloaded and checked for P-256 type/size, signing capability, canonical SPKI, persistent reference, token classification, and non-exportability before use.
+
+Current qualification status and integration steps are in [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md) and [integration/APPLE_SECURITY_QUALIFICATION.md](integration/APPLE_SECURITY_QUALIFICATION.md). Historical M0–M8 reports remain evidence of their named revisions only.

@@ -1,5 +1,7 @@
 # ACP Security Hardening Plan
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Status: approved execution plan  
 Scope: Swift production security path, with application-neutral semantics frozen for Rust and Python parity  
 Amendments incorporated: `ACP_Security_Hardening_Plan_Recommended_Amendments.md` items 1–21

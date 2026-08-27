@@ -1,5 +1,8 @@
 # Session, sequence, acknowledgement, and idempotency
 
+Status: **Normative**
+Last reconciled: **2026-08-27**
+
 Golden vectors do **not** test these machines. TestKit suites do.
 
 ## Version negotiation

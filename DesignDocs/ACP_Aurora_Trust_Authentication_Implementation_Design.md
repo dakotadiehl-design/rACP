@@ -1,5 +1,7 @@
 # Aurora Trust: ACP Authentication, Enrollment, and Credential Lifecycle
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Status:** Proposed implementation design  
 **Target protocol:** Aurora Communications Protocol (ACP) 1.2 additive security extension  
 **Target SDKs:** Swift, Python 3.11+, Rust 1.75+  

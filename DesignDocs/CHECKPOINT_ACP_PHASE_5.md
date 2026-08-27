@@ -1,5 +1,7 @@
 # Checkpoint — ACP Phase 5 / 6 / 7 prototype (authority safety core, leases, blackout mapping)
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-19  
 **ACP tag:** `1.1.0-dev.2`
 

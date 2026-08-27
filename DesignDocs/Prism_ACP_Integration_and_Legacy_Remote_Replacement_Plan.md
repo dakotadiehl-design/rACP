@@ -1,5 +1,7 @@
 # Prism ACP Integration and Legacy Remote Replacement Plan
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Status:** Approved implementation plan  
 **Date:** 2026-08-19  
 **ACP baseline:** ACP 1.2 plus the Remote Profile amendments  

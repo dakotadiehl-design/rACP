@@ -1,5 +1,7 @@
 # S13 Aurora Remote integration contract
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../../docs/README.md).
+
 Inspection evidence: `/Users/dakota/code/AuroraRemote`, branch `main`, HEAD `538a33c467ea74147d46ee61c7b574299ac8fc1f`, clean at inspection. The repository was read-only.
 
 ## Current boundary

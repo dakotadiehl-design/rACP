@@ -1,5 +1,7 @@
 # ACP Aurora Trust M0 Independent Security Review Prompt
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Mission
 
 Perform an **independent, adversarial GO / NO-GO security review** of Milestone 0 (Candidate Freeze 1) of the Aurora Communications Protocol (ACP) Aurora Trust security extension.

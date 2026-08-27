@@ -1,4 +1,6 @@
 # Aurora Communications Protocol
+
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
 ## Swift Package Conversion and Distribution Handoff for Grok
 
 **Document purpose:** Convert the existing Swift implementation of the Aurora Communications Protocol (ACP) into the canonical, standalone Swift Package used by Aurora applications such as Prism, Remote, Conductor, and Lyric.

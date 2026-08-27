@@ -1,5 +1,7 @@
 # ACP Aurora Trust M0 Conditional Close / M1 Execution Directive for Codex
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Purpose
 
 Conditionally close Aurora Trust Milestone 0 and begin Milestone 1.

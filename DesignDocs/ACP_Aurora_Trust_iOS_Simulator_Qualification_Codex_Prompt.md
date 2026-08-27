@@ -1,5 +1,7 @@
 # ACP Aurora Trust iOS Simulator Qualification Directive for Codex
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Purpose
 
 Run the maximum meaningful **iOS Simulator-based Aurora Trust Full-profile qualification** that can be performed before physical iPhone/iPad hardware testing.

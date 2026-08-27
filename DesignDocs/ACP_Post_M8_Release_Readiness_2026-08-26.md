@@ -1,5 +1,7 @@
 # ACP post-M8 release readiness
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Date: 2026-08-26
 
 Baseline: `f877e91ab8f3ab0a19e1e9581bba87a400ce4365`

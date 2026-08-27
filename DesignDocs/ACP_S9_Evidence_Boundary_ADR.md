@@ -1,5 +1,7 @@
 # ADR: S9 authenticated-evidence construction boundary
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Status: ACP-local implementation complete; independent architecture review remains BLOCKED and production adapters remain S10/S11/S12 work.
 
 ## Decision

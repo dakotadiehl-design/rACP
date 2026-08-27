@@ -6,7 +6,7 @@ ACP carries Aurora-level intent, state, health, configuration, synchronization, 
 
 This repository is the **protocol foundation**. It is not a product adapter. Nothing here drives DMX, talks to a mixer, or replaces Prism’s engine.
 
-Baseline: **ACP v1.2**. Spec: `Aurora_Communications_Protocol_Handoff_Spec_v1.2.pdf`.
+Baseline: **ACP v1.2**, with Aurora Trust security extension 1.0. Start with the [current documentation index](docs/README.md); historical plans and reviews are indexed separately under `DesignDocs/`.
 
 ## Non-negotiables
 
@@ -24,7 +24,8 @@ Package.swift   SwiftPM manifest (product AuroraACP)
 Sources/        AuroraACP library + acp-framed-hello interop fixture
 schema/         JSON Schema, constants, message registry, semantic invariants
 vectors/        Frozen golden JSON/CBOR (never silently rewritten)
-docs/           Normative markdown (wire profile, state machines, catalogs)
+docs/           Current normative docs, status matrix, and integration guides
+DesignDocs/     Historical plans, decisions, reviews, and execution records
 python/         Reference models, codec, CLI, simulators
 rust/           Bridge-oriented crates (acp-model has no Tokio)
 tools/          acp-inspect, acp-sim, Wireshark dissector
@@ -145,20 +146,25 @@ See [`docs/ADDING_A_MESSAGE.md`](docs/ADDING_A_MESSAGE.md). Short version: schem
 | Bridge / config / blackout | yes | — | — |
 | Resource transfer | chunk + SHA-256 + activate | — | — |
 | Lyric assignment | resolver | — | — |
-| Remote Profile | session-hosted production authority | non-production simulator | safety core + non-production simulator; production host not yet complete |
+| Aurora Trust models | implemented | implemented | implemented, including Apple Full provider |
+| Full TLS 1.3 mTLS | contract/models | contract/models | Apple Network.framework production provider |
+| Authorization + revocation | implemented | implemented | implemented with atomic policy consumption |
+| Remote Profile | session-hosted production authority | non-production simulator | safety core/simulator; Prism adapter pending |
 | Live session transport | WebSocket + framed TCP | framed TCP + loopback | framed TCP + loopback |
 | CLI | `python3 -m acp inspect\|sim\|remote` | — | — |
 
-- Schema + 93-type `schema/registry.json` + semantic invariants
-- Frozen golden vectors in `vectors/` (one JSON/CBOR pair for each of the 93 registry messages)
+- Schema + 109-type `schema/registry.json` + semantic invariants
+- Frozen golden vectors in `vectors/` (one JSON/CBOR pair for each of the 109 registry messages)
 - Shared malformed CBOR corpus in `vectors/malformed/`
 - Localhost Python WebSocket HELLO: `python3 tests/interop/test_ws_hello.py`
 - Localhost Python WebSocket Remote hello/sync/commands: `python3 tests/interop/test_ws_remote.py`
 - Cross-language framed TCP: `python3 tests/interop/test_framed_cross.py --sdk rust|swift|rust-swift --suite hello|session|remote|negative`
-- Coverage matrix: **codec** (all 93 golden vectors plus the invalid-message corpus), **session** (loopback plus framed TCP HELLO, heartbeat, correlated `state.request`/`state.snapshot`, goodbye), **Remote profile** (Python production host; Rust/Swift simulators exchange chunk/activate/invoke over an established session). Rust↔Swift framed session is covered by `--sdk rust-swift`.
+- Coverage matrix: **codec** (all 109 golden vectors plus the invalid-message corpus), **session** (loopback plus framed TCP HELLO, heartbeat, correlated `state.request`/`state.snapshot`, goodbye), **Remote profile** (Python production host; Rust/Swift simulators exchange chunk/activate/invoke over an established session). Rust↔Swift framed session is covered by `--sdk rust-swift`.
 - Wireshark Lua dissector: `tools/wireshark/`
 
 Remote Profile (v1.2 profile, recommended future revision 1.3): see `docs/REMOTE.md` and `Aurora_ACP_Remote_Profile_Implementation_Spec.md`.
+
+Security and product integration: see [docs/SECURITY.md](docs/SECURITY.md), the [implementation matrix](docs/IMPLEMENTATION_STATUS.md), and the [Prism/Remote integration guides](docs/integration/).
 
 Product adapters (Prism `ControlActionRouter`, Conductor UI, Lyric presentation, Bridge firmware I/O) are **not** in this repo.
 

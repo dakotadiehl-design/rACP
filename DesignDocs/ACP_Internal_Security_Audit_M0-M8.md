@@ -1,5 +1,7 @@
 # ACP Internal Security Audit — M0–M8
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Audit date: 2026-08-26
 
 ## Audit baseline and findings freeze

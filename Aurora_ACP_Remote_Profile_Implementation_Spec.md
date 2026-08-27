@@ -1,13 +1,16 @@
 # Aurora Communications Protocol (ACP)
 # Aurora Remote Profile Implementation Specification
 
-**Document Type:** Engineering Handoff / Protocol Profile Specification  
-**Profile Name:** Aurora Remote Profile  
-**Protocol Family:** Aurora Communications Protocol (ACP)  
-**Target ACP Baseline:** ACP v1.2+  
-**Recommended Protocol Revision After Adoption:** ACP v1.3  
-**Primary Implementations:** Python is the reference production Remote authority (`RemoteAuthority` + `RemoteHost`). Rust and Swift ship models plus **non-production simulators** only; they do not implement the Aurora Remote amendment engine.  
-**Status:** Implementation-ready design specification
+Status: **Normative profile companion, reconciled 2026-08-27**
+Current integration guidance: [`docs/integration/REMOTE.md`](docs/integration/REMOTE.md)
+
+**Document Type:** Engineering Handoff / Protocol Profile Specification
+**Profile Name:** Aurora Remote Profile
+**Protocol Family:** Aurora Communications Protocol (ACP)
+**Target ACP Baseline:** ACP v1.2+
+**Recommended Protocol Revision After Adoption:** ACP v1.3
+**Primary Implementations:** Python is the reference production Remote authority (`RemoteAuthority` + `RemoteHost`). Rust and Swift ship models plus **non-production simulators** only; they do not implement the Aurora Remote amendment engine.
+**Status:** Implemented reference profile; Swift product adapter integration pending
 
 ---
 

@@ -1,5 +1,7 @@
 # Recommended Amendments to the ACP Security Hardening Plan
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 > **Disposition:** Incorporated into `ACP_Security_Hardening_Plan.md`. This
 > document remains the review record; the consolidated plan is authoritative
 > for execution.

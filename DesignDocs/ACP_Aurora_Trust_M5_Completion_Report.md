@@ -1,5 +1,7 @@
 # ACP Aurora Trust M5 Implementation Report
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Date: 2026-08-25
 Starting commit: `301e55d` (`Fix M4 credential store crash recovery`)
 

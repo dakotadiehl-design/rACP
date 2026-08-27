@@ -1,5 +1,7 @@
 # Prism ACP Remote Profile Live-Test Remediation
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Status: implementation directive based on a live, non-destructive ACP Workbench audit on 2026-08-20.
 
 ## 1. Purpose

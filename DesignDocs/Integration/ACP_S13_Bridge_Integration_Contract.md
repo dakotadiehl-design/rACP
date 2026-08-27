@@ -1,5 +1,7 @@
 # S13 Bridge integration contract
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../../docs/README.md).
+
 No matching Bridge repository was present under `/Users/dakota/code` during inspection on 2026-08-26. No repository was modified.
 
 ## Required future analysis and migration

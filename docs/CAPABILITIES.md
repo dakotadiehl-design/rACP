@@ -1,5 +1,8 @@
 # Capability catalog
 
+Status: **Normative generated-catalog companion**
+Canonical source: `schema/constants.json`
+
 Capability IDs are stable lowercase dotted strings. Versions evolve independently of ACP minor versions. A peer must not send capability-specific commands until the capability is in the negotiated intersection.
 
 | ID | Min protocol | Meaning |

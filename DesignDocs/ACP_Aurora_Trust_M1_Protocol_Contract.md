@@ -1,5 +1,7 @@
 # Aurora Trust M1 Protocol Contract
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Status: normative ACP 1.2 Aurora Trust 1.0 contract (Candidate Freeze 2.1.1).
 
 The canonical machine-readable sources are `schema/common/defs.schema.json`,

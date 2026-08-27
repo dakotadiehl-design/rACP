@@ -1,5 +1,7 @@
 # S13 Prism integration contract
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../../docs/README.md).
+
 Inspection evidence: `/Users/dakota/code/Aurora`, branch `main`, HEAD `c291e9bb034ac4d6e23345b833ca7db11edf6250`, clean at inspection. The repository was read-only.
 
 ## Current boundary

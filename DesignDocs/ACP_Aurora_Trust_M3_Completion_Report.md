@@ -1,5 +1,7 @@
 # Aurora Trust M3 Completion Report
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Date: 2026-08-25
 Starting commit: `ce89b8a` (`Aurora Trust M2 shared security models`)
 

@@ -4,6 +4,12 @@ Package version (`AuroraACP` semver) is not the ACP wire-protocol version. Wire 
 
 ## Unreleased
 
+- Established a current documentation index, authority order, status taxonomy, implementation matrix, and requirement traceability matrix.
+- Reconciled Aurora Trust documentation with implemented transcript-bound issuance, fail-closed Apple custody, atomic authorization, revocation hash continuity, transactional credential recovery, and application-neutral authority ownership.
+- Added current Prism, Remote, Apple qualification, trusted-LAN migration, and future Conductor integration guides.
+- Preserved and visibly labeled all `DesignDocs/` material as historical records.
+- Added automated documentation metadata, local-link, historical-label, and frozen-security-claim validation.
+
 ## 1.1.0-dev.2 — 2026-08-19
 
 Production Swift Remote Profile authority (`ACPRemoteProductionAuthority`):

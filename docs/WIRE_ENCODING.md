@@ -1,5 +1,8 @@
 # ACP-CDE-1.2 wire encoding profile
 
+Status: **Normative**
+Last reconciled: **2026-08-27**
+
 This is a protocol rule, not a library default. Golden CBOR is produced by the Python reference encoder and consumed by every SDK.
 
 ## JSON

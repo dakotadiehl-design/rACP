@@ -1,5 +1,7 @@
 # ACP Aurora Trust Offline Operations Runbook
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Aurora Trust is designed to operate without Internet access. The operator CLI is `acp-security`; set `--state-dir` to restricted, backed-up local storage. Its state file is atomically replaced with mode `0600`, contains public operational metadata rather than private keys or bootstrap secrets, and maintains a verifiable hash-chained audit history.
 
 ## Commissioning and headless enrollment

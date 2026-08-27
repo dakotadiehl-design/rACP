@@ -1,5 +1,7 @@
 # ACP Aurora Trust M0 Rust 1.75 Qualification
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-21  
 **Scope:** Existing ACP Rust workspace only  
 **Result:** PASS for the current production graph; future M1 Trust/provider features are not yet present and are not qualified

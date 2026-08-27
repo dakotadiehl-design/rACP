@@ -1,5 +1,7 @@
 # Adding a message type
 
+Status: **Current contributor guide**
+
 1. Add or extend a JSON Schema under `schema/<family>/`.
 2. Add a row to `scripts/gen_registry.py` and run `python3 scripts/gen_registry.py`.
 3. Run `python3 scripts/check_registry.py`.

@@ -1,5 +1,7 @@
 # ACP Aurora Trust M0 Independent Security Review
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Reviewer:** Grok 4.6 (independent of the Codex M0 package)
 **Date:** 2026-08-21
 **Subject:** Aurora Communications Protocol (ACP) Aurora Trust Candidate Freeze 1

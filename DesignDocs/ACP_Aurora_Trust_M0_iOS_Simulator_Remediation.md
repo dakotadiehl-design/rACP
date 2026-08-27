@@ -1,5 +1,7 @@
 # ACP Aurora Trust M0 iOS Simulator Remediation
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-21  
 **Result:** FAIL — harness defects remediated; complete M1-bound identity-policy cases remain NOT_RUN
 

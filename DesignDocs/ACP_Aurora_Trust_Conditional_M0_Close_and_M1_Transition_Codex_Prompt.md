@@ -1,5 +1,7 @@
 # ACP Aurora Trust Conditional M0 Close / M1 Transition Directive for Codex
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Purpose
 
 Determine whether Aurora Trust Milestone 0 is eligible for a **conditional close** with only the Pico-class Lightweight HIL qualification deferred.

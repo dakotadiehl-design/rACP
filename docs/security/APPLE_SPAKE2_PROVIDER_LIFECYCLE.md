@@ -1,9 +1,8 @@
 # Apple SPAKE2+ provider lifecycle review
 
-Status: **ABI gate passed at the interface-model level; native ABI may now be designed to this contract.**
+Status: **Current provider contract; restricted Botan 3.13.0 wrapper implemented and boundary-audited.**
 
-This review precedes and constrains the ACP-owned Botan C ABI. The ABI must not
-add any operation that is more permissive than this model.
+This review constrains the implemented ACP-owned Botan C ABI. Future ABI changes must not add any operation that is more permissive than this model.
 
 ## Chosen boundary
 

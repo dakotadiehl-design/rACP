@@ -1,5 +1,7 @@
 # ACP Aurora Trust iOS Simulator Qualification Remediation Directive for Codex
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 ## Purpose
 
 Remediate the failed iOS Simulator qualification for Aurora Trust M0 without reopening Candidate Freeze 2.1.1 and without beginning M1.

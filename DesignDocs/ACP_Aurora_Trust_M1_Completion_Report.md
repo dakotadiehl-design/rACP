@@ -1,5 +1,7 @@
 # ACP Aurora Trust M1 Completion Report
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Date:** 2026-08-21  
 **M0 transition:** CONDITIONALLY CLOSED  
 **M1 result:** COMPLETE — M2 development authorized

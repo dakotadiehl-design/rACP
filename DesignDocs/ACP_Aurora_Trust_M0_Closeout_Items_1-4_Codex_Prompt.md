@@ -1,4 +1,6 @@
 # ACP Aurora Trust M0 Closeout Directive for Codex
+
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
 ## Scope: Close Remaining M0 Items 1–4 Only
 
 **Repository:** AuroraCommunicationsProtocol  

@@ -1,5 +1,8 @@
 # Error codes
 
+Status: **Normative generated-catalog companion**
+Canonical sources: `schema/constants.json` and `schema/registry.json`
+
 Stable lowercase dotted codes. `error.report` and `command.ack.error` use this catalog.
 
 | Code | Category | Retryable | Meaning |

@@ -1,5 +1,8 @@
 # Aurora Remote Profile
 
+Status: **Normative profile with current implementation notes**
+Last reconciled: **2026-08-27**
+
 Normative companion to `Aurora_ACP_Remote_Profile_Implementation_Spec.md`.
 
 Remote expresses operator intent. Conductor/Prism own state and execution. Remote never drives DMX, Art-Net, MIDI, or vendor I/O.

@@ -1,5 +1,7 @@
 # S10 Apple provider feasibility decision
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 Date: 2026-08-26
 
 Status: API feasibility PASS; certificate-policy hardening PASS on available frozen fixtures; production adapter and platform qualification INCOMPLETE.

@@ -1,5 +1,7 @@
 # Aurora Trust M2 Completion Report
 
+> **Historical record.** This document preserves the plan, review, or evidence at the time it was written. For current normative and integration guidance, start at [`docs/README.md`](../docs/README.md).
+
 **Milestone:** M2 — Shared models and security boundaries
 
 **Starting commit:** `f2c2429dae598b3965d4d5fe54d2dd6b2812f12a`
