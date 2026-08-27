@@ -48,6 +48,7 @@ public final class RACPSession {
   public private(set) var malformedCount = 0
   public private(set) var lastReceived: TimeInterval
   public private(set) var outstandingPing: (nonce: UInt64, sentAt: TimeInterval)?
+  public private(set) var lastMessage: RACPMessage?
 
   private let handler: CommandHandler
   private let stateHandler: StateHandler
@@ -82,6 +83,7 @@ public final class RACPSession {
     guard state != .closing, state != .closed else { throw RACPSessionError.closed("closed") }
     lastReceived = now()
     if state == .hello {
+      lastMessage = nil
       helloLines.append(line)
       guard helloLines.count <= 1_027 else { throw RACPProtocolError.malformedMessage(fatal: true) }
       if line == "END" {
@@ -92,7 +94,9 @@ public final class RACPSession {
       return []
     }
     do {
-      return try receive(message: RACPMessage.parse(line))
+      let message = try RACPMessage.parse(line)
+      lastMessage = message
+      return try receive(message: message)
     } catch let error as RACPProtocolError {
       malformedCount += 1
       if malformedCount >= 3 { throw RACPProtocolError.malformedMessage(fatal: true) }

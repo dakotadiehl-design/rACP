@@ -11,6 +11,26 @@ public enum RACPConnectionError: Error, Sendable, Equatable {
   case handshakeTimeout
   case connectionLost
   case writeFailed
+  case requestTimeout
+  case tooManyPendingRequests
+  case cancelled
+  case disconnected(String)
+}
+
+public struct RACPRemoteError: Error, Sendable, Equatable {
+  public let requestID: UInt64
+  public let code: String
+  public init(requestID: UInt64, code: String) {
+    self.requestID = requestID
+    self.code = code
+  }
+}
+
+public enum RACPConnectionState: Sendable, Equatable {
+  case connecting
+  case handshaking
+  case ready(RACPHello)
+  case disconnected(String)
 }
 
 private actor OutboundQueue {
@@ -115,22 +135,71 @@ public actor RACPConnection {
   private let output: OutboundQueue
   private var decoder = RACPLineDecoder()
   private var closing = false
+  private var hasRun = false
   private var nextNonce: UInt64 = 1
   private var publishedRevisions: [String: UInt64] = [:]
   private let allowUnsolicitedState: Bool
+  private let maximumPendingRequests: Int
+  private var nextRequestID: UInt64 = 1
+  private var pendingRequests: [UInt64: PendingRequest] = [:]
+  private var observers: [UUID: AsyncStream<RACPConnectionState>.Continuation] = [:]
+  public private(set) var lifecycleState: RACPConnectionState = .connecting
   public private(set) var closeReason: String?
+
+  private struct PendingRequest {
+    let continuation: CheckedContinuation<Void, any Error>
+    let timeout: Task<Void, Never>
+  }
 
   public init(
     stream: any RACPByteStream,
     session: sending RACPSession,
     outputMessages: Int = defaultOutputMessages,
+    maximumPendingRequests: Int = 1_024,
     allowUnsolicitedState: Bool = false
   ) {
-    precondition(outputMessages > 0)
+    precondition(outputMessages > 0 && maximumPendingRequests > 0)
     self.stream = stream
     self.session = session
     output = OutboundQueue(maximum: outputMessages)
+    self.maximumPendingRequests = maximumPendingRequests
     self.allowUnsolicitedState = allowUnsolicitedState
+  }
+
+  public func stateUpdates() -> AsyncStream<RACPConnectionState> {
+    let id = UUID()
+    return AsyncStream { continuation in
+      observers[id] = continuation
+      continuation.yield(lifecycleState)
+      continuation.onTermination = { _ in Task { await self.removeObserver(id) } }
+    }
+  }
+
+  public func waitUntilReady() async throws -> RACPHello {
+    for await state in stateUpdates() {
+      switch state {
+      case .ready(let peer): return peer
+      case .disconnected(let reason): throw RACPConnectionError.disconnected(reason)
+      case .connecting, .handshaking: continue
+      }
+    }
+    throw RACPConnectionError.disconnected("state_stream_ended")
+  }
+
+  public func command(
+    _ name: String, arguments: JSONValue? = nil, timeout: Duration = .seconds(5)
+  ) async throws {
+    try await terminalRequest(timeout: timeout) { id in
+      .command(Command(requestID: id, name: name, value: arguments, hasValue: arguments != nil))
+    }
+  }
+
+  public func subscribe(_ name: String, timeout: Duration = .seconds(5)) async throws {
+    try await terminalRequest(timeout: timeout) { .subscribe($0, name) }
+  }
+
+  public func unsubscribe(_ name: String, timeout: Duration = .seconds(5)) async throws {
+    try await terminalRequest(timeout: timeout) { .unsubscribe($0, name) }
   }
 
   public func send(_ messages: RACPMessage...) async throws {
@@ -162,6 +231,9 @@ public actor RACPConnection {
   }
 
   public func run() async {
+    guard !hasRun, !closing else { return }
+    hasRun = true
+    transition(to: .handshaking)
     let writer = Task { await writerLoop() }
     let heartbeat = Task { await heartbeatLoop() }
     let handshakeTimer = Task {
@@ -174,6 +246,8 @@ public actor RACPConnection {
       await output.flush()
       try await readUntilEstablished()
       handshakeTimer.cancel()
+      guard let peer = session.peer else { throw RACPProtocolError.handshakeRequired }
+      transition(to: .ready(peer))
       try await readEstablished()
     } catch let error as RACPProtocolError {
       closeReason = error.code
@@ -197,6 +271,8 @@ public actor RACPConnection {
     closing = true
     closeReason = closeReason ?? reason
     session.markClosed()
+    failAllPending(with: RACPConnectionError.disconnected(closeReason ?? reason))
+    transition(to: .disconnected(closeReason ?? reason))
     await output.abort()
     await stream.close()
   }
@@ -222,6 +298,7 @@ public actor RACPConnection {
     }
     for line in try decoder.feed(data) {
       let responses = try session.receive(line: line)
+      if let message = session.lastMessage { resolveTerminal(message) }
       for response in responses { try await output.enqueue(try RACPSession.encode([response])) }
     }
     return true
@@ -263,4 +340,87 @@ public actor RACPConnection {
       await close(reason: "handshake_timeout")
     }
   }
+
+  private func terminalRequest(
+    timeout: Duration, message: @escaping (UInt64) -> RACPMessage
+  ) async throws {
+    guard case .ready = lifecycleState else { throw RACPConnectionError.disconnected("not_ready") }
+    guard pendingRequests.count < maximumPendingRequests else {
+      throw RACPConnectionError.tooManyPendingRequests
+    }
+    let id = allocateRequestID()
+    try await withTaskCancellationHandler {
+      try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<Void, any Error>) in
+        if Task.isCancelled {
+          continuation.resume(throwing: RACPConnectionError.cancelled)
+          return
+        }
+        let timeoutTask = Task {
+          try? await Task.sleep(for: timeout)
+          guard !Task.isCancelled else { return }
+          self.expireRequest(id)
+        }
+        pendingRequests[id] = PendingRequest(continuation: continuation, timeout: timeoutTask)
+        Task {
+          do { try await self.send(message(id)) } catch { self.failRequest(id, with: error) }
+        }
+      }
+    } onCancel: {
+      Task { await self.failRequest(id, with: RACPConnectionError.cancelled) }
+    }
+  }
+
+  private func allocateRequestID() -> UInt64 {
+    while pendingRequests[nextRequestID] != nil {
+      nextRequestID = nextRequestID == racpMaximumSafeInteger ? 1 : nextRequestID + 1
+    }
+    let id = nextRequestID
+    nextRequestID = nextRequestID == racpMaximumSafeInteger ? 1 : nextRequestID + 1
+    return id
+  }
+
+  private func resolveTerminal(_ message: RACPMessage) {
+    switch message {
+    case .ack(let id): completeRequest(id, result: .success(()))
+    case .error(let id, let code) where id != 0:
+      completeRequest(id, result: .failure(RACPRemoteError(requestID: id, code: code)))
+    default: break
+    }
+  }
+
+  private func expireRequest(_ id: UInt64) {
+    failRequest(id, with: RACPConnectionError.requestTimeout)
+  }
+
+  private func failRequest(_ id: UInt64, with error: any Error) {
+    completeRequest(id, result: .failure(error))
+  }
+
+  private func completeRequest(_ id: UInt64, result: Result<Void, any Error>) {
+    guard let pending = pendingRequests.removeValue(forKey: id) else { return }
+    pending.timeout.cancel()
+    pending.continuation.resume(with: result)
+  }
+
+  private func failAllPending(with error: any Error) {
+    let requests = pendingRequests
+    pendingRequests.removeAll()
+    for pending in requests.values {
+      pending.timeout.cancel()
+      pending.continuation.resume(throwing: error)
+    }
+  }
+
+  private func transition(to state: RACPConnectionState) {
+    lifecycleState = state
+    for observer in observers.values { observer.yield(state) }
+    if case .disconnected = state {
+      let current = observers
+      observers.removeAll()
+      for observer in current.values { observer.finish() }
+    }
+  }
+
+  private func removeObserver(_ id: UUID) { observers.removeValue(forKey: id) }
 }

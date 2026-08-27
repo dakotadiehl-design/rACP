@@ -42,12 +42,25 @@ The Swift package requires Swift 6 or newer:
 
 ```sh
 swift test
+python3 tools/interoperability/run.py
 ```
 
 Add the repository as a Swift Package dependency and depend on the
 `ReasonableACP` product. The portable core exposes `JSONValue`, `RACPMessage`,
 `RACPLineDecoder`, `RACPSession`, and `RACPConnection`. Apple platforms also expose
 `NetworkByteStream` and `RACPNetworkServer` for bounded plain-TCP connections.
+
+Client applications can observe `connection.stateUpdates()`, await
+`connection.waitUntilReady()`, and issue correlated requests with
+`connection.command(_:arguments:timeout:)`, `subscribe`, and `unsubscribe`. Pending
+requests are bounded and fail on timeout, cancellation, or disconnect. Hosts can use
+`RACPNetworkServer`'s `connectionHandler` to retain ready-capable connections for
+authoritative state publication.
+
+Network.framework `.waiting` is treated as recoverable during startup because path
+changes can resolve it. Startup remains bounded to five seconds; `.failed` and
+`.cancelled` are terminal before readiness. Once connected, stream read/write errors
+drive the ordinary rACP disconnection lifecycle.
 
 The implementation is transport-independent above its byte-stream adapter. A future
 TLS/TCP transport can wrap the same rACP messages without changing application

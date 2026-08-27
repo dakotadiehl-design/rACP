@@ -12,6 +12,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build and test Swift package
         run: swift test
+      - name: Swift-Python interoperability
+        run: python3 tools/interoperability/run.py
       - name: Worktree stays clean
         run: test -z "$(git status --porcelain)"
 

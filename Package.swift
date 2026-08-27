@@ -8,6 +8,7 @@ let package = Package(
   products: [.library(name: "ReasonableACP", targets: ["ReasonableACP"])],
   targets: [
     .target(name: "ReasonableACP"),
+    .executableTarget(name: "RACPInteropPeer", dependencies: ["ReasonableACP"]),
     .testTarget(name: "ReasonableACPTests", dependencies: ["ReasonableACP"]),
   ]
 )

@@ -3,7 +3,7 @@ import Testing
 
 @testable import ReasonableACP
 
-private final class CommandRecorder: @unchecked Sendable {
+final class CommandRecorder: @unchecked Sendable {
   private let lock = NSLock()
   private var storage: [Command] = []
   func append(_ command: Command) { lock.withLock { storage.append(command) } }

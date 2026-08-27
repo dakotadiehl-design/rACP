@@ -39,9 +39,13 @@
           case .ready:
             guard gate.claim() else { return }
             continuation.resume()
-          case .failed(let error), .waiting(let error):
+          case .failed(let error):
             guard gate.claim() else { return }
             continuation.resume(throwing: error)
+          case .waiting:
+            // Waiting may recover after a network path change. The bounded
+            // startup timer remains authoritative while Network retries.
+            break
           case .cancelled:
             guard gate.claim() else { return }
             continuation.resume(throwing: RACPConnectionError.connectionLost)
@@ -49,6 +53,11 @@
           }
         }
         connection.start(queue: DispatchQueue(label: "org.aurora.racp.connection"))
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+          guard gate.claim() else { return }
+          self.connection.cancel()
+          continuation.resume(throwing: RACPConnectionError.connectionLost)
+        }
       }
     }
 
@@ -86,6 +95,7 @@
   public final class RACPNetworkServer: @unchecked Sendable {
     private let listener: NWListener
     private let sessionFactory: @Sendable () -> RACPSession
+    private let connectionHandler: @Sendable (RACPConnection) -> Void
     private let maximumConnections: Int
     private let lock = NSLock()
     private var activeConnections = 0
@@ -93,6 +103,7 @@
     public init(
       port: UInt16,
       maximumConnections: Int = 64,
+      connectionHandler: @escaping @Sendable (RACPConnection) -> Void = { _ in },
       sessionFactory: @escaping @Sendable () -> RACPSession
     ) throws {
       guard maximumConnections > 0, let port = NWEndpoint.Port(rawValue: port) else {
@@ -100,12 +111,43 @@
       }
       listener = try NWListener(using: racpTCPParameters(), on: port)
       self.maximumConnections = maximumConnections
+      self.connectionHandler = connectionHandler
       self.sessionFactory = sessionFactory
     }
 
-    public func start(queue: DispatchQueue = DispatchQueue(label: "org.aurora.racp.listener")) {
+    public var port: UInt16? { listener.port?.rawValue }
+
+    public func start(queue: DispatchQueue = DispatchQueue(label: "org.aurora.racp.listener"))
+      async throws
+    {
       listener.newConnectionHandler = { [weak self] connection in self?.accept(connection) }
-      listener.start(queue: queue)
+      try await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<Void, any Error>) in
+        let gate = ResumeGate()
+        listener.stateUpdateHandler = { state in
+          switch state {
+          case .ready:
+            guard gate.claim() else { return }
+            continuation.resume()
+          case .failed(let error):
+            guard gate.claim() else { return }
+            continuation.resume(throwing: error)
+          case .cancelled:
+            guard gate.claim() else { return }
+            continuation.resume(throwing: RACPConnectionError.connectionLost)
+          case .waiting:
+            break
+          default:
+            break
+          }
+        }
+        listener.start(queue: queue)
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
+          guard gate.claim() else { return }
+          self.listener.cancel()
+          continuation.resume(throwing: RACPConnectionError.connectionLost)
+        }
+      }
     }
 
     public func cancel() { listener.cancel() }
@@ -123,7 +165,9 @@
         let stream = NetworkByteStream(connection: connection)
         do {
           try await stream.start()
-          await RACPConnection(stream: stream, session: sessionFactory()).run()
+          let racpConnection = RACPConnection(stream: stream, session: sessionFactory())
+          connectionHandler(racpConnection)
+          await racpConnection.run()
         } catch {
           await stream.close()
         }

@@ -23,6 +23,9 @@ version, heartbeat, and TCP reconnect tests equivalent to the reference suites.
 3. Extend the bidirectional matrix from golden-transcript conformance to live
    Python↔Swift TCP sessions, then Python↔Rust and Swift↔Rust sessions when Rust exists.
 
+The Python↔Swift TCP matrix is automated by `tools/interoperability/run.py` and runs in
+CI with Swift acting as both client and server.
+
 ## Semantic checklist for every port
 
 - UTF-8 and CRLF behavior matches the specification.
