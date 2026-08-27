@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "botan": {
+    "version": "3.13.0",
+    "source_archive": "Botan-3.13.0.tar.xz",
+    "sha256": "12f5a8358890bbee82edfe9d2e7769b0a610b6dd0e0698aea13d20a675d84620",
+    "source_policy": "official-unmodified-release"
+  },
+  "toolchain": {
+    "vendor": "Apple",
+    "compiler": "clang++",
+    "cxx_standard": "c++20",
+    "archive_tool": "llvm-ar",
+    "qualified_xcode": "Xcode 26.6 / Build version 17F113",
+    "qualified_swift": "Apple Swift 6.3.3",
+    "qualified_sdk_version": "26.5"
+  },
+  "targets": [
+    {"id": "macos-arm64", "sdk": "macosx", "sdk_version": "26.5", "triple": "arm64-apple-macos13.0", "deployment_target": "13.0"},
+    {"id": "ios-arm64", "sdk": "iphoneos", "sdk_version": "26.5", "triple": "arm64-apple-ios16.0", "deployment_target": "16.0"},
+    {"id": "ios-simulator-arm64", "sdk": "iphonesimulator", "sdk_version": "26.5", "triple": "arm64-apple-ios16.0-simulator", "deployment_target": "16.0"}
+  ],
+  "configure": {
+    "flags": [
+      "--os=darwin", "--cpu=arm64", "--cc=clang",
+      "--disable-shared-library", "--minimized-build", "--without-documentation",
+      "--enable-modules=spake2p,system_rng,pcurves_secp256r1"
+    ]
+  },
+  "module_closure": [
+    "argon2", "asn1", "base", "base64", "bigint", "blake2", "codec",
+    "ec_group", "enc_padding", "hash", "hex", "hkdf", "hmac", "kdf",
+    "mac", "math", "mdx_hash", "mp", "numbertheory", "pbkdf", "pcurves",
+    "pcurves_impl", "pcurves_secp256r1", "pem", "pubkey", "rng",
+    "sha2_32", "sha2_64", "spake2p", "system_rng", "utils"
+  ],
+  "required_capabilities": [
+    "spake2p", "pcurves_secp256r1", "sha2_32", "hkdf", "hmac", "system_rng"
+  ],
+  "wrapper_profile": {
+    "ciphersuite": "RFC9383-P256-SHA256-HKDF-HMAC-SHA256",
+    "scalar_bytes": 32,
+    "prover_secret_bytes": 64,
+    "share_bytes": 65,
+    "registration_record_bytes": 97,
+    "verifier_response_bytes": 97,
+    "confirmation_bytes": 32,
+    "shared_secret_bytes": 32,
+    "max_identity_bytes": 255,
+    "max_context_bytes": 4096
+  }
+}

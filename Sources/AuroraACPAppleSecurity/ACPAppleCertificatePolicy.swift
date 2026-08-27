@@ -46,6 +46,7 @@ public enum ACPAppleCertificatePolicy {
         evaluationDate: Date = Date(),
         revocation: (any ACPAppleRevocationChecking)? = nil
     ) throws -> ACPAppleVerifiedCertificate {
+#if os(macOS)
         guard chain.count >= 2, !anchors.isEmpty,
               !anchors.contains(where: { SecCertificateCopyData($0) as Data == SecCertificateCopyData(chain[0]) as Data })
         else { throw ACPAppleSecurityError.invalidCertificate }
@@ -75,6 +76,13 @@ public enum ACPAppleCertificatePolicy {
             trustDomainID: expectedDomain, nodeID: node, credentialID: credentialID,
             identityKeyID: identityKeyID, leafDER: der
         )
+#else
+        // SecCertificateCopyValues and the OID property API used for ACP's
+        // strict extension audit are macOS-only. Fail closed until the
+        // separately scoped iOS X.509 parser/policy milestone is implemented.
+        _ = (chain, anchors, expectedDomain, expectedNode, evaluationDate, revocation)
+        throw ACPAppleSecurityError.providerUnavailable
+#endif
     }
 
     private static func evaluate(
@@ -91,6 +99,7 @@ public enum ACPAppleCertificatePolicy {
         else { throw ACPAppleSecurityError.trustFailure }
     }
 
+#if os(macOS)
     private static func certificateValues(_ certificate: SecCertificate) throws -> [String: Any] {
         let keys = [kSecOIDSubjectAltName, kSecOIDBasicConstraints, kSecOIDKeyUsage, kSecOIDExtendedKeyUsage,
                     kSecOIDSubjectKeyIdentifier, kSecOIDAuthorityKeyIdentifier, kSecOIDX509V1SerialNumber] as CFArray
@@ -158,6 +167,7 @@ public enum ACPAppleCertificatePolicy {
         let octets = text.split(separator: " ").compactMap { UInt8($0, radix: 16) }
         return octets.count == 16 && octets.contains(where: { $0 != 0 })
     }
+#endif
 
     private static func digestID(_ data: Data) -> String {
         "sha256:" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

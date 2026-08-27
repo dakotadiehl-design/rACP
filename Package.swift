@@ -25,8 +25,15 @@ let package = Package(
         ),
         .target(
             name: "AuroraACPAppleSecurity",
-            dependencies: ["AuroraACP"],
-            linkerSettings: [.linkedFramework("Network"), .linkedFramework("Security")]
+            dependencies: ["AuroraACP", "AuroraACPSPAKE2"],
+            linkerSettings: [
+                .linkedFramework("Network"), .linkedFramework("Security"),
+                .linkedLibrary("c++"),
+            ]
+        ),
+        .binaryTarget(
+            name: "AuroraACPSPAKE2",
+            path: "Artifacts/AuroraACPSPAKE2.xcframework"
         ),
         .executableTarget(
             name: "acp-framed-hello",
