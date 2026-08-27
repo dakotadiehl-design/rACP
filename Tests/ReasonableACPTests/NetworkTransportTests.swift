@@ -14,6 +14,44 @@
     }
   }
 
+  private final class ConnectionStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [RACPConnection] = []
+    func append(_ connection: RACPConnection) { lock.withLock { storage.append(connection) } }
+    var connections: [RACPConnection] { lock.withLock { storage } }
+  }
+
+  private final class StateRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [StateMessage] = []
+    func append(_ state: StateMessage) { lock.withLock { storage.append(state) } }
+    var states: [StateMessage] { lock.withLock { storage } }
+  }
+
+  private actor AsyncExecutionRecorder {
+    private var started = 0
+    private var completed = 0
+    func start() { started += 1 }
+    func complete() { completed += 1 }
+    func counts() -> (Int, Int) { (started, completed) }
+  }
+
+  private func waitForConnections(_ store: ConnectionStore, count: Int) async throws {
+    for _ in 0..<100 {
+      if store.connections.count >= count { return }
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    throw RACPConnectionError.connectionLost
+  }
+
+  private func waitForStates(_ recorder: StateRecorder, count: Int) async throws {
+    for _ in 0..<100 {
+      if recorder.states.count >= count { return }
+      try await Task.sleep(for: .milliseconds(5))
+    }
+    throw RACPConnectionError.connectionLost
+  }
+
   @Test func networkByteStreamLoopback() async throws {
     let listener = try NWListener(using: .tcp, on: .any)
     let queue = DispatchQueue(label: "org.aurora.racp.tests.loopback")
@@ -101,6 +139,119 @@
       if case .disconnected = state { observedDisconnect = true }
     }
     #expect(observedReady && observedDisconnect)
+    server.cancel()
+  }
+
+  @Test func subscriptionEventsAndPublicationArePerConnection() async throws {
+    let hosts = ConnectionStore()
+    let hello = try RACPHello(
+      peerType: "device", peerID: "publisher",
+      capabilities: ["cue.current", "state.subscribe"])
+    let server = try RACPNetworkServer(
+      port: 0, connectionHandler: { hosts.append($0) },
+      sessionFactory: { RACPSession(local: hello) })
+    try await server.start()
+    let port = try #require(server.port)
+
+    let firstStates = StateRecorder()
+    let first = RACPConnection(
+      stream: try await NetworkByteStream.connect(host: "127.0.0.1", port: port),
+      session: RACPSession(
+        local: try RACPHello(peerType: "remote", peerID: "first"),
+        stateHandler: { firstStates.append($0) }))
+    let firstRun = Task { await first.run() }
+    _ = try await first.waitUntilReady()
+    try await waitForConnections(hosts, count: 1)
+    let firstHost = hosts.connections[0]
+    var events = (await firstHost.subscriptionUpdates()).makeAsyncIterator()
+
+    await #expect(throws: RACPRemoteError.self) { try await first.subscribe("unknown.state") }
+    try await first.subscribe("cue.current")
+    #expect(await events.next() == .subscribed("cue.current"))
+    let initial = StateMessage(name: "cue.current", revision: 1, value: .integer(7))
+    #expect(try await firstHost.publish(initial) == .published)
+    try await waitForStates(firstStates, count: 1)
+    #expect(firstStates.states == [initial])
+    await #expect(throws: RACPProtocolError.invalidValue) {
+      try await firstHost.publish(
+        StateMessage(name: "cue.current", revision: 1, value: .integer(8)))
+    }
+
+    try await first.subscribe("cue.current")
+    #expect(await events.next() == .subscribed("cue.current"))
+    try await first.unsubscribe("cue.current")
+    #expect(await events.next() == .unsubscribed("cue.current"))
+    #expect(
+      try await firstHost.publish(
+        StateMessage(name: "cue.current", revision: 2, value: .integer(9))) == .notSubscribed)
+
+    let second = RACPConnection(
+      stream: try await NetworkByteStream.connect(host: "127.0.0.1", port: port),
+      session: RACPSession(local: try RACPHello(peerType: "remote", peerID: "second")))
+    let secondRun = Task { await second.run() }
+    _ = try await second.waitUntilReady()
+    try await waitForConnections(hosts, count: 2)
+    #expect(
+      try await hosts.connections[1].publish(
+        StateMessage(name: "cue.current", revision: 1, value: .integer(1))) == .notSubscribed)
+
+    await first.close(reason: "test_complete")
+    await second.close(reason: "test_complete")
+    await firstRun.value
+    await secondRun.value
+    server.cancel()
+  }
+
+  @Test func asyncCommandsRunConcurrentlyAcrossClientsAndSurviveDisconnect() async throws {
+    let execution = AsyncExecutionRecorder()
+    let hello = try RACPHello(peerType: "device", peerID: "async", capabilities: ["cue.go"])
+    let server = try RACPNetworkServer(port: 0) {
+      RACPSession(
+        local: hello,
+        asyncCommandHandler: { _ in
+          await execution.start()
+          try await Task.sleep(for: .milliseconds(30))
+          await execution.complete()
+          return .success
+        })
+    }
+    try await server.start()
+    let port = try #require(server.port)
+    func client(_ id: String) async throws -> (RACPConnection, Task<Void, Never>) {
+      let connection = RACPConnection(
+        stream: try await NetworkByteStream.connect(host: "127.0.0.1", port: port),
+        session: RACPSession(
+          local: try RACPHello(peerType: "remote", peerID: id, capabilities: ["cue.go"])))
+      let run = Task { await connection.run() }
+      _ = try await connection.waitUntilReady()
+      return (connection, run)
+    }
+    let (first, firstRun) = try await client("first")
+    let (second, secondRun) = try await client("second")
+    async let firstCommand: Void = first.command("cue.go")
+    async let secondCommand: Void = second.command("cue.go")
+    try await firstCommand
+    try await secondCommand
+    #expect(await execution.counts().0 == 2)
+
+    let disconnected = Task { try await first.command("cue.go") }
+    for _ in 0..<100 {
+      if await execution.counts().0 == 3 { break }
+      try await Task.sleep(for: .milliseconds(2))
+    }
+    await first.close(reason: "client_disconnect")
+    await #expect(throws: RACPConnectionError.disconnected("client_disconnect")) {
+      try await disconnected.value
+    }
+    for _ in 0..<100 {
+      if await execution.counts().1 == 3 { break }
+      try await Task.sleep(for: .milliseconds(2))
+    }
+    #expect(await execution.counts().1 == 3)
+
+    await second.close(reason: "test_complete")
+    await firstRun.value
+    await secondRun.value
     server.cancel()
   }
 

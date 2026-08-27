@@ -34,10 +34,22 @@ public enum RACPSessionState: Sendable, Equatable {
 
 public enum RACPSessionError: Error, Sendable, Equatable {
   case closed(String)
+  case asynchronousCommandHandler
+}
+
+public enum RACPCommandDisposition: Sendable, Equatable {
+  case success
+  case error(String)
+}
+
+public enum RACPSubscriptionEvent: Sendable, Equatable {
+  case subscribed(String)
+  case unsubscribed(String)
 }
 
 public final class RACPSession {
   public typealias CommandHandler = (Command) -> String?
+  public typealias AsyncCommandHandler = (Command) async throws -> RACPCommandDisposition
   public typealias StateHandler = (StateMessage) -> Void
 
   public let local: RACPHello
@@ -49,8 +61,10 @@ public final class RACPSession {
   public private(set) var lastReceived: TimeInterval
   public private(set) var outstandingPing: (nonce: UInt64, sentAt: TimeInterval)?
   public private(set) var lastMessage: RACPMessage?
+  public private(set) var lastSubscriptionEvent: RACPSubscriptionEvent?
 
-  private let handler: CommandHandler
+  private let handler: CommandHandler?
+  private let asyncHandler: AsyncCommandHandler?
   private let stateHandler: StateHandler
   private let ledgerSize: Int
   private let now: () -> TimeInterval
@@ -75,6 +89,24 @@ public final class RACPSession {
     self.ledgerSize = ledgerSize
     self.now = now
     handler = commandHandler
+    asyncHandler = nil
+    self.stateHandler = stateHandler
+    lastReceived = now()
+  }
+
+  public init(
+    local: RACPHello,
+    ledgerSize: Int = 1_024,
+    now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+    asyncCommandHandler: @escaping AsyncCommandHandler,
+    stateHandler: @escaping StateHandler = { _ in }
+  ) {
+    precondition(ledgerSize > 0)
+    self.local = local
+    self.ledgerSize = ledgerSize
+    self.now = now
+    handler = nil
+    asyncHandler = asyncCommandHandler
     self.stateHandler = stateHandler
     lastReceived = now()
   }
@@ -82,6 +114,7 @@ public final class RACPSession {
   public func receive(line: String) throws -> [RACPMessage] {
     guard state != .closing, state != .closed else { throw RACPSessionError.closed("closed") }
     lastReceived = now()
+    lastSubscriptionEvent = nil
     if state == .hello {
       lastMessage = nil
       helloLines.append(line)
@@ -104,8 +137,29 @@ public final class RACPSession {
     }
   }
 
+  /// Receives one wire line, awaiting application command completion before
+  /// returning its terminal ACK or ERR response.
+  public nonisolated(nonsending) func receiveAsync(line: String) async throws -> [RACPMessage] {
+    guard state != .closing, state != .closed else { throw RACPSessionError.closed("closed") }
+    lastReceived = now()
+    lastSubscriptionEvent = nil
+    if state == .hello {
+      return try receiveHello(line: line)
+    }
+    do {
+      let message = try RACPMessage.parse(line)
+      lastMessage = message
+      return try await receiveAsync(message: message)
+    } catch let error as RACPProtocolError {
+      malformedCount += 1
+      if malformedCount >= 3 { throw RACPProtocolError.malformedMessage(fatal: true) }
+      throw error
+    }
+  }
+
   public func receive(message: RACPMessage) throws -> [RACPMessage] {
     guard state == .established else { throw RACPProtocolError.handshakeRequired }
+    lastSubscriptionEvent = nil
     switch message {
     case .ping(let nonce): return [.pong(nonce)]
     case .pong(let nonce):
@@ -114,10 +168,13 @@ public final class RACPSession {
     case .bye:
       state = .closing
       return []
-    case .command(let command): return [handle(command)]
+    case .command(let command):
+      guard asyncHandler == nil else { throw RACPSessionError.asynchronousCommandHandler }
+      return [handle(command)]
     case .subscribe(let id, let name): return [subscribe(id: id, name: name)]
     case .unsubscribe(let id, let name):
       subscriptions.remove(name)
+      lastSubscriptionEvent = .unsubscribed(name)
       return [.ack(id)]
     case .state(let message):
       let previous = stateRevisions[message.name]
@@ -128,6 +185,15 @@ public final class RACPSession {
       return []
     case .ack, .error: return []
     }
+  }
+
+  public nonisolated(nonsending) func receiveAsync(message: RACPMessage) async throws
+    -> [RACPMessage]
+  {
+    guard state == .established else { throw RACPProtocolError.handshakeRequired }
+    lastSubscriptionEvent = nil
+    if case .command(let command) = message { return [await handleAsync(command)] }
+    return try receive(message: message)
   }
 
   public func heartbeat(nonce: UInt64) throws -> [RACPMessage] {
@@ -168,20 +234,54 @@ public final class RACPSession {
     let response: RACPMessage
     if !local.capabilities.contains(command.name) {
       response = .error(command.requestID, "unsupported_capability")
-    } else if let code = handler(command) {
-      do {
-        try validateName(code)
-        response = .error(command.requestID, code)
-      } catch {
-        response = .error(command.requestID, "application_error")
-      }
+    } else if let code = handler?(command) {
+      response = validatedError(id: command.requestID, code: code)
     } else {
       response = .ack(command.requestID)
     }
+    record(command: command, response: response)
+    return response
+  }
+
+  private nonisolated(nonsending) func handleAsync(_ command: Command) async -> RACPMessage {
+    if let previous = ledger[command.requestID] {
+      return previous.command == command
+        ? previous.response : .error(command.requestID, "request_id_conflict")
+    }
+    let response: RACPMessage
+    if !local.capabilities.contains(command.name) {
+      response = .error(command.requestID, "unsupported_capability")
+    } else if let asyncHandler {
+      do {
+        switch try await asyncHandler(command) {
+        case .success: response = .ack(command.requestID)
+        case .error(let code): response = validatedError(id: command.requestID, code: code)
+        }
+      } catch {
+        response = .error(command.requestID, "application_error")
+      }
+    } else if let code = handler?(command) {
+      response = validatedError(id: command.requestID, code: code)
+    } else {
+      response = .ack(command.requestID)
+    }
+    record(command: command, response: response)
+    return response
+  }
+
+  private func validatedError(id: UInt64, code: String) -> RACPMessage {
+    do {
+      try validateName(code)
+      return .error(id, code)
+    } catch {
+      return .error(id, "application_error")
+    }
+  }
+
+  private func record(command: Command, response: RACPMessage) {
     ledger[command.requestID] = LedgerEntry(command: command, response: response)
     ledgerOrder.append(command.requestID)
     if ledgerOrder.count > ledgerSize { ledger.removeValue(forKey: ledgerOrder.removeFirst()) }
-    return response
   }
 
   private func subscribe(id: UInt64, name: String) -> RACPMessage {
@@ -189,7 +289,20 @@ public final class RACPSession {
       return .error(id, "unsupported_capability")
     }
     subscriptions.insert(name)
+    lastSubscriptionEvent = .subscribed(name)
     return .ack(id)
+  }
+
+  private func receiveHello(line: String) throws -> [RACPMessage] {
+    lastMessage = nil
+    helloLines.append(line)
+    guard helloLines.count <= 1_027 else { throw RACPProtocolError.malformedMessage(fatal: true) }
+    if line == "END" {
+      peer = try Self.parseHello(helloLines)
+      helloLines.removeAll(keepingCapacity: false)
+      state = .established
+    }
+    return []
   }
 
   private static func parseHello(_ lines: [String]) throws -> RACPHello {

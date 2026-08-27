@@ -35,6 +35,11 @@ public enum RACPConnectionState: Sendable, Equatable {
   case disconnected(String)
 }
 
+public enum RACPStatePublication: Sendable, Equatable {
+  case published
+  case notSubscribed
+}
+
 private actor OutboundQueue {
   private let maximum: Int
   private var items: [Data] = []
@@ -145,6 +150,7 @@ public actor RACPConnection {
   private var nextRequestID: UInt64? = 1
   private var pendingRequests: [UInt64: PendingRequest] = [:]
   private var observers: [UUID: AsyncStream<RACPConnectionState>.Continuation] = [:]
+  private var subscriptionObservers: [UUID: AsyncStream<RACPSubscriptionEvent>.Continuation] = [:]
   public private(set) var lifecycleState: RACPConnectionState = .connecting
   public private(set) var closeReason: String?
 
@@ -171,9 +177,26 @@ public actor RACPConnection {
   public func stateUpdates() -> AsyncStream<RACPConnectionState> {
     let id = UUID()
     return AsyncStream { continuation in
-      observers[id] = continuation
       continuation.yield(lifecycleState)
+      if case .disconnected = lifecycleState {
+        continuation.finish()
+        return
+      }
+      observers[id] = continuation
       continuation.onTermination = { _ in Task { await self.removeObserver(id) } }
+    }
+  }
+
+  /// Events accepted for this connection. The stream ends when the connection closes.
+  public func subscriptionUpdates() -> AsyncStream<RACPSubscriptionEvent> {
+    let id = UUID()
+    return AsyncStream { continuation in
+      guard !closing else {
+        continuation.finish()
+        return
+      }
+      subscriptionObservers[id] = continuation
+      continuation.onTermination = { _ in Task { await self.removeSubscriptionObserver(id) } }
     }
   }
 
@@ -220,6 +243,19 @@ public actor RACPConnection {
       throw RACPConnectionError.manualRequestIDNotAllowed
     }
     try await enqueue(messages)
+  }
+
+  /// Publishes state only when this connection is subscribed to its channel.
+  ///
+  /// An unsubscribed publication is a normal no-op and does not consume a queue
+  /// slot or advance this connection's published revision.
+  @discardableResult
+  public func publish(_ state: StateMessage) async throws -> RACPStatePublication {
+    guard !closing else { throw RACPSessionError.closed(closeReason ?? "closing") }
+    guard session.state == .established else { throw RACPProtocolError.handshakeRequired }
+    guard session.subscriptions.contains(state.name) else { return .notSubscribed }
+    try await enqueue([.state(state)])
+    return .published
   }
 
   /// Sends manual request IDs for wire-conformance tooling only.
@@ -323,9 +359,12 @@ public actor RACPConnection {
       return false
     }
     for line in try decoder.feed(data) {
-      let responses = try session.receive(line: line)
+      let responses = try await session.receiveAsync(line: line)
       if let message = session.lastMessage { resolveTerminal(message) }
       for response in responses { try await output.enqueue(try RACPSession.encode([response])) }
+      if let event = session.lastSubscriptionEvent {
+        for observer in subscriptionObservers.values { observer.yield(event) }
+      }
     }
     return true
   }
@@ -442,8 +481,14 @@ public actor RACPConnection {
       let current = observers
       observers.removeAll()
       for observer in current.values { observer.finish() }
+      let subscriptions = subscriptionObservers
+      subscriptionObservers.removeAll()
+      for observer in subscriptions.values { observer.finish() }
     }
   }
 
   private func removeObserver(_ id: UUID) { observers.removeValue(forKey: id) }
+  private func removeSubscriptionObserver(_ id: UUID) {
+    subscriptionObservers.removeValue(forKey: id)
+  }
 }

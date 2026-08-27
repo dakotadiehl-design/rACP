@@ -57,6 +57,18 @@ requests are bounded and fail on timeout, cancellation, or disconnect. Hosts can
 `RACPNetworkServer`'s `connectionHandler` to retain ready-capable connections for
 authoritative state publication.
 
+Hosts that must await an authoritative executor (for example, `@MainActor`) can
+construct `RACPSession` with `asyncCommandHandler:`. ACK or ERR is not emitted until
+that handler returns a `RACPCommandDisposition`; thrown errors become
+`application_error`. Commands remain ordered per connection, while separate
+connections can execute concurrently.
+
+`connection.subscriptionUpdates()` reports every accepted SUB and UNSUB for that
+connection. A host can capture its authoritative value on a subscribed event and call
+`connection.publish(_:)`. Publication returns `.notSubscribed` as a normal no-op
+when appropriate; subscribed output retains bounded-queue and monotonic-revision
+validation.
+
 Ordinary `send()` rejects CMD, SUB, and UNSUB messages with manual request IDs; use
 the correlated high-level APIs instead. A request timeout or Swift task cancellation
 only means the local caller stopped waiting. If TCP bytes were already sent, the peer

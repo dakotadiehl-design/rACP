@@ -117,3 +117,78 @@ private func established(
   time = 25
   #expect(throws: RACPSessionError.self) { try session.heartbeat(nonce: 9) }
 }
+
+private actor AsyncCommandRecorder {
+  private var commands: [Command] = []
+  func append(_ command: Command) { commands.append(command) }
+  func snapshot() -> [Command] { commands }
+}
+
+private func asyncEstablished(
+  handler: @escaping RACPSession.AsyncCommandHandler
+) throws -> RACPSession {
+  let session = RACPSession(
+    local: try RACPHello(
+      peerType: "device", peerID: "async-host", capabilities: ["cue.go"]),
+    asyncCommandHandler: handler)
+  for line in ["RACP/1 HELLO", "PEER remote desk", "CAP cue.go", "END"] {
+    _ = try session.receive(line: line)
+  }
+  return session
+}
+
+@Test func asyncCommandCompletionSuccessErrorAndSuspension() async throws {
+  let recorder = AsyncCommandRecorder()
+  let session = try asyncEstablished { command in
+    try await Task.sleep(for: .milliseconds(10))
+    await recorder.append(command)
+    return command.hasValue ? .error("command_rejected") : .success
+  }
+  let success = Command(requestID: 1, name: "cue.go")
+  let failure = Command(requestID: 2, name: "cue.go", value: .bool(false), hasValue: true)
+  #expect(try await session.receiveAsync(message: .command(success)) == [.ack(1)])
+  #expect(
+    try await session.receiveAsync(message: .command(failure)) == [
+      .error(2, "command_rejected")
+    ])
+  #expect(await recorder.snapshot() == [success, failure])
+}
+
+@Test func asyncCommandReplayConflictAndApplicationFailure() async throws {
+  struct Failure: Error {}
+  let recorder = AsyncCommandRecorder()
+  let session = try asyncEstablished { command in
+    await recorder.append(command)
+    if command.requestID == 2 { throw Failure() }
+    return .success
+  }
+  let original = Command(requestID: 1, name: "cue.go")
+  #expect(try await session.receiveAsync(message: .command(original)) == [.ack(1)])
+  #expect(try await session.receiveAsync(message: .command(original)) == [.ack(1)])
+  #expect(
+    try await session.receiveAsync(
+      message: .command(Command(requestID: 1, name: "cue.go", value: .null, hasValue: true)))
+      == [.error(1, "request_id_conflict")])
+  #expect(
+    try await session.receiveAsync(
+      message: .command(Command(requestID: 2, name: "cue.go")))
+      == [.error(2, "application_error")])
+  #expect((await recorder.snapshot()).map(\.requestID) == [1, 2])
+}
+
+@Test func asyncCommandsPreserveWireOrder() async throws {
+  let recorder = AsyncCommandRecorder()
+  let session = try asyncEstablished { command in
+    if command.requestID == 1 { try await Task.sleep(for: .milliseconds(10)) }
+    await recorder.append(command)
+    return .success
+  }
+  for id in 1...3 {
+    #expect(
+      try await session.receiveAsync(
+        message: .command(Command(requestID: UInt64(id), name: "cue.go"))) == [
+          .ack(UInt64(id))
+        ])
+  }
+  #expect((await recorder.snapshot()).map(\.requestID) == [1, 2, 3])
+}

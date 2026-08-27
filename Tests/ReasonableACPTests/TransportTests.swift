@@ -60,6 +60,27 @@ private actor MemoryByteStream: RACPByteStream {
   #expect(await stream.isClosed)
 }
 
+@Test func statePublicationUsesBoundedOutputQueue() async throws {
+  let stream = MemoryByteStream(reads: [])
+  let session = RACPSession(
+    local: try RACPHello(
+      peerType: "device", peerID: "publisher",
+      capabilities: ["cue.current", "state.subscribe"]))
+  for line in ["RACP/1 HELLO", "PEER remote desk", "END"] {
+    _ = try session.receive(line: line)
+  }
+  #expect(try session.receive(message: .subscribe(1, "cue.current")) == [.ack(1)])
+  let connection = RACPConnection(stream: stream, session: session, outputMessages: 1)
+  #expect(
+    try await connection.publish(
+      StateMessage(name: "cue.current", revision: 1, value: .integer(1))) == .published)
+  await #expect(throws: RACPConnectionError.outputQueueFull) {
+    try await connection.publish(
+      StateMessage(name: "cue.current", revision: 2, value: .integer(2)))
+  }
+  #expect(await stream.isClosed)
+}
+
 @Test func publicSendRejectsManualRequestIDs() async throws {
   let stream = MemoryByteStream(reads: [])
   let session = RACPSession(local: try RACPHello(peerType: "device", peerID: "x"))
