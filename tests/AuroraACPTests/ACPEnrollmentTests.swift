@@ -121,6 +121,18 @@ final class ACPEnrollmentTests: XCTestCase {
         do { _ = try await duplicate.processPeerShare(duplicateID, operation: &operation, encodedShare: Data("share".utf8), now: 3); XCTFail("duplicate share accepted") }
         catch { XCTAssertEqual(error as? ACPSecurityErrorCode, .authenticationFailed) }
     }
+
+    func testProviderCannotReleaseKeyBeforeShareOrAfterTerminalResult() throws {
+        let operation = FixtureSPAKE2Plus()
+        XCTAssertThrowsError(try operation.verifyAndConsumeKey(confirmation: Data("valid".utf8)))
+        XCTAssertThrowsError(try operation.receive(peerShare: Data("share".utf8)))
+
+        let successful = FixtureSPAKE2Plus()
+        _ = try successful.receive(peerShare: Data("share".utf8))
+        _ = try successful.verifyAndConsumeKey(confirmation: Data("valid".utf8))
+        XCTAssertThrowsError(try successful.verifyAndConsumeKey(confirmation: Data("valid".utf8)))
+        XCTAssertThrowsError(try successful.receive(peerShare: Data("share".utf8)))
+    }
 }
 
 private extension Data {

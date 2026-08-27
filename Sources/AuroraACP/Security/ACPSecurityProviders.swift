@@ -9,9 +9,27 @@ public protocol ACPCryptoProvider: Sendable {
     func sha256(_ value: Data) -> Data
     func hmacSHA256(key: ACPSecretBytes, value: Data) throws -> Data
 }
+
+/// Opaque proof that a SPAKE2+ provider completed peer confirmation before
+/// releasing key material. Product code can carry this value but cannot
+/// construct it or extract its secret.
+public final class ACPConfirmedSPAKE2PlusKey: @unchecked Sendable {
+    private let secret: ACPSecretBytes
+
+    package init(secret: ACPSecretBytes) { self.secret = secret }
+
+    package func withUnsafeBytes<T>(
+        _ operation: (UnsafeRawBufferPointer) throws -> T
+    ) rethrows -> T {
+        try secret.withUnsafeBytes(operation)
+    }
+}
+
 public protocol ACPSPAKE2PlusOperation: Sendable {
     func receive(peerShare: Data) throws -> Data
-    func verify(confirmation: Data) throws -> Bool
+    /// Verifies the peer confirmation and atomically consumes the provider's
+    /// shared secret. Implementations must become terminal on every return.
+    func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey
 }
 public protocol ACPAEADProvider: Sendable {
     func seal(key: ACPSecretBytes, plaintext: ACPSecretBytes, nonce: Data, associatedData: Data) throws -> Data

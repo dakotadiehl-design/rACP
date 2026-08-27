@@ -44,8 +44,27 @@ struct FixtureAEAD: ACPAEADProvider {
     }
 }
 
-struct FixtureSPAKE2Plus: ACPSPAKE2PlusOperation {
+final class FixtureSPAKE2Plus: ACPSPAKE2PlusOperation, @unchecked Sendable {
     var valid = true
-    func receive(peerShare: Data) -> Data { peerShare }
-    func verify(confirmation: Data) -> Bool { valid && confirmation == Data("valid".utf8) }
+    private var received = false
+    private var terminal = false
+    func receive(peerShare: Data) throws -> Data {
+        guard !received, !terminal, !peerShare.isEmpty else {
+            terminal = true
+            throw ACPSecurityErrorCode.authenticationFailed
+        }
+        received = true
+        return peerShare
+    }
+    func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey {
+        guard received, !terminal else {
+            terminal = true
+            throw ACPSecurityErrorCode.authenticationFailed
+        }
+        terminal = true
+        guard valid, confirmation == Data("valid".utf8) else {
+            throw ACPSecurityErrorCode.authenticationFailed
+        }
+        return ACPConfirmedSPAKE2PlusKey(secret: ACPSecretBytes(Data(repeating: 0xA5, count: 32))!)
+    }
 }

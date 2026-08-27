@@ -1,9 +1,18 @@
 import AuroraACP
 import Foundation
 
-struct FixtureConfirmation: ACPSPAKE2PlusOperation {
+final class FixtureConfirmation: ACPSPAKE2PlusOperation, @unchecked Sendable {
+    private var terminal = false
     func receive(peerShare: Data) -> Data { peerShare }
-    func verify(confirmation: Data) -> Bool { confirmation == Data("valid".utf8) }
+    func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey {
+        guard !terminal else { throw ACPSecurityErrorCode.authenticationFailed }
+        terminal = true
+        guard confirmation == Data("valid".utf8),
+              let secret = ACPSecretBytes(Data(repeating: 0xA5, count: 32)) else {
+            throw ACPSecurityErrorCode.authenticationFailed
+        }
+        return ACPConfirmedSPAKE2PlusKey(secret: secret)
+    }
 }
 
 @main struct EnrollmentFixture {

@@ -37,6 +37,7 @@ private struct ACPCandidateAttempt: Sendable {
     var state: ACPCandidateEnrollmentState = .negotiating
     let deadline: UInt64
     var peerShareProcessed = false
+    var confirmedKey: ACPConfirmedSPAKE2PlusKey?
     var durableInstallVerified = false
 }
 
@@ -84,13 +85,13 @@ public actor ACPCandidateEnrollment {
         guard current.peerShareProcessed else {
             cryptographicFailure(id); throw ACPSecurityErrorCode.authenticationFailed
         }
-        let verified: Bool
-        do { verified = try operation.verify(confirmation: confirmation) }
+        let confirmedKey: ACPConfirmedSPAKE2PlusKey
+        do { confirmedKey = try operation.verifyAndConsumeKey(confirmation: confirmation) }
         catch {
             cryptographicFailure(id); throw ACPSecurityErrorCode.authenticationFailed
         }
-        guard verified else { cryptographicFailure(id); throw ACPSecurityErrorCode.authenticationFailed }
         var attempt = try active(id, expected: .negotiating, now: now)
+        attempt.confirmedKey = confirmedKey
         attempt.state = .keyConfirmed; attempts[id] = attempt
         record("security.enrollment.key_confirmed", id)
     }
