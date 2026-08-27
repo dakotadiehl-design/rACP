@@ -99,24 +99,33 @@ package final class ACPIssuanceAuthorization: @unchecked Sendable {
 package enum ACPIssuanceAuthorizationGate {
     package static func authorize(
         facts: ACPIssuanceCeremonyFacts,
-        cryptographyConfirmed: Bool,
-        candidateIdentityBound: Bool,
+        confirmedKey: ACPConfirmedSPAKE2PlusKey,
         approvalMatchesCeremony: Bool,
-        approvalUnexpired: Bool,
         approvalSingleUse: Bool,
         cancelled: Bool,
         replayed: Bool,
-        publicKeyValid: Bool,
-        trustDomainValid: Bool,
         stillValid: @escaping @Sendable () -> Bool
-    ) throws -> ACPIssuanceAuthorization {
-        guard cryptographyConfirmed, candidateIdentityBound, approvalMatchesCeremony,
-              approvalUnexpired, approvalSingleUse, !cancelled, !replayed,
-              publicKeyValid, trustDomainValid,
+    ) throws -> ACPIssuanceCeremonyCapabilities {
+        guard confirmedKey.transcriptHash == facts.transcriptHash,
+              approvalMatchesCeremony, approvalSingleUse, !cancelled, !replayed,
+              (try? P256.Signing.PublicKey(
+                derRepresentation: facts.candidatePublicKeySPKI)) != nil,
               ACPCredentialIdentifiers.identityKeyID(for: facts.candidatePublicKeySPKI) == facts.identityKeyID
         else { throw ACPSecurityErrorCode.authenticationFailed }
-        return ACPIssuanceAuthorization(validated: facts, stillValid: stillValid)
+        let installVerifier = try confirmedKey.claimInstallVerifier(
+            transcriptHash: facts.transcriptHash)
+        return .init(
+            authorization: ACPIssuanceAuthorization(validated: facts, stillValid: stillValid),
+            installVerifier: installVerifier)
     }
+}
+
+/// Paired, non-serializable capabilities sealed to one confirmed enrollment
+/// ceremony. Issuance and installation confirmation cannot be assembled from
+/// unrelated SPAKE2+ exchanges.
+package struct ACPIssuanceCeremonyCapabilities: Sendable {
+    package let authorization: ACPIssuanceAuthorization
+    package let installVerifier: ACPEnrollmentInstallVerifier
 }
 
 /// One-shot, non-serializable evidence that an exact installation result was
@@ -266,7 +275,9 @@ package actor ACPIssuanceJournal {
         var entries: [Entry] = []
     }
     private struct Entry: Codable {
-        enum State: String, Codable { case reserved, signed, delivered, installedReceiptVerified, closed, revoked }
+        enum State: String, Codable {
+            case reserved, signed, delivered, installedReceiptVerified, trusted, closed, revoked
+        }
         let authorizationID: UUID
         let authorityKeyID: String
         let serial: Data
@@ -290,7 +301,8 @@ package actor ACPIssuanceJournal {
         guard (1...1_000_000).contains(maximumEntries) else { throw ACPSecurityErrorCode.resourceLimit }
         self.backend = backend; self.maximumEntries = maximumEntries
         if let bytes = try backend.load() {
-            guard let decoded = try? JSONDecoder().decode(Snapshot.self, from: bytes), decoded.version == 1,
+            guard bytes.count <= 64 * 1_048_576,
+                  let decoded = try? JSONDecoder().decode(Snapshot.self, from: bytes), decoded.version == 1,
                   decoded.entries.count <= maximumEntries,
                   Set(decoded.entries.map(\.authorizationID)).count == decoded.entries.count,
                   Set(decoded.entries.map { $0.authorityKeyID + ":" + $0.serial.hex }).count == decoded.entries.count,
@@ -380,15 +392,30 @@ package actor ACPIssuanceJournal {
     package func markInstallReceiptVerified(_ authorizationID: UUID) throws {
         try transition(authorizationID, to: .installedReceiptVerified)
     }
+    package func markTrusted(_ authorizationID: UUID) throws {
+        try transition(authorizationID, to: .trusted)
+    }
     package func markRevoked(_ authorizationID: UUID) throws { try transition(authorizationID, to: .revoked) }
+
+    package func trustRecoveryPackages() throws -> [(package: ACPIssuedCredentialPackage, committed: Bool)] {
+        try snapshot.entries.compactMap { entry in
+            guard entry.state == .installedReceiptVerified || entry.state == .trusted,
+                  let stored = entry.package else { return nil }
+            return (try restore(stored), entry.state == .trusted)
+        }
+    }
 
     private func transition(_ id: UUID, to state: Entry.State) throws {
         guard let index = snapshot.entries.firstIndex(where: { $0.authorizationID == id }),
               snapshot.entries[index].package != nil else { throw ACPSecurityErrorCode.storageFailed }
         let current = snapshot.entries[index].state
-        if current == state || (current == .installedReceiptVerified && state == .delivered) { return }
+        if current == state
+            || (state == .delivered
+                && (current == .installedReceiptVerified || current == .trusted))
+            || (state == .installedReceiptVerified && current == .trusted) { return }
         let legal = (current == .signed && state == .delivered)
             || (current == .delivered && state == .installedReceiptVerified)
+            || (current == .installedReceiptVerified && state == .trusted)
             || (state == .revoked && current != .closed)
         guard legal else { throw ACPSecurityErrorCode.enrollmentReplayed }
         let old = snapshot; snapshot.entries[index].state = state

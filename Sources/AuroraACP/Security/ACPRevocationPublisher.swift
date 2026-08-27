@@ -15,6 +15,10 @@ package actor ACPRevocationPublisher {
         var epoch: UInt64 = 0
         var entries: [Entry] = []
         var previousSnapshotHash: String?
+        var latestBody: Data?
+        var latestSignature: Data?
+        var latestIssuedAt: String?
+        var latestNextUpdate: String?
     }
     private struct Entry: Codable, Equatable {
         let credentialID: String
@@ -36,7 +40,8 @@ package actor ACPRevocationPublisher {
         self.domain = domain; self.signer = signer; self.backend = backend
         self.maximumEntries = maximumEntries
         if let raw = try backend.load() {
-            guard let value = try? JSONDecoder().decode(Snapshot.self, from: raw), value.version == 1,
+            guard raw.count <= 8 * 1_048_576,
+                  let value = try? JSONDecoder().decode(Snapshot.self, from: raw), value.version == 1,
                   value.trustDomainID == domain.rawValue,
                   value.issuerKeyID == signer.keyID.rawValue,
                   value.entries.count <= maximumEntries,
@@ -45,7 +50,8 @@ package actor ACPRevocationPublisher {
                   value.entries.allSatisfy(Self.valid),
                   (value.previousSnapshotHash == nil
                     || ACPCredentialID(rawValue: value.previousSnapshotHash!) != nil),
-                  value.entries.isEmpty || value.epoch > 0
+                  value.entries.isEmpty || value.epoch > 0,
+                  Self.validPublicationFields(value)
             else { throw ACPSecurityErrorCode.storageFailed }
             snapshot = value
         } else {
@@ -85,6 +91,19 @@ package actor ACPRevocationPublisher {
         return try advanceAndPublish(issuedAt: issuedAt, nextUpdate: nextUpdate)
     }
 
+    package func latest(at now: Date, maximumSnapshotAge: TimeInterval) throws
+        -> ACPPublishedRevocationState {
+        guard (0...172_800).contains(maximumSnapshotAge),
+              let body = snapshot.latestBody, let signature = snapshot.latestSignature,
+              let issuedRaw = snapshot.latestIssuedAt, let nextRaw = snapshot.latestNextUpdate,
+              let issued = ISO8601DateFormatter().date(from: issuedRaw),
+              let next = ISO8601DateFormatter().date(from: nextRaw),
+              now >= issued.addingTimeInterval(-120),
+              now <= min(next, issued.addingTimeInterval(maximumSnapshotAge))
+        else { throw ACPSecurityErrorCode.authenticationFailed }
+        return .init(body: body, signature: signature, epoch: snapshot.epoch)
+    }
+
     private func advanceAndPublish(
         issuedAt: Date, nextUpdate: Date
     ) throws -> ACPPublishedRevocationState {
@@ -97,6 +116,10 @@ package actor ACPRevocationPublisher {
             let published = try publish(issuedAt: issuedAt, nextUpdate: nextUpdate)
             snapshot.previousSnapshotHash = ACPCredentialIdentifiers
                 .credentialID(for: published.body).rawValue
+            snapshot.latestBody = published.body
+            snapshot.latestSignature = published.signature
+            snapshot.latestIssuedAt = Self.timestamp(issuedAt)
+            snapshot.latestNextUpdate = Self.timestamp(nextUpdate)
             try persist()
             return published
         } catch {
@@ -131,7 +154,11 @@ package actor ACPRevocationPublisher {
 
     private func persist() throws {
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
-        try backend.replace(with: encoder.encode(snapshot))
+        let encoded = try encoder.encode(snapshot)
+        guard encoded.count <= 8 * 1_048_576 else {
+            throw ACPSecurityErrorCode.resourceLimit
+        }
+        try backend.replace(with: encoded)
     }
     private static func timestamp(_ date: Date) -> String {
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime]
@@ -150,5 +177,54 @@ package actor ACPRevocationPublisher {
                 && replacement != entry.credentialID
         }
         return true
+    }
+
+    private static func validPublicationFields(_ value: Snapshot) -> Bool {
+        if value.epoch == 0 {
+            return value.latestBody == nil && value.latestSignature == nil
+                && value.latestIssuedAt == nil && value.latestNextUpdate == nil
+        }
+        guard let body = value.latestBody, !body.isEmpty,
+              let signature = value.latestSignature, !signature.isEmpty,
+              let issuedRaw = value.latestIssuedAt,
+              let nextRaw = value.latestNextUpdate,
+              let issued = ISO8601DateFormatter().date(from: issuedRaw),
+              let next = ISO8601DateFormatter().date(from: nextRaw),
+              timestamp(issued) == issuedRaw, timestamp(next) == nextRaw,
+              issued < next,
+              value.previousSnapshotHash
+                == ACPCredentialIdentifiers.credentialID(for: body).rawValue,
+              case .object(let fields) = try? ACPEncoding.decodeValue(body),
+              (try? ACPEncoding.encodeValue(.plain(.object(fields)))) == body,
+              fields["format"] == .string("acp-revocation-snapshot-v1"),
+              fields["trust_domain_id"] == .string(value.trustDomainID),
+              fields["issuer_key_id"] == .string(value.issuerKeyID),
+              unsigned(fields["epoch"]) == value.epoch,
+              fields["issued_at"] == .string(issuedRaw),
+              fields["next_update"] == .string(nextRaw),
+              case .array(let encodedEntries) = fields["entries"],
+              encodedEntries.count == value.entries.count
+        else { return false }
+        return zip(encodedEntries, value.entries).allSatisfy { encoded, entry in
+            guard case .object(let item) = encoded,
+                  item["credential_id"] == .string(entry.credentialID),
+                  item["node_id"] == .string(entry.nodeID),
+                  item["revoked_at"] == .string(entry.revokedAt),
+                  item["reason"] == .string(entry.reason)
+            else { return false }
+            if let replacement = entry.replacementCredentialID {
+                return item["replacement_credential_id"] == .string(replacement)
+                    && item.count == 5
+            }
+            return item["replacement_credential_id"] == nil && item.count == 4
+        }
+    }
+
+    private static func unsigned(_ value: AnySendable?) -> UInt64? {
+        switch value {
+        case .uint(let number): return number
+        case .int(let number) where number >= 0: return UInt64(number)
+        default: return nil
+        }
     }
 }

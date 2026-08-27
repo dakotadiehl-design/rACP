@@ -1,7 +1,7 @@
 import AuroraACP
 import Foundation
 
-public enum ACPApplePeerTrustState: String, Sendable, Codable { case trusted, revoked }
+public enum ACPApplePeerTrustState: String, Sendable, Codable { case pending, trusted, revoked }
 
 public struct ACPAppleTrustedPeer: Sendable, Equatable, Codable {
     public let nodeID: String
@@ -33,21 +33,26 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
     private let backend: ACPKeychainCredentialBackend
     private let account: String
     private let maximumPeers: Int
+    private let activeSessionRevocationPolicy: ACPActiveSessionRevocationPolicy
     private var snapshot: Snapshot
     private var revocationObservers: [String: [UUID: @Sendable () -> Void]] = [:]
     private var revocationObserverCount = 0
 
     public init(service: String = "com.aurora.acp.trust", account: String,
-                accessGroup: String? = nil, maximumPeers: Int = 1024) throws {
+                accessGroup: String? = nil, maximumPeers: Int = 1024,
+                activeSessionRevocationPolicy persistedPolicy: String? = nil) throws {
         guard (1...128).contains(account.utf8.count), (1...4096).contains(maximumPeers) else {
             throw ACPAppleSecurityError.trustStoreFailure
         }
         self.backend = ACPKeychainCredentialBackend(service: service, accessGroup: accessGroup)
         self.account = account; self.maximumPeers = maximumPeers
+        activeSessionRevocationPolicy = .resolve(persistedValue: persistedPolicy)
         if let data = try backend.read(name: account) {
-            guard let decoded = try? JSONDecoder().decode(Snapshot.self, from: data),
+            guard data.count <= 1_048_576,
+                  let decoded = try? JSONDecoder().decode(Snapshot.self, from: data),
                   decoded.version == 1, decoded.peers.count <= maximumPeers,
-                  Set(decoded.peers.map(\.credentialID)).count == decoded.peers.count
+                  Set(decoded.peers.map(\.credentialID)).count == decoded.peers.count,
+                  decoded.peers.allSatisfy(Self.validPersistedPeer)
             else { throw ACPAppleSecurityError.trustStoreFailure }
             snapshot = decoded
         } else { snapshot = Snapshot() }
@@ -76,9 +81,10 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
                 identityKeyID: peer.identityKeyID, displayName: peer.displayName,
                 state: .revoked, lastSeen: peer.lastSeen, revokedAt: date)
             do { try persist() } catch { snapshot = old; throw error }
-            let callbacks = Array(revocationObservers.removeValue(
+            let removed = Array(revocationObservers.removeValue(
                 forKey: credentialID.rawValue)?.values ?? [:].values)
-            revocationObserverCount -= callbacks.count
+            revocationObserverCount -= removed.count
+            let callbacks = activeSessionRevocationPolicy == .hardenedTerminate ? removed : []
             return (.revoked, callbacks)
         }
         callbacks.forEach { $0() }
@@ -102,35 +108,102 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
 
     package func recordAuthenticated(_ certificate: ACPAppleVerifiedCertificate,
                                      displayName: String?, at date: Date = Date()) throws {
+        guard Self.validDisplayName(displayName) else {
+            throw ACPAppleSecurityError.resourceLimit
+        }
+        try lock.withLock {
+            let old = snapshot
+            guard let index = snapshot.peers.firstIndex(where: {
+                $0.credentialID == certificate.credentialID.rawValue
+            }) else { throw ACPAppleSecurityError.trustFailure }
+            let peer = snapshot.peers[index]
+            guard peer.state == .trusted,
+                  peer.nodeID == certificate.nodeID.rawValue,
+                  peer.identityKeyID == certificate.identityKeyID.rawValue
+            else {
+                throw peer.state == .revoked ? ACPAppleSecurityError.revoked
+                    : ACPAppleSecurityError.trustFailure
+            }
+            snapshot.peers[index] = .init(
+                nodeID: peer.nodeID, credentialID: peer.credentialID,
+                identityKeyID: peer.identityKeyID,
+                displayName: displayName ?? peer.displayName, state: .trusted,
+                lastSeen: date, revokedAt: nil)
+            do { try persist() } catch { snapshot = old; throw error }
+        }
+    }
+
+    package func recordPending(_ certificate: ACPAppleVerifiedCertificate,
+                               displayName: String?) throws {
+        guard Self.validDisplayName(displayName) else {
+            throw ACPAppleSecurityError.resourceLimit
+        }
         try lock.withLock {
             let old = snapshot
             if let index = snapshot.peers.firstIndex(where: {
                 $0.credentialID == certificate.credentialID.rawValue
             }) {
-                guard snapshot.peers[index].state != .revoked else { throw ACPAppleSecurityError.revoked }
                 let peer = snapshot.peers[index]
+                guard peer.state != .revoked,
+                      peer.nodeID == certificate.nodeID.rawValue,
+                      peer.identityKeyID == certificate.identityKeyID.rawValue
+                else { throw ACPAppleSecurityError.trustStoreFailure }
+                if peer.state == .trusted { return }
                 snapshot.peers[index] = .init(
-                    nodeID: certificate.nodeID.rawValue, credentialID: peer.credentialID,
-                    identityKeyID: certificate.identityKeyID.rawValue,
-                    displayName: displayName ?? peer.displayName, state: .trusted,
-                    lastSeen: date, revokedAt: nil)
+                    nodeID: peer.nodeID, credentialID: peer.credentialID,
+                    identityKeyID: peer.identityKeyID,
+                    displayName: displayName ?? peer.displayName, state: .pending,
+                    lastSeen: nil, revokedAt: nil)
             } else {
-                guard snapshot.peers.count < maximumPeers else { throw ACPAppleSecurityError.resourceLimit }
+                guard snapshot.peers.count < maximumPeers else {
+                    throw ACPAppleSecurityError.resourceLimit
+                }
                 snapshot.peers.append(.init(
                     nodeID: certificate.nodeID.rawValue,
                     credentialID: certificate.credentialID.rawValue,
                     identityKeyID: certificate.identityKeyID.rawValue,
-                    displayName: displayName, state: .trusted, lastSeen: date, revokedAt: nil))
+                    displayName: displayName, state: .pending,
+                    lastSeen: nil, revokedAt: nil))
             }
             do { try persist() } catch { snapshot = old; throw error }
+        }
+    }
+
+    package func activatePending(_ credentialID: ACPCredentialID, at date: Date = Date()) throws {
+        try lock.withLock {
+            guard let index = snapshot.peers.firstIndex(where: {
+                $0.credentialID == credentialID.rawValue
+            }) else { throw ACPAppleSecurityError.trustStoreFailure }
+            let peer = snapshot.peers[index]
+            guard peer.state != .revoked else { throw ACPAppleSecurityError.revoked }
+            if peer.state == .trusted { return }
+            let old = snapshot
+            snapshot.peers[index] = .init(
+                nodeID: peer.nodeID, credentialID: peer.credentialID,
+                identityKeyID: peer.identityKeyID, displayName: peer.displayName,
+                state: .trusted, lastSeen: date, revokedAt: nil)
+            do { try persist() } catch { snapshot = old; throw error }
+        }
+    }
+
+    package func isPending(_ credentialID: ACPCredentialID) -> Bool {
+        lock.withLock {
+            snapshot.peers.first(where: {
+                $0.credentialID == credentialID.rawValue
+            })?.state == .pending
         }
     }
 
     package func observeRevocation(_ credentialID: ACPCredentialID,
                                    callback: @escaping @Sendable () -> Void) throws -> UUID {
         try lock.withLock {
-            guard snapshot.peers.first(where: { $0.credentialID == credentialID.rawValue })?.state != .revoked
-            else { throw ACPAppleSecurityError.revoked }
+            guard let peer = snapshot.peers.first(where: {
+                $0.credentialID == credentialID.rawValue
+            }) else { throw ACPAppleSecurityError.trustFailure }
+            guard peer.state == .trusted else {
+                throw peer.state == .revoked ? ACPAppleSecurityError.revoked
+                    : ACPAppleSecurityError.trustFailure
+            }
             guard revocationObserverCount < maximumPeers * 4 else {
                 throw ACPAppleSecurityError.resourceLimit
             }
@@ -157,6 +230,26 @@ public final class ACPAppleTrustedPeerStore: ACPAppleRevocationChecking, @unchec
         }
         do { try backend.write(name: account, data: data) }
         catch { throw ACPAppleSecurityError.trustStoreFailure }
+    }
+
+    private static func validPersistedPeer(_ peer: ACPAppleTrustedPeer) -> Bool {
+        guard ACPSecurityNodeID(rawValue: peer.nodeID) != nil,
+              ACPCredentialID(rawValue: peer.credentialID) != nil,
+              ACPIdentityKeyID(rawValue: peer.identityKeyID) != nil,
+              peer.displayName.map({ !$0.isEmpty && $0.utf8.count <= 128 }) ?? true
+        else { return false }
+        switch peer.state {
+        case .pending:
+            return peer.lastSeen == nil && peer.revokedAt == nil
+        case .trusted:
+            return peer.lastSeen != nil && peer.revokedAt == nil
+        case .revoked:
+            return peer.revokedAt != nil
+        }
+    }
+
+    private static func validDisplayName(_ value: String?) -> Bool {
+        value.map { (1...128).contains($0.utf8.count) } ?? true
     }
 }
 

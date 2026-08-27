@@ -9,6 +9,14 @@ public struct ACPAppleVerifiedCertificate: Sendable, Equatable {
     public let credentialID: ACPCredentialID
     public let identityKeyID: ACPIdentityKeyID
     public let leafDER: Data
+
+    package init(trustDomainID: ACPTrustDomainID, nodeID: ACPSecurityNodeID,
+                 credentialID: ACPCredentialID, identityKeyID: ACPIdentityKeyID,
+                 leafDER: Data) {
+        self.trustDomainID = trustDomainID; self.nodeID = nodeID
+        self.credentialID = credentialID; self.identityKeyID = identityKeyID
+        self.leafDER = leafDER
+    }
 }
 
 public enum ACPAppleSecurityError: String, Error, Sendable {
@@ -47,11 +55,22 @@ public enum ACPAppleCertificatePolicy {
         revocation: (any ACPAppleRevocationChecking)? = nil
     ) throws -> ACPAppleVerifiedCertificate {
 #if os(macOS)
-        guard chain.count >= 2, !anchors.isEmpty,
+        // TLS peers commonly omit the self-signed root, while Network.framework
+        // may report the leaf or root more than once. Accept only copies of the
+        // peer leaf and configured root; never accept an intermediate/other root.
+        let leafDER = chain.first.map { SecCertificateCopyData($0) as Data }
+        let anchorDER = anchors.first.map { SecCertificateCopyData($0) as Data }
+        guard (1 ... 3).contains(chain.count), anchors.count == 1,
+              leafDER != anchorDER,
+              chain.dropFirst().allSatisfy({
+                  let der = SecCertificateCopyData($0) as Data
+                  return der == leafDER || der == anchorDER
+              }),
               !anchors.contains(where: { SecCertificateCopyData($0) as Data == SecCertificateCopyData(chain[0]) as Data })
         else { throw ACPAppleSecurityError.invalidCertificate }
-        try evaluate(chain: chain, anchors: anchors, date: evaluationDate, server: true)
-        try evaluate(chain: chain, anchors: anchors, date: evaluationDate, server: false)
+        let canonicalChain = [chain[0], anchors[0]]
+        try evaluate(chain: canonicalChain, anchors: anchors, date: evaluationDate, server: true)
+        try evaluate(chain: canonicalChain, anchors: anchors, date: evaluationDate, server: false)
 
         let leaf = chain[0]
         let der = SecCertificateCopyData(leaf) as Data
@@ -94,6 +113,7 @@ public enum ACPAppleCertificatePolicy {
               let trust,
               SecTrustSetAnchorCertificates(trust, anchors as CFArray) == errSecSuccess,
               SecTrustSetAnchorCertificatesOnly(trust, true) == errSecSuccess,
+              SecTrustSetNetworkFetchAllowed(trust, false) == errSecSuccess,
               SecTrustSetVerifyDate(trust, date as CFDate) == errSecSuccess,
               SecTrustEvaluateWithError(trust, nil)
         else { throw ACPAppleSecurityError.trustFailure }

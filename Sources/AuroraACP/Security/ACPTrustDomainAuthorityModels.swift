@@ -17,6 +17,7 @@ public struct ACPTrustDomainAuthorityIdentity: Codable, Sendable, Equatable {
         case authorityKeyID = "authority_key_id"
         case trustAnchorCredentialID = "trust_anchor_credential_id"
     }
+
 }
 
 /// Portable commissioner identity metadata. Authentication does not itself
@@ -36,6 +37,7 @@ public struct ACPCommissionerIdentity: Codable, Sendable, Equatable {
         case nodeID = "node_id"; case instanceID = "instance_id"
         case credentialID = "credential_id"; case identityKeyID = "identity_key_id"
     }
+
 }
 
 public enum ACPPortableIssuancePurpose: String, Codable, Sendable {
@@ -83,6 +85,23 @@ public struct ACPPortableIssuanceMetadata: Codable, Sendable, Equatable {
         case credentialID = "credential_id"; case purpose
         case replacesCredentialID = "replaces_credential_id"
     }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            authorizationID: values.decode(UUID.self, forKey: .authorizationID),
+            enrollmentID: values.decode(ACPEnrollmentID.self, forKey: .enrollmentID),
+            attemptID: values.decode(ACPEnrollmentAttemptID.self, forKey: .attemptID),
+            trustDomainID: values.decode(ACPTrustDomainID.self, forKey: .trustDomainID),
+            authorityKeyID: values.decode(ACPIdentityKeyID.self, forKey: .authorityKeyID),
+            commissionerNodeID: values.decode(ACPSecurityNodeID.self, forKey: .commissionerNodeID),
+            candidateNodeID: values.decode(ACPSecurityNodeID.self, forKey: .candidateNodeID),
+            identityKeyID: values.decode(ACPIdentityKeyID.self, forKey: .identityKeyID),
+            credentialID: values.decode(ACPCredentialID.self, forKey: .credentialID),
+            purpose: values.decode(ACPPortableIssuancePurpose.self, forKey: .purpose),
+            replacesCredentialID: values.decodeIfPresent(
+                ACPCredentialID.self, forKey: .replacesCredentialID))
+    }
 }
 
 /// Portable revocation publication metadata, separate from the host's journal
@@ -106,5 +125,16 @@ public struct ACPPortableRevocationMetadata: Codable, Sendable, Equatable {
         case trustDomainID = "trust_domain_id"; case authorityKeyID = "authority_key_id"
         case epoch; case snapshotID = "snapshot_id"
         case previousSnapshotID = "previous_snapshot_id"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            trustDomainID: values.decode(ACPTrustDomainID.self, forKey: .trustDomainID),
+            authorityKeyID: values.decode(ACPIdentityKeyID.self, forKey: .authorityKeyID),
+            epoch: values.decode(UInt64.self, forKey: .epoch),
+            snapshotID: values.decode(ACPCredentialID.self, forKey: .snapshotID),
+            previousSnapshotID: values.decodeIfPresent(
+                ACPCredentialID.self, forKey: .previousSnapshotID))
     }
 }

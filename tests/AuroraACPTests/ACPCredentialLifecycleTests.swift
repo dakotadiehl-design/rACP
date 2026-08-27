@@ -31,6 +31,9 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         var state = ACPRevocationState(trustDomainID: domain, maximumEntries: 128)
         try state.ingest(bodyRaw: body, signature: signature, verifier: revocationVerifier)
         try state.requireFresh(at: ISO8601DateFormatter().date(from: "2026-08-22T12:00:00Z")!, maximumSnapshotAge: 172_800)
+        XCTAssertThrowsError(try state.requireFresh(
+            at: ISO8601DateFormatter().date(from: "2026-08-21T11:57:59Z")!,
+            maximumSnapshotAge: 172_800))
         XCTAssertThrowsError(try state.requireFresh(at: ISO8601DateFormatter().date(from: "2026-08-23T12:00:00Z")!, maximumSnapshotAge: 172_800))
         XCTAssertEqual(ACPRevocationAction(revoked: true), .terminate)
         XCTAssertEqual(ACPRevocationAction(revoked: true, policy: .explicitAuditedGrace), .auditedGrace)
@@ -81,6 +84,43 @@ final class ACPCredentialLifecycleTests: XCTestCase {
         try await store.commit(generation: 4)
         let committed = try await store.recover()
         XCTAssertEqual(committed, next)
+    }
+
+    func testActiveSelectorIsAuthoritativeAndCommitRetryRecoversInterruptedPromotion() async throws {
+        let backend = MemoryCredentialBackend()
+        let store = ACPTwoSlotIdentityStore(backend: backend)
+        let first = generation(1), second = generation(2)
+        try await store.stage(first)
+        try await store.validateStaged(generation: 1, valid: true)
+        try await store.commit(generation: 1)
+        try await store.stage(second)
+        try await store.validateStaged(generation: 2, valid: true)
+
+        backend.failNextWriteName = "active"
+        await XCTAssertThrowsLifecycleErrorAsync { try await store.commit(generation: 2) }
+        let beforeRetry = try await store.recover()
+        XCTAssertEqual(beforeRetry, first)
+
+        try await store.commit(generation: 2)
+        let afterRetry = try await store.recover()
+        XCTAssertEqual(afterRetry, second)
+
+        backend.corrupt(name: "active")
+        await XCTAssertThrowsLifecycleErrorAsync { _ = try await store.recover() }
+    }
+
+    func testMalformedOrUnreadableSlotNeverBecomesAbsentState() async throws {
+        let corruptBackend = MemoryCredentialBackend()
+        corruptBackend.corrupt(name: "slot-0")
+        let corruptStore = ACPTwoSlotIdentityStore(backend: corruptBackend)
+        await XCTAssertThrowsLifecycleErrorAsync { try await corruptStore.stage(self.generation(1)) }
+        XCTAssertEqual(corruptBackend.writeCount, 0)
+
+        let unavailableBackend = MemoryCredentialBackend()
+        unavailableBackend.failNextReadName = "slot-0"
+        let unavailableStore = ACPTwoSlotIdentityStore(backend: unavailableBackend)
+        await XCTAssertThrowsLifecycleErrorAsync { try await unavailableStore.stage(self.generation(1)) }
+        XCTAssertEqual(unavailableBackend.writeCount, 0)
     }
 
     func testClockPolicyRejectsUntrustedAndRollback() throws {
@@ -164,9 +204,11 @@ final class ACPCredentialLifecycleTests: XCTestCase {
     }
 
     private func generation(_ value: UInt64) -> ACPCredentialGeneration {
-        let text = "sha256:" + String(format: "%064llx", value)
-        return .init(generation: value, credentialID: ACPCredentialID(rawValue: text)!,
-                     identityKeyID: ACPIdentityKeyID(rawValue: text)!, credential: Data([UInt8(value)]))
+        let credential = Data([UInt8(value)])
+        let credentialID = ACPCredentialIdentifiers.credentialID(for: credential)
+        let keyText = "sha256:" + String(format: "%064llx", value)
+        return .init(generation: value, credentialID: credentialID,
+                     identityKeyID: ACPIdentityKeyID(rawValue: keyText)!, credential: credential)
     }
     private func evidence() -> ACPX509ValidationEvidence {
         .init(derParsed: true, isolatedChain: true, signatureValid: true, sanWellFormed: true,
@@ -221,9 +263,38 @@ private struct FixtureAuthorityKey: ACPSigningKeyHandle {
 private final class MemoryCredentialBackend: ACPCredentialSlotBackend, @unchecked Sendable {
     private var values: [String: Data] = [:]
     private let lock = NSLock()
-    func read(name: String) -> Data? { lock.withLock { values[name] } }
-    func write(name: String, data: Data) { lock.withLock { values[name] = data } }
+    var failNextWriteName: String?
+    var failNextReadName: String?
+    private(set) var writeCount = 0
+    func read(name: String) throws -> Data? {
+        try lock.withLock {
+            if failNextReadName == name {
+                failNextReadName = nil
+                throw ACPSecurityErrorCode.storageFailed
+            }
+            return values[name]
+        }
+    }
+    func write(name: String, data: Data) throws {
+        try lock.withLock {
+            if failNextWriteName == name {
+                failNextWriteName = nil
+                throw ACPSecurityErrorCode.storageFailed
+            }
+            values[name] = data
+            writeCount += 1
+        }
+    }
     func delete(name: String) { _ = lock.withLock { values.removeValue(forKey: name) } }
+    func corrupt(name: String) { lock.withLock { values[name] = Data("corrupt".utf8) } }
+}
+
+private func XCTAssertThrowsLifecycleErrorAsync(
+    _ operation: () async throws -> Void,
+    file: StaticString = #filePath, line: UInt = #line
+) async {
+    do { try await operation(); XCTFail("expected error", file: file, line: line) }
+    catch { }
 }
 
 private extension Data {

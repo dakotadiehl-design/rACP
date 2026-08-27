@@ -85,6 +85,8 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
     private var context: OpaquePointer?
     private var generated = false
     private var terminal = false
+    private let transcriptContext: Data
+    private var proverShare: Data?
 
     public init(
         proverSecret: ACPSecretBytes,
@@ -97,6 +99,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
               transcriptContext.count <= ACP_SPAKE2_MAX_CONTEXT_BYTES else {
             throw ACPSecurityErrorCode.authenticationFailed
         }
+        self.transcriptContext = transcriptContext
         var created: OpaquePointer?
         let status = proverSecret.withUnsafeBytes { secret in
             guard secret.count == ACP_SPAKE2_PROVER_SECRET_BYTES else {
@@ -139,6 +142,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
             failLocked(); throw ACPNormalizeSPAKE2Status(status)
         }
         generated = true
+        proverShare = share
         return share
     }
 
@@ -147,7 +151,7 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
     ) throws -> (confirmation: Data, key: ACPConfirmedSPAKE2PlusKey) {
         lock.lock(); defer { lock.unlock() }
         guard generated, !terminal, response.count == ACP_SPAKE2_VERIFIER_RESPONSE_BYTES,
-              let context else {
+              let context, let proverShare else {
             failLocked(); throw ACPSecurityErrorCode.authenticationFailed
         }
         var confirmation = Data(repeating: 0, count: ACP_SPAKE2_CONFIRMATION_BYTES)
@@ -173,8 +177,16 @@ public final class ACPAppleSPAKE2PlusProver: @unchecked Sendable {
             key.resetBytes(in: key.indices)
             throw ACPNormalizeSPAKE2Status(status)
         }
+        let verifierShare = Data(response.prefix(ACP_SPAKE2_SHARE_BYTES))
+        let verifierConfirmation = Data(response.dropFirst(ACP_SPAKE2_SHARE_BYTES))
+        let transcriptHash = try ACPSecurityContext.sha256(
+            ACPSecurityContext.canonicalTranscript([
+                transcriptContext, proverShare, verifierShare,
+                verifierConfirmation, confirmation,
+            ]))
         key.resetBytes(in: key.indices)
-        return (confirmation, ACPConfirmedSPAKE2PlusKey(secret: secret))
+        return (confirmation, ACPConfirmedSPAKE2PlusKey(
+            secret: secret, transcriptHash: transcriptHash))
     }
 
     private func destroy() { lock.lock(); defer { lock.unlock() }; failLocked() }
@@ -192,6 +204,9 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
     private var context: OpaquePointer?
     private var peerShareProcessed = false
     private var terminal = false
+    private let transcriptContext: Data
+    private var proverShare: Data?
+    private var verifierResponse: Data?
 
     public init(
         registrationRecord: Data,
@@ -205,6 +220,7 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
               transcriptContext.count <= ACP_SPAKE2_MAX_CONTEXT_BYTES else {
             throw ACPSecurityErrorCode.authenticationFailed
         }
+        self.transcriptContext = transcriptContext
         var created: OpaquePointer?
         let status = registrationRecord.withUnsafeBytes { record in
             proverIdentity.withUnsafeBytes { prover in
@@ -252,13 +268,16 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
             throw ACPNormalizeSPAKE2Status(status)
         }
         peerShareProcessed = true
+        proverShare = peerShare
+        verifierResponse = response
         return response
     }
 
     public func verifyAndConsumeKey(confirmation: Data) throws -> ACPConfirmedSPAKE2PlusKey {
         lock.lock(); defer { lock.unlock() }
         guard !terminal, peerShareProcessed,
-              confirmation.count == ACP_SPAKE2_CONFIRMATION_BYTES, let context else {
+              confirmation.count == ACP_SPAKE2_CONFIRMATION_BYTES, let context,
+              let proverShare, let verifierResponse else {
             failLocked()
             throw ACPSecurityErrorCode.authenticationFailed
         }
@@ -280,8 +299,17 @@ public final class ACPAppleSPAKE2PlusVerifier: ACPSPAKE2PlusOperation, @unchecke
             key.resetBytes(in: key.indices)
             throw ACPNormalizeSPAKE2Status(status)
         }
+        let verifierShare = Data(verifierResponse.prefix(ACP_SPAKE2_SHARE_BYTES))
+        let verifierConfirmation = Data(
+            verifierResponse.dropFirst(ACP_SPAKE2_SHARE_BYTES))
+        let transcriptHash = try ACPSecurityContext.sha256(
+            ACPSecurityContext.canonicalTranscript([
+                transcriptContext, proverShare, verifierShare,
+                verifierConfirmation, confirmation,
+            ]))
         key.resetBytes(in: key.indices)
-        return ACPConfirmedSPAKE2PlusKey(secret: secret)
+        return ACPConfirmedSPAKE2PlusKey(
+            secret: secret, transcriptHash: transcriptHash)
     }
 
     private func destroy() {

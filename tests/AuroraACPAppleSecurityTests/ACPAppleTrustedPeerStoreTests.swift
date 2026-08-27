@@ -9,6 +9,7 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
         let store = try ACPAppleTrustedPeerStore(service: service, account: account)
         defer { try? store.reset() }
         let certificate = verifiedCertificate()
+        try commit(certificate, in: store, displayName: "Qualification iPad")
         try store.recordAuthenticated(certificate, displayName: "Qualification iPad",
                                       at: Date(timeIntervalSince1970: 100))
         XCTAssertEqual(store.trustedPeers().first?.state, .trusted)
@@ -30,7 +31,7 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
         let service = "com.aurora.acp.tests.\(UUID().uuidString)"
         let account = UUID().uuidString
         let store = try ACPAppleTrustedPeerStore(service: service, account: account)
-        try store.recordAuthenticated(verifiedCertificate(), displayName: nil)
+        try commit(verifiedCertificate(), in: store)
         try store.reset()
         XCTAssertTrue(store.trustedPeers().isEmpty)
         XCTAssertTrue(try ACPAppleTrustedPeerStore(service: service, account: account).trustedPeers().isEmpty)
@@ -41,7 +42,7 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
         let store = try ACPAppleTrustedPeerStore(service: service, account: UUID().uuidString)
         defer { try? store.reset() }
         let certificate = verifiedCertificate()
-        try store.recordAuthenticated(certificate, displayName: nil)
+        try commit(certificate, in: store)
         let notifications = LockedCounter()
         _ = try store.observeRevocation(certificate.credentialID) {
             notifications.increment()
@@ -51,12 +52,42 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
         XCTAssertThrowsError(try store.observeRevocation(certificate.credentialID) {})
 
         try store.reset()
-        try store.recordAuthenticated(certificate, displayName: nil)
+        try commit(certificate, in: store)
         _ = try store.observeRevocation(certificate.credentialID) {
             notifications.increment()
         }
         try store.reset()
         XCTAssertEqual(notifications.value, 2)
+    }
+
+    func testExplicitAuditedGraceRetainsActiveObserverButRejectsFutureCredentialUse() throws {
+        let service = "com.aurora.acp.tests.\(UUID().uuidString)"
+        let store = try ACPAppleTrustedPeerStore(
+            service: service, account: UUID().uuidString,
+            activeSessionRevocationPolicy: "explicit_audited_grace")
+        defer { try? store.reset() }
+        let certificate = verifiedCertificate()
+        try commit(certificate, in: store)
+        let notifications = LockedCounter()
+        _ = try store.observeRevocation(certificate.credentialID) {
+            notifications.increment()
+        }
+        XCTAssertEqual(try store.revoke(certificate.credentialID), .revoked)
+        XCTAssertEqual(notifications.value, 0)
+        XCTAssertTrue(store.isRevoked(certificate.credentialID))
+        XCTAssertThrowsError(try store.observeRevocation(certificate.credentialID) {})
+    }
+
+    func testRevocationObserversRequireCommittedTrustedCredential() throws {
+        let service = "com.aurora.acp.tests.\(UUID().uuidString)"
+        let store = try ACPAppleTrustedPeerStore(service: service, account: UUID().uuidString)
+        defer { try? store.reset() }
+        let certificate = verifiedCertificate()
+        XCTAssertThrowsError(try store.observeRevocation(certificate.credentialID) {})
+        try store.recordPending(certificate, displayName: nil)
+        XCTAssertThrowsError(try store.observeRevocation(certificate.credentialID) {})
+        try store.activatePending(certificate.credentialID)
+        XCTAssertNoThrow(try store.observeRevocation(certificate.credentialID) {})
     }
 
     private func verifiedCertificate() -> ACPAppleVerifiedCertificate {
@@ -66,6 +97,13 @@ final class ACPAppleTrustedPeerStoreTests: XCTestCase {
             credentialID: ACPCredentialID(rawValue: "sha256:" + String(repeating: "1", count: 64))!,
             identityKeyID: ACPIdentityKeyID(rawValue: "sha256:" + String(repeating: "2", count: 64))!,
             leafDER: Data([1, 2, 3]))
+    }
+
+    private func commit(_ certificate: ACPAppleVerifiedCertificate,
+                        in store: ACPAppleTrustedPeerStore,
+                        displayName: String? = nil) throws {
+        try store.recordPending(certificate, displayName: displayName)
+        try store.activatePending(certificate.credentialID)
     }
 }
 

@@ -62,6 +62,12 @@ require("public init(" not in re.search(
 ).group(0), "issuance authorization gained a public initializer")
 require("package struct ACPIssuedCredentialPackage" in swift_issuance,
         "issued credential package is not package-sealed")
+require("cryptographyConfirmed: Bool" not in swift_issuance,
+        "issuance gate accepts caller-fabricated cryptography confirmation")
+require("confirmedKey.transcriptHash == facts.transcriptHash" in swift_issuance,
+        "issuance authorization is not bound to the confirmed PAKE transcript")
+require("claimInstallVerifier" in swift_issuance,
+        "confirmed PAKE capability is not consumed exactly once for installation")
 for type_name, source in (
     ("ACPVerifiedEnrollmentInstallResult", swift_issuance),
     ("ACPAppleVerifiedInstallReceipt", swift_apple_coordinator),

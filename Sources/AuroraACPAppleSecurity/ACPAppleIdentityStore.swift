@@ -120,20 +120,21 @@ public actor ACPAppleIdentityStore {
         if preferSecureEnclave { attributes[kSecAttrTokenID as String] = kSecAttrTokenIDSecureEnclave }
         var error: Unmanaged<CFError>?
         var key = SecKeyCreateRandomKey(attributes as CFDictionary, &error)
-        var hardwareBacked = preferSecureEnclave && key != nil
         if key == nil && preferSecureEnclave && allowNonHardwareFallback {
-            _ = error?.takeRetainedValue(); error = nil
+            let secureEnclaveError = error?.takeRetainedValue()
+            error = nil
+            let outcome = ACPAppleAuthorityKeyStore.classifySecureEnclaveFailure(
+                secureEnclaveError)
+            guard outcome.permitsKeychainFallback else { throw outcome }
             attributes.removeValue(forKey: kSecAttrTokenID as String)
             key = SecKeyCreateRandomKey(attributes as CFDictionary, &error)
-            hardwareBacked = false
         }
         guard let key
         else {
             _ = error?.takeRetainedValue()
             throw ACPAppleSecurityError.privateKeyUnavailable
         }
-        return try pendingCapability(attemptID: attemptID, key: key,
-                                     knownHardwareBacked: hardwareBacked)
+        return try pendingCapability(attemptID: attemptID, key: key)
     }
 
     package func discardCandidateKey(_ pendingKey: ACPApplePendingCandidateKey) throws {
@@ -363,16 +364,31 @@ public actor ACPAppleIdentityStore {
         try references.delete(name: markerName)
     }
 
-    private func pendingCapability(attemptID: ACPEnrollmentAttemptID, key: SecKey,
-                                   knownHardwareBacked: Bool? = nil) throws -> ACPApplePendingCandidateKey {
-        guard SecKeyCopyExternalRepresentation(key, nil) == nil,
+    private func pendingCapability(attemptID: ACPEnrollmentAttemptID, key: SecKey) throws
+        -> ACPApplePendingCandidateKey {
+        var persistent: CFTypeRef?
+        guard let attributes = SecKeyCopyAttributes(key) as? [String: Any],
+              attributes[kSecAttrKeyType as String] as? String
+                == kSecAttrKeyTypeECSECPrimeRandom as String,
+              (attributes[kSecAttrKeySizeInBits as String] as? NSNumber)?.intValue == 256,
+              SecItemCopyMatching([
+                kSecValueRef as String: key,
+                kSecReturnPersistentRef as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+              ] as CFDictionary, &persistent) == errSecSuccess,
+              persistent is Data,
+              SecKeyCopyExternalRepresentation(key, nil) == nil,
+              SecKeyIsAlgorithmSupported(
+                key, .sign, .ecdsaSignatureDigestX962SHA256),
               let publicKey = SecKeyCopyPublicKey(key),
               let x963 = SecKeyCopyExternalRepresentation(publicKey, nil) as Data?,
               let spki = ACPAppleCredentialIssuer.canonicalSPKI(x963: x963)
         else { throw ACPAppleSecurityError.privateKeyUnavailable }
-        let attributes = SecKeyCopyAttributes(key) as? [String: Any]
-        let hardware = knownHardwareBacked
-            ?? (attributes?[kSecAttrTokenID as String] as? String == kSecAttrTokenIDSecureEnclave as String)
+        let token = attributes[kSecAttrTokenID as String] as? String
+        guard token == nil || token == kSecAttrTokenIDSecureEnclave as String else {
+            throw ACPAppleSecureEnclaveOutcome.providerIntegrityFailure
+        }
+        let hardware = token == kSecAttrTokenIDSecureEnclave as String
         return .init(
             attemptID: attemptID, publicKeySPKI: spki,
             identityKeyID: ACPCredentialIdentifiers.identityKeyID(for: spki),

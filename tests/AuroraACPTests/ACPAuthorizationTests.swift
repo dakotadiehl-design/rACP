@@ -43,6 +43,70 @@ final class ACPAuthorizationTests: XCTestCase {
         XCTAssertFalse(ACPAuthorization.authorize(permission, context: denied).allowed)
     }
 
+    func testAuthorizationDecisionIsSessionTargetRevisionBoundAndOneShot() {
+        let value = ACPAuthorizationContext(
+            principal: principal(), credentialPermissions: [permission],
+            localPolicyPermissions: [permission], capabilityPermissions: [permission],
+            safetyPermissions: [permission], policyRevision: 7, safetyState: "armed",
+            authenticatedSessionID: "session-a", roleAssignmentRevision: 2,
+            capabilityRevision: 3, credentialGeneration: 4,
+            lifecycleGeneration: 5, revocationGeneration: 6)
+        let wrong = ACPAuthorization.authorize(
+            permission, targetScope: "device-a", context: value)
+        XCTAssertFalse(wrong.consume(
+            sessionID: "session-b", operation: permission, targetScope: "device-a",
+            policyRevision: 7, roleAssignmentRevision: 2, capabilityRevision: 3,
+            credentialGeneration: 4, lifecycleGeneration: 5, revocationGeneration: 6))
+        XCTAssertFalse(wrong.consume(
+            sessionID: "session-a", operation: permission, targetScope: "device-a",
+            policyRevision: 7, roleAssignmentRevision: 2, capabilityRevision: 3,
+            credentialGeneration: 4, lifecycleGeneration: 5, revocationGeneration: 6))
+
+        let exact = ACPAuthorization.authorize(
+            permission, targetScope: "device-a", context: value)
+        XCTAssertTrue(exact.consume(
+            sessionID: "session-a", operation: permission, targetScope: "device-a",
+            policyRevision: 7, roleAssignmentRevision: 2, capabilityRevision: 3,
+            credentialGeneration: 4, lifecycleGeneration: 5, revocationGeneration: 6))
+        XCTAssertFalse(exact.consume(
+            sessionID: "session-a", operation: permission, targetScope: "device-a",
+            policyRevision: 7, roleAssignmentRevision: 2, capabilityRevision: 3,
+            credentialGeneration: 4, lifecycleGeneration: 5, revocationGeneration: 6))
+    }
+
+    func testAuditFailurePolicyIsOperationClassSpecificAndBufferIsBounded() throws {
+        let value = context()
+        let administration = ACPAuthorization.authorize(permission, context: value)
+        XCTAssertFalse(administration.consume(
+            sessionID: value.authenticatedSessionID, operation: permission, targetScope: nil,
+            policyRevision: 7, roleAssignmentRevision: 0, capabilityRevision: 0,
+            credentialGeneration: 0, lifecycleGeneration: 0, revocationGeneration: 0,
+            operationClass: .trustLifecycle))
+
+        let log = try ACPBoundedSecurityAuditLog(maximumEvents: 1)
+        let audited = ACPAuthorization.authorize(permission, context: value)
+        XCTAssertTrue(audited.consume(
+            sessionID: value.authenticatedSessionID, operation: permission, targetScope: nil,
+            policyRevision: 7, roleAssignmentRevision: 0, capabilityRevision: 0,
+            credentialGeneration: 0, lifecycleGeneration: 0, revocationGeneration: 0,
+            operationClass: .trustLifecycle, auditSink: log))
+        XCTAssertEqual(log.count, 1)
+
+        let fullBufferAdministration = ACPAuthorization.authorize(permission, context: value)
+        XCTAssertFalse(fullBufferAdministration.consume(
+            sessionID: value.authenticatedSessionID, operation: permission, targetScope: nil,
+            policyRevision: 7, roleAssignmentRevision: 0, capabilityRevision: 0,
+            credentialGeneration: 0, lifecycleGeneration: 0, revocationGeneration: 0,
+            operationClass: .securityAdministration, auditSink: log))
+
+        let liveControl = ACPAuthorization.authorize(permission, context: value)
+        XCTAssertTrue(liveControl.consume(
+            sessionID: value.authenticatedSessionID, operation: permission, targetScope: nil,
+            policyRevision: 7, roleAssignmentRevision: 0, capabilityRevision: 0,
+            credentialGeneration: 0, lifecycleGeneration: 0, revocationGeneration: 0,
+            operationClass: .safetyCriticalLiveControl, auditSink: log))
+    }
+
     func testOperatorReassignmentDoesNotChangeDeviceIdentity() throws {
         let before = try ACPAuthorization.deviceIdentity(principal())
         let value = ACPAuthorizationContext(
@@ -66,6 +130,19 @@ final class ACPAuthorizationTests: XCTestCase {
         XCTAssertEqual(ACPAuthorization.revalidation(previous: previous, current: current), .terminate)
     }
 
+    func testRevisionChangeTerminatesEvenWhenPermissionRemainsAllowed() {
+        let previous = ACPAuthorization.authorize(permission, context: context())
+        let changed = ACPAuthorization.authorize(permission, context: .init(
+            principal: principal(), credentialPermissions: [permission],
+            localPolicyPermissions: [permission], capabilityPermissions: [permission],
+            safetyPermissions: [permission], policyRevision: 8,
+            safetyState: "armed", authenticatedSessionID: previous.authenticatedSessionID))
+        XCTAssertTrue(previous.allowed)
+        XCTAssertTrue(changed.allowed)
+        XCTAssertEqual(
+            ACPAuthorization.revalidation(previous: previous, current: changed), .terminate)
+    }
+
     func testRemoteProductionHostRequiresAuthenticatedPermissionAndIgnoresClaims() async {
         let layout = ACPRemoteLayout(layoutID: "lay", revision: 1, showID: "show", name: "Test", controls: [
             .init(controlID: "go", label: "GO", controlType: "button", permission: "remote.operator", action: "cue.go")
@@ -79,11 +156,15 @@ final class ACPAuthorizationTests: XCTestCase {
         let allowed = ACPAuthorizationContext(
             principal: principal(), credentialPermissions: [remotePermission], localPolicyPermissions: [remotePermission],
             capabilityPermissions: [remotePermission], safetyPermissions: [remotePermission], policyRevision: 1,
-            safetyState: "armed")
+            safetyState: "armed", authenticatedSessionID: "s")
         let applied = await host.invoke(context: allowed, instanceID: "i", sessionID: "s", controlID: "go",
                                         invocationID: "inv-1", interaction: .activate,
                                         claimedRoles: ["remote.admin"])
         XCTAssertEqual(applied.status, "applied")
+        let substituted = await host.invoke(
+            context: allowed, instanceID: "i", sessionID: "attacker-session",
+            controlID: "go", invocationID: "inv-substitution", interaction: .activate)
+        XCTAssertEqual(substituted.code, "remote.control.permission_denied")
         let unauthenticated = ACPAuthorizationContext(
             principal: principal(.unauthenticated), credentialPermissions: [remotePermission],
             localPolicyPermissions: [remotePermission], capabilityPermissions: [remotePermission],

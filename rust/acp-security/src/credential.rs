@@ -436,6 +436,7 @@ pub struct RevocationState {
     entries: HashMap<CredentialId, RevocationEntry>,
     issued_at: Option<String>,
     next_update: Option<String>,
+    snapshot_hash: Option<CredentialId>,
 }
 impl RevocationState {
     pub fn new(domain: TrustDomainId, max_entries: usize) -> Self {
@@ -446,6 +447,7 @@ impl RevocationState {
             entries: HashMap::new(),
             issued_at: None,
             next_update: None,
+            snapshot_hash: None,
         }
     }
     pub fn epoch(&self) -> u64 {
@@ -515,6 +517,18 @@ impl RevocationState {
             _ => return Err(SecurityErrorCode::CredentialInvalid),
         };
         if epoch <= self.epoch {
+            return Err(SecurityErrorCode::AuthenticationFailed);
+        }
+        let previous_hash = fields
+            .get("previous_snapshot_hash")
+            .map(|value| {
+                value
+                    .as_str()
+                    .ok_or(SecurityErrorCode::CredentialInvalid)
+                    .and_then(CredentialId::parse)
+            })
+            .transpose()?;
+        if self.snapshot_hash.is_some() && previous_hash.as_ref() != self.snapshot_hash.as_ref() {
             return Err(SecurityErrorCode::AuthenticationFailed);
         }
         if format == "acp-revocation-delta-v1" {
@@ -625,6 +639,13 @@ impl RevocationState {
                     return Err(SecurityErrorCode::CredentialInvalid);
                 }
             }
+            let revoked_at = entry
+                .get("revoked_at")
+                .and_then(|v| v.as_str())
+                .ok_or(SecurityErrorCode::CredentialInvalid)?;
+            if timestamp_key(revoked_at).is_none() {
+                return Err(SecurityErrorCode::CredentialInvalid);
+            }
             parsed.push(RevocationEntry {
                 credential_id,
                 node_id: SecurityNodeId::parse(
@@ -633,11 +654,7 @@ impl RevocationState {
                         .and_then(|v| v.as_str())
                         .ok_or(SecurityErrorCode::CredentialInvalid)?,
                 )?,
-                revoked_at: entry
-                    .get("revoked_at")
-                    .and_then(|v| v.as_str())
-                    .ok_or(SecurityErrorCode::CredentialInvalid)?
-                    .into(),
+                revoked_at: revoked_at.into(),
                 reason: reason.into(),
             });
         }
@@ -652,6 +669,7 @@ impl RevocationState {
         self.epoch = epoch;
         self.issued_at = Some(issued_at.into());
         self.next_update = Some(next_update.into());
+        self.snapshot_hash = Some(CredentialId::parse(digest_id(raw))?);
         Ok(())
     }
 

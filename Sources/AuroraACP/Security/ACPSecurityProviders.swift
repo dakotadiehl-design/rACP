@@ -15,13 +15,43 @@ public protocol ACPCryptoProvider: Sendable {
 /// construct it or extract its secret.
 public final class ACPConfirmedSPAKE2PlusKey: @unchecked Sendable {
     private let secret: ACPSecretBytes
+    package let transcriptHash: Data
+    private let lock = NSLock()
+    private var claimedForIssuance = false
 
-    package init(secret: ACPSecretBytes) { self.secret = secret }
+    package init(secret: ACPSecretBytes, transcriptHash: Data) {
+        precondition(transcriptHash.count == 32)
+        self.secret = secret
+        self.transcriptHash = transcriptHash
+    }
 
     package func withUnsafeBytes<T>(
         _ operation: (UnsafeRawBufferPointer) throws -> T
     ) rethrows -> T {
         try secret.withUnsafeBytes(operation)
+    }
+
+    package func claimInstallVerifier(
+        transcriptHash: Data
+    ) throws -> ACPEnrollmentInstallVerifier {
+        try lock.withLock {
+            guard transcriptHash == self.transcriptHash else {
+                throw ACPSecurityErrorCode.transcriptMismatch
+            }
+            guard !claimedForIssuance else {
+                throw ACPSecurityErrorCode.enrollmentReplayed
+            }
+            let verifier = try ACPEnrollmentInstallVerifier(
+                confirmedKey: self, transcriptHash: transcriptHash)
+            claimedForIssuance = true
+            return verifier
+        }
+    }
+}
+
+private extension NSLock {
+    func withLock<T>(_ operation: () throws -> T) rethrows -> T {
+        lock(); defer { unlock() }; return try operation()
     }
 }
 

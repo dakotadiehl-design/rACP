@@ -65,6 +65,8 @@ final class FixtureSPAKE2Plus: ACPSPAKE2PlusOperation, @unchecked Sendable {
         guard valid, confirmation == Data("valid".utf8) else {
             throw ACPSecurityErrorCode.authenticationFailed
         }
-        return ACPConfirmedSPAKE2PlusKey(secret: ACPSecretBytes(Data(repeating: 0xA5, count: 32))!)
+        return ACPConfirmedSPAKE2PlusKey(
+            secret: ACPSecretBytes(Data(repeating: 0xA5, count: 32))!,
+            transcriptHash: Data(repeating: 0x5a, count: 32))
     }
 }

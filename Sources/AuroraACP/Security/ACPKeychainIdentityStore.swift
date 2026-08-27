@@ -34,6 +34,18 @@ public final class ACPKeychainCredentialBackend: ACPCredentialSlotBackend, @unch
             } else if add != errSecSuccess { throw ACPSecurityErrorCode.storageFailed }
         } else if update != errSecSuccess { throw ACPSecurityErrorCode.storageFailed }
     }
+    /// Atomically creates a value without replacing an existing reservation.
+    /// Returns false when another process already owns the exact service/name.
+    public func createIfAbsent(name: String, data: Data) throws -> Bool {
+        var insertion = base(name)
+        insertion[kSecValueData as String] = data
+        insertion[kSecAttrAccessible as String]
+            = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(insertion as CFDictionary, nil)
+        if status == errSecDuplicateItem { return false }
+        guard status == errSecSuccess else { throw ACPSecurityErrorCode.storageFailed }
+        return true
+    }
     public func delete(name: String) throws {
         let status = SecItemDelete(base(name) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else { throw ACPSecurityErrorCode.storageFailed }

@@ -76,8 +76,21 @@ package actor ACPAppleEnrollmentCoordinator {
 
     package func commitTrust(_ receipt: ACPAppleVerifiedInstallReceipt,
                              displayName: String?) async throws {
-        try trustStore.recordAuthenticated(receipt.certificate, displayName: displayName)
+        try trustStore.recordPending(receipt.certificate, displayName: displayName)
         try await journal.markInstallReceiptVerified(receipt.authorizationID)
+        try await journal.markTrusted(receipt.authorizationID)
+        try trustStore.activatePending(receipt.package.credentialID)
+    }
+
+    /// Completes only journal-authorized pending trust after a process restart.
+    /// It never reconstructs possession evidence or trusts a peer from portable
+    /// package metadata alone.
+    package func recoverCommittedTrust() async throws {
+        for item in try await journal.trustRecoveryPackages() {
+            guard trustStore.isPending(item.package.credentialID) else { continue }
+            if !item.committed { try await journal.markTrusted(item.package.authorizationID) }
+            try trustStore.activatePending(item.package.credentialID)
+        }
     }
 
     private func verifyInstallProof(_ signature: Data, key: SecKey, transcriptHash: Data,

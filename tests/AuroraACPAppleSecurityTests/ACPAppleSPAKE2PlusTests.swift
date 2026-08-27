@@ -29,6 +29,13 @@ final class ACPAppleSPAKE2PlusTests: XCTestCase {
         let verifierBytes = verifierKey.withUnsafeBytes { Data($0) }
         XCTAssertEqual(proverBytes, verifierBytes)
         XCTAssertEqual(proverBytes.count, 32)
+        let expectedTranscriptHash = ACPSecurityContext.sha256(
+            try ACPSecurityContext.canonicalTranscript([
+                context, share, Data(response.prefix(65)),
+                Data(response.dropFirst(65)), proverResult.confirmation,
+            ]))
+        XCTAssertEqual(proverResult.key.transcriptHash, expectedTranscriptHash)
+        XCTAssertEqual(verifierKey.transcriptHash, expectedTranscriptHash)
 
         XCTAssertThrowsError(try prover.generateShare())
         XCTAssertThrowsError(try verifier.verifyAndConsumeKey(confirmation: proverResult.confirmation))

@@ -1,13 +1,13 @@
 //! Aurora Trust typed models and narrow cryptographic provider boundaries. No networking.
 
-mod authorization;
 mod authority;
+mod authorization;
 mod credential;
 mod hardening;
 mod migration;
 mod transport;
-pub use authorization::*;
 pub use authority::*;
+pub use authorization::*;
 pub use credential::*;
 pub use migration::*;
 pub use transport::*;

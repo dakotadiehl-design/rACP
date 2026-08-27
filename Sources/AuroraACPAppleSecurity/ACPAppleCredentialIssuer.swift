@@ -46,35 +46,65 @@ package final class ACPAppleProtectedSigningKey: ACPSigningKeyHandle, @unchecked
     package let custody: ACPAppleSigningKeyCustody
     private let key: SecKey
 
-    package init(secKey: SecKey, expectedKeyID: ACPIdentityKeyID) throws {
+    package init(
+        secKey: SecKey,
+        expectedKeyID: ACPIdentityKeyID? = nil,
+        expectedCustody: ACPAppleSigningKeyCustody? = nil
+    ) throws {
         guard let attributes = SecKeyCopyAttributes(secKey) as? [String: Any],
+              attributes[kSecAttrKeyType as String] as? String == kSecAttrKeyTypeECSECPrimeRandom as String,
               (attributes[kSecAttrKeySizeInBits as String] as? NSNumber)?.intValue == 256,
-              (attributes[kSecAttrIsPermanent as String] as? NSNumber)?.boolValue == true,
+              Self.hasPersistentReference(secKey),
               SecKeyCopyExternalRepresentation(secKey, nil) == nil,
               SecKeyIsAlgorithmSupported(secKey, .sign, .ecdsaSignatureMessageX962SHA256),
               let publicKey = SecKeyCopyPublicKey(secKey),
               let x963 = SecKeyCopyExternalRepresentation(publicKey, nil) as Data?,
-              let spki = ACPAppleCredentialIssuer.canonicalSPKI(x963: x963),
-              ACPCredentialIdentifiers.identityKeyID(for: spki) == expectedKeyID
+              let spki = ACPAppleCredentialIssuer.canonicalSPKI(x963: x963)
         else { throw ACPAppleSecurityError.privateKeyUnavailable }
+        let actualKeyID = ACPCredentialIdentifiers.identityKeyID(for: spki)
+        guard expectedKeyID == nil || expectedKeyID == actualKeyID else {
+            throw ACPAppleSecureEnclaveOutcome.identityMismatch
+        }
         let token = attributes[kSecAttrTokenID as String] as? String
-        custody = token == kSecAttrTokenIDSecureEnclave as String ? .secureEnclave : .keychain
-        self.key = secKey; keyID = expectedKeyID
+        guard token == nil || token == kSecAttrTokenIDSecureEnclave as String else {
+            throw ACPAppleSecureEnclaveOutcome.providerIntegrityFailure
+        }
+        let actualCustody: ACPAppleSigningKeyCustody = token == kSecAttrTokenIDSecureEnclave as String
+            ? .secureEnclave : .keychain
+        guard expectedCustody == nil || expectedCustody == actualCustody else {
+            throw ACPAppleSecureEnclaveOutcome.identityMismatch
+        }
+        custody = actualCustody
+        self.key = secKey; keyID = actualKeyID
         certificateKey = try Certificate.PrivateKey(secKey)
+    }
+
+    private static func hasPersistentReference(_ key: SecKey) -> Bool {
+        var result: CFTypeRef?
+        return SecItemCopyMatching([
+            kSecValueRef as String: key,
+            kSecReturnPersistentRef as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ] as CFDictionary, &result) == errSecSuccess && result is Data
     }
 
     package func proveOperational() throws {
         let message = Data("ACP authority operational proof v1".utf8)
-        var error: Unmanaged<CFError>?
-        guard let signature = SecKeyCreateSignature(
-            key, .ecdsaSignatureMessageX962SHA256, message as CFData, &error
-        ) as Data?, let publicKey = SecKeyCopyPublicKey(key),
-              SecKeyVerifySignature(publicKey, .ecdsaSignatureMessageX962SHA256,
-                                    message as CFData, signature as CFData, nil)
-        else {
-            _ = error?.takeRetainedValue()
+        guard let publicKey = SecKeyCopyPublicKey(key) else {
             throw ACPAppleSecurityError.privateKeyUnavailable
         }
+        for _ in 0..<16 {
+            var error: Unmanaged<CFError>?
+            if let signature = SecKeyCreateSignature(
+                key, .ecdsaSignatureMessageX962SHA256, message as CFData, &error
+            ) as Data?, ACPAppleCredentialIssuer.isLowSP256(signatureDER: Array(signature)),
+               SecKeyVerifySignature(publicKey, .ecdsaSignatureMessageX962SHA256,
+                                     message as CFData, signature as CFData, nil) {
+                return
+            }
+            _ = error?.takeRetainedValue()
+        }
+        throw ACPAppleSecurityError.privateKeyUnavailable
     }
 
     package func sign(digest: Data) throws -> Data {
@@ -113,12 +143,20 @@ package actor ACPAppleCredentialIssuer: ACPCredentialIssuing {
         guard anchor.subject == anchor.issuer,
               let ski = try anchor.extensions.subjectKeyIdentifier?.keyIdentifier, ski.count == 20,
               let constraints = try anchor.extensions.basicConstraints,
+              let usage = try anchor.extensions.keyUsage,
               anchor.publicKey.isValidSignature(anchor.signature, for: anchor),
+              Self.isLowSP256(signatureDER: anchor.signature.rawRepresentation),
+              ski == ArraySlice(SHA256.hash(
+                data: Data(anchor.publicKey.subjectPublicKeyInfoBytes)).prefix(20)),
               try Self.keyID(for: anchor.publicKey) == authorityKeyID,
               signingKey.keyID == authorityKeyID
         else { throw ACPAppleSecurityError.invalidCertificate }
         guard case .isCertificateAuthority(let maximumPathLength) = constraints,
-              maximumPathLength.map({ $0 <= 1 }) ?? true else {
+              maximumPathLength == 1,
+              usage.keyCertSign, usage.cRLSign,
+              !usage.digitalSignature, !usage.nonRepudiation,
+              !usage.keyEncipherment, !usage.dataEncipherment,
+              !usage.keyAgreement, !usage.encipherOnly, !usage.decipherOnly else {
             throw ACPAppleSecurityError.invalidCertificate
         }
         self.domain = domain; self.authorityKeyID = authorityKeyID; self.anchor = anchor

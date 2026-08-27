@@ -68,6 +68,9 @@ public enum ACPAppleFullServerFactory {
 /// Lifecycle-owned, fail-closed TLS listener. `accept` returns only after mTLS,
 /// certificate policy, HELLO parsing, and exporter verification have succeeded.
 public actor ACPAppleFullServerListener {
+    /// Frozen v1 bound for connections that have reached the listener but have
+    /// not yet been selected for an authenticated handshake.
+    private static let maximumPendingConnections = 32
     private let listener: NWListener
     private let configuration: ACPAppleFullProviderConfiguration
     private var pending: [NWConnection] = []
@@ -152,7 +155,8 @@ public actor ACPAppleFullServerListener {
     private func enqueue(_ connection: NWConnection) {
         guard !stopped else { connection.cancel(); return }
         if let waiter { self.waiter = nil; waiter.continuation.resume(returning: connection) }
-        else { pending.append(connection) }
+        else if pending.count < Self.maximumPendingConnections { pending.append(connection) }
+        else { connection.cancel() }
     }
 
     private func next(timeout: TimeInterval) async throws -> NWConnection {

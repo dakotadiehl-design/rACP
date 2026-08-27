@@ -28,6 +28,11 @@ final class ACPAppleFullAllUpTests: XCTestCase {
         let clientIdentity = try await clientStore.installIssuedPKCS12(
             Data(contentsOf: fixture.directory.appendingPathComponent("client.p12")),
             password: fixture.password, label: fixture.clientLabel, identity: clientACP)
+        // This fixture starts after enrollment, so explicitly seed the same
+        // committed-trust state that the production enrollment coordinator
+        // creates. Transport authentication itself may not create trust.
+        try commitFixtureTrust(clientIdentity, in: hostTrust)
+        try commitFixtureTrust(hostIdentity, in: clientTrust)
         let domain = ACPTrustDomainID(rawValue: fixture.domain)!
         let hostConfiguration = ACPAppleFullProviderConfiguration(
             localIdentity: hostIdentity, anchors: [root], trustDomainID: domain,
@@ -103,6 +108,19 @@ final class ACPAppleFullAllUpTests: XCTestCase {
         _ = try await session.handshake()
         let peer = await session.peer?.nodeID
         return (session, peer)
+    }
+
+    private func commitFixtureTrust(_ identity: ACPAppleLocalIdentity,
+                                    in store: ACPAppleTrustedPeerStore) throws {
+        let metadata = identity.metadata
+        let certificate = ACPAppleVerifiedCertificate(
+            trustDomainID: ACPTrustDomainID(rawValue: metadata.trustDomainID)!,
+            nodeID: ACPSecurityNodeID(rawValue: metadata.nodeID)!,
+            credentialID: ACPCredentialID(rawValue: metadata.credentialID)!,
+            identityKeyID: ACPIdentityKeyID(rawValue: metadata.identityKeyID)!,
+            leafDER: SecCertificateCopyData(identity.certificateChain[0]) as Data)
+        try store.recordPending(certificate, displayName: nil)
+        try store.activatePending(certificate.credentialID)
     }
 
     private func provenance() throws -> ACPProviderProvenance {

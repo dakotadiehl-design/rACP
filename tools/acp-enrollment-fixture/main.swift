@@ -11,7 +11,8 @@ final class FixtureConfirmation: ACPSPAKE2PlusOperation, @unchecked Sendable {
               let secret = ACPSecretBytes(Data(repeating: 0xA5, count: 32)) else {
             throw ACPSecurityErrorCode.authenticationFailed
         }
-        return ACPConfirmedSPAKE2PlusKey(secret: secret)
+        return ACPConfirmedSPAKE2PlusKey(
+            secret: secret, transcriptHash: Data(repeating: 0x5a, count: 32))
     }
 }
 

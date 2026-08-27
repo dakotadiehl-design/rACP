@@ -14,8 +14,27 @@ enum ACPAppleFullQualificationHost {
     }
 
     private static func run(_ arguments: [String]) async throws {
-        guard arguments.count >= 3 else { throw UsageError() }
+        guard arguments.count >= 2 else { throw UsageError() }
         let mode = arguments[0]
+        if mode == "authority-bootstrap" {
+            guard arguments.count == 2 else { throw UsageError() }
+            let service = arguments[1]
+            let store = try ACPAppleTrustDomainAuthorityStore(
+                applicationTag: Data("\(service).authority".utf8),
+                metadataService: service + ".authority",
+                keyMetadataService: service + ".authority-key")
+            let authority = try await store.openOrCreate()
+            emit([
+                "status": "active",
+                "trust_domain_id": authority.identity.trustDomainID.rawValue,
+                "authority_key_id": authority.identity.authorityKeyID.rawValue,
+                "anchor_credential_id": authority.identity.trustAnchorCredentialID.rawValue,
+                "custody": authority.custody.rawValue,
+                "anchor_der_base64": authority.anchorDER.base64EncodedString(),
+            ])
+            return
+        }
+        guard arguments.count >= 3 else { throw UsageError() }
         let fixture = URL(fileURLWithPath: arguments[1], isDirectory: true)
         let service = arguments[2]
         let values = try manifest(fixture)
@@ -34,12 +53,18 @@ enum ACPAppleFullQualificationHost {
         switch mode {
         case "bootstrap":
             guard arguments.count == 3 else { throw UsageError() }
-            _ = try await hostStore.installIssuedPKCS12(
+            let installedHost = try await hostStore.installIssuedPKCS12(
                 Data(contentsOf: fixture.appendingPathComponent("host.p12")),
                 password: values["password"]!, label: hostLabel, identity: hostIdentity)
-            _ = try await clientStore.installIssuedPKCS12(
+            let installedClient = try await clientStore.installIssuedPKCS12(
                 Data(contentsOf: fixture.appendingPathComponent("client.p12")),
                 password: values["password"]!, label: clientLabel, identity: clientIdentity)
+            let hostTrust = try ACPAppleTrustedPeerStore(
+                service: service + ".host-trust", account: "peers")
+            let clientTrust = try ACPAppleTrustedPeerStore(
+                service: service + ".client-trust", account: "peers")
+            try commitFixtureTrust(installedClient, in: hostTrust)
+            try commitFixtureTrust(installedHost, in: clientTrust)
             emit(["status": "bootstrapped"])
         case "server":
             guard arguments.count == 3 else { throw UsageError() }
@@ -116,6 +141,20 @@ enum ACPAppleFullQualificationHost {
         {"schema_version":"1.0","adapter_id":"apple.network-framework.full","source_revision":"\(String(repeating: "a", count: 40))","provider":{"name":"Network.framework","version":"macOS"},"target_triple":"arm64-apple-macosx","profiles":["full"],"key_storage_classes":["keychain"],"qualification":{"status":"PASS","artifact_sha256":"\(String(repeating: "b", count: 64))"}}
         """
         return try ACPProviderProvenance(jsonData: Data(json.utf8))
+    }
+
+    private static func commitFixtureTrust(
+        _ identity: ACPAppleLocalIdentity, in store: ACPAppleTrustedPeerStore
+    ) throws {
+        let metadata = identity.metadata
+        let certificate = ACPAppleVerifiedCertificate(
+            trustDomainID: try required(ACPTrustDomainID(rawValue: metadata.trustDomainID)),
+            nodeID: try required(ACPSecurityNodeID(rawValue: metadata.nodeID)),
+            credentialID: try required(ACPCredentialID(rawValue: metadata.credentialID)),
+            identityKeyID: try required(ACPIdentityKeyID(rawValue: metadata.identityKeyID)),
+            leafDER: SecCertificateCopyData(identity.certificateChain[0]) as Data)
+        try store.recordPending(certificate, displayName: nil)
+        try store.activatePending(certificate.credentialID)
     }
 }
 

@@ -309,6 +309,7 @@ class RevocationState:
     entries: dict[CredentialID, RevocationEntry] = field(default_factory=dict)
     issued_at: datetime | None = None
     next_update: datetime | None = None
+    snapshot_hash: CredentialID | None = None
 
     def ingest(self, raw_body: bytes, signature: bytes, verifier: SignatureVerifier) -> None:
         maximum_bytes = 8192 if self.max_entries <= 128 else 65536
@@ -333,6 +334,13 @@ class RevocationState:
         issuer = body["issuer_key_id"]
         values = body["entries"]
         if not isinstance(epoch, int) or epoch <= self.epoch or not isinstance(values, list):
+            _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
+        previous_hash = body.get("previous_snapshot_hash")
+        if previous_hash is not None:
+            if not isinstance(previous_hash, str):
+                _fail()
+            previous_hash = CredentialID(previous_hash)
+        if self.snapshot_hash is not None and previous_hash != self.snapshot_hash:
             _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
         if body["format"] == "acp-revocation-delta-v1":
             if body.get("base_epoch") != self.epoch or epoch != self.epoch + 1:
@@ -384,6 +392,7 @@ class RevocationState:
         self.epoch = epoch
         self.issued_at = issued_at
         self.next_update = next_update
+        self.snapshot_hash = CredentialID("sha256:" + hashlib.sha256(raw_body).hexdigest())
 
     def contains(self, credential_id: CredentialID) -> bool:
         return credential_id in self.entries
@@ -393,11 +402,12 @@ class RevocationState:
             self.issued_at is None
             or self.next_update is None
             or now.tzinfo is None
-            or maximum_snapshot_age.total_seconds() < 0
+            or not 0 <= maximum_snapshot_age.total_seconds() <= 172_800
         ):
             _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
         deadline = min(self.next_update, self.issued_at + maximum_snapshot_age)
-        if now.astimezone(UTC) > deadline:
+        normalized_now = now.astimezone(UTC)
+        if normalized_now < self.issued_at - timedelta(seconds=120) or normalized_now > deadline:
             _fail(SecurityErrorCode.AUTHENTICATION_FAILED)
 
 
@@ -406,7 +416,7 @@ class ActiveSessionRevocationPolicy(str, Enum):
     EXPLICIT_AUDITED_GRACE = "explicit_audited_grace"
 
     @classmethod
-    def resolve(cls, persisted_value: object) -> "ActiveSessionRevocationPolicy":
+    def resolve(cls, persisted_value: object) -> ActiveSessionRevocationPolicy:
         """Resolve absent/corrupt policy to the frozen fail-closed v1 default."""
         if persisted_value == cls.EXPLICIT_AUDITED_GRACE.value:
             return cls.EXPLICIT_AUDITED_GRACE

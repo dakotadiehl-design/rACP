@@ -75,17 +75,20 @@ mod tests {
     use std::path::PathBuf;
 
     fn root() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../vectors/security/conformance")
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../vectors/security/conformance")
     }
     fn digest(bytes: &[u8]) -> String {
-        Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+        Sha256::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
     }
 
     #[test]
     fn rust_consumes_swift_and_python_security_fixtures() {
         let root = root();
-        let manifest: Value = serde_json::from_slice(&fs::read(root.join("manifest.json")).unwrap()).unwrap();
+        let manifest: Value =
+            serde_json::from_slice(&fs::read(root.join("manifest.json")).unwrap()).unwrap();
         let fixtures = manifest["fixtures"].as_array().unwrap();
         let ids: HashSet<&str> = fixtures.iter().map(|f| f["id"].as_str().unwrap()).collect();
         assert_eq!(ids.len(), fixtures.len());
@@ -98,24 +101,38 @@ mod tests {
                 assert!(ids.contains(dependency.as_str().unwrap()));
             }
             let language = fixture["producer"]["language"].as_str().unwrap();
-            if language == "rust" { continue; }
+            if language == "rust" {
+                continue;
+            }
             foreign.insert(language);
             let artifact: Value = serde_json::from_slice(&raw).unwrap();
             match fixture["artifact_type"].as_str().unwrap() {
                 "x509_chain" => {
                     let leaf = base64_decode(artifact["leaf_der_base64"].as_str().unwrap());
                     let anchor = base64_decode(artifact["root_der_base64"].as_str().unwrap());
-                    assert_eq!(format!("sha256:{}", digest(&leaf)), artifact["leaf_credential_id"]);
-                    assert_eq!(format!("sha256:{}", digest(&anchor)), artifact["root_credential_id"]);
+                    assert_eq!(
+                        format!("sha256:{}", digest(&leaf)),
+                        artifact["leaf_credential_id"]
+                    );
+                    assert_eq!(
+                        format!("sha256:{}", digest(&anchor)),
+                        artifact["root_credential_id"]
+                    );
                 }
                 "revocation_state" => {
                     let snapshot = hex(artifact["snapshot_cbor_hex"].as_str().unwrap());
-                    assert_eq!(format!("sha256:{}", digest(&snapshot)), artifact["snapshot_id"]);
+                    assert_eq!(
+                        format!("sha256:{}", digest(&snapshot)),
+                        artifact["snapshot_id"]
+                    );
                     assert!(artifact["epoch"].as_u64().unwrap() > 0);
                 }
                 "negative_mutation" => {
                     assert_eq!(fixture["expectation"]["result"], "reject");
-                    assert_eq!(artifact["expected_error"], fixture["expectation"]["error_category"]);
+                    assert_eq!(
+                        artifact["expected_error"],
+                        fixture["expectation"]["error_category"]
+                    );
                 }
                 _ => {}
             }
@@ -124,9 +141,11 @@ mod tests {
     }
 
     fn hex(value: &str) -> Vec<u8> {
-        value.as_bytes().chunks_exact(2).map(|pair| {
-            u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap()
-        }).collect()
+        value
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect()
     }
 
     fn base64_decode(value: &str) -> Vec<u8> {
@@ -135,16 +154,24 @@ mod tests {
                 b'A'..=b'Z' => (byte - b'A') as u32,
                 b'a'..=b'z' => (byte - b'a' + 26) as u32,
                 b'0'..=b'9' => (byte - b'0' + 52) as u32,
-                b'+' => 62, b'/' => 63, _ => 0,
+                b'+' => 62,
+                b'/' => 63,
+                _ => 0,
             }
         }
         let mut output = Vec::new();
         for chunk in value.as_bytes().chunks_exact(4) {
-            let bits = (digit(chunk[0]) << 18) | (digit(chunk[1]) << 12)
-                | (digit(chunk[2]) << 6) | digit(chunk[3]);
+            let bits = (digit(chunk[0]) << 18)
+                | (digit(chunk[1]) << 12)
+                | (digit(chunk[2]) << 6)
+                | digit(chunk[3]);
             output.push((bits >> 16) as u8);
-            if chunk[2] != b'=' { output.push((bits >> 8) as u8); }
-            if chunk[3] != b'=' { output.push(bits as u8); }
+            if chunk[2] != b'=' {
+                output.push((bits >> 8) as u8);
+            }
+            if chunk[3] != b'=' {
+                output.push(bits as u8);
+            }
         }
         output
     }

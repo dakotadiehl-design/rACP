@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import XCTest
 @testable import AuroraACP
@@ -5,17 +6,30 @@ import XCTest
 final class ACPCredentialIssuanceTests: XCTestCase {
     func testAuthorizationIsBoundAndOneShot() throws {
         let facts = try makeFacts()
-        let authorization = try ACPIssuanceAuthorizationGate.authorize(
-            facts: facts, cryptographyConfirmed: true, candidateIdentityBound: true,
-            approvalMatchesCeremony: true, approvalUnexpired: true, approvalSingleUse: true,
-            cancelled: false, replayed: false, publicKeyValid: true, trustDomainValid: true,
+        let ceremonyKey = confirmedKey(facts.transcriptHash)
+        let capabilities = try ACPIssuanceAuthorizationGate.authorize(
+            facts: facts, confirmedKey: ceremonyKey,
+            approvalMatchesCeremony: true, approvalSingleUse: true,
+            cancelled: false, replayed: false,
             stillValid: { true })
-        XCTAssertEqual(try authorization.consume(now: Date(timeIntervalSince1970: 1_100)), facts)
-        XCTAssertThrowsError(try authorization.consume(now: Date(timeIntervalSince1970: 1_100)))
+        XCTAssertEqual(try capabilities.authorization.consume(
+            now: Date(timeIntervalSince1970: 1_100)), facts)
+        XCTAssertThrowsError(try capabilities.authorization.consume(
+            now: Date(timeIntervalSince1970: 1_100)))
         XCTAssertThrowsError(try ACPIssuanceAuthorizationGate.authorize(
-            facts: facts, cryptographyConfirmed: true, candidateIdentityBound: true,
-            approvalMatchesCeremony: false, approvalUnexpired: true, approvalSingleUse: true,
-            cancelled: false, replayed: false, publicKeyValid: true, trustDomainValid: true,
+            facts: facts, confirmedKey: ceremonyKey,
+            approvalMatchesCeremony: true,
+            approvalSingleUse: true, cancelled: false, replayed: false,
+            stillValid: { true }))
+        XCTAssertThrowsError(try ACPIssuanceAuthorizationGate.authorize(
+            facts: facts,
+            confirmedKey: confirmedKey(Data(repeating: 0xff, count: 32)),
+            approvalMatchesCeremony: true, approvalSingleUse: true,
+            cancelled: false, replayed: false, stillValid: { true }))
+        XCTAssertThrowsError(try ACPIssuanceAuthorizationGate.authorize(
+            facts: facts, confirmedKey: confirmedKey(facts.transcriptHash),
+            approvalMatchesCeremony: false, approvalSingleUse: true,
+            cancelled: false, replayed: false,
             stillValid: { true }))
     }
 
@@ -84,9 +98,10 @@ final class ACPCredentialIssuanceTests: XCTestCase {
     func testInstallConfirmationIsSealedExactAndOneShot() throws {
         let facts = try makeFacts()
         let shared = Data(repeating: 0xa5, count: 32)
-        let verifier = try ACPEnrollmentInstallVerifier(
-            confirmedKey: ACPConfirmedSPAKE2PlusKey(secret: ACPSecretBytes(shared)!),
-            transcriptHash: facts.transcriptHash)
+        let verifier = try ACPConfirmedSPAKE2PlusKey(
+            secret: ACPSecretBytes(shared)!,
+            transcriptHash: facts.transcriptHash).claimInstallVerifier(
+                transcriptHash: facts.transcriptHash)
         let credential = "sha256:" + String(repeating: "c", count: 64)
         let values: [String: AnySendable] = [
             "attempt_id": .string(facts.attemptID.rawValue), "status": .string("installed"),
@@ -108,9 +123,10 @@ final class ACPCredentialIssuanceTests: XCTestCase {
         XCTAssertEqual(evidence.credentialID.rawValue, credential)
         XCTAssertThrowsError(try verifier.verify(values: values, confirmation: confirmation))
 
-        let badVerifier = try ACPEnrollmentInstallVerifier(
-            confirmedKey: ACPConfirmedSPAKE2PlusKey(secret: ACPSecretBytes(shared)!),
-            transcriptHash: facts.transcriptHash)
+        let badVerifier = try ACPConfirmedSPAKE2PlusKey(
+            secret: ACPSecretBytes(shared)!,
+            transcriptHash: facts.transcriptHash).claimInstallVerifier(
+                transcriptHash: facts.transcriptHash)
         XCTAssertThrowsError(try badVerifier.verify(
             values: values, confirmation: Data(repeating: 0, count: 32)))
         XCTAssertThrowsError(try badVerifier.verify(values: values, confirmation: confirmation))
@@ -140,6 +156,16 @@ final class ACPCredentialIssuanceTests: XCTestCase {
                          verifier: AcceptingVerifier(expectedKeyID: facts.authorityKeyID.rawValue))
         XCTAssertEqual(state.epoch, 2)
 
+        let restoredPublisher = try ACPRevocationPublisher(
+            domain: facts.trustDomainID, signer: signer, backend: backend)
+        let durable = try await restoredPublisher.latest(
+            at: Date(timeIntervalSince1970: 1_200), maximumSnapshotAge: 500)
+        XCTAssertEqual(durable, refreshed)
+        await XCTAssertThrowsErrorAsync {
+            _ = try await restoredPublisher.latest(
+                at: Date(timeIntervalSince1970: 2_101), maximumSnapshotAge: 5_000)
+        }
+
         await XCTAssertThrowsErrorAsync {
             _ = try await publisher.revoke(
                 credentialID: credential, nodeID: facts.candidateNodeID, reason: "policy",
@@ -153,7 +179,7 @@ final class ACPCredentialIssuanceTests: XCTestCase {
     }
 
     private func makeFacts() throws -> ACPIssuanceCeremonyFacts {
-        let spki = Data(repeating: 0x42, count: 91)
+        let spki = P256.Signing.PrivateKey().publicKey.derRepresentation
         return try .init(
             authorizationID: UUID(uuidString: "10000000-0000-4000-8000-000000000001")!,
             enrollmentID: ACPEnrollmentID(rawValue: "20000000-0000-4000-8000-000000000001")!,
@@ -175,10 +201,16 @@ final class ACPCredentialIssuanceTests: XCTestCase {
 
     private func authorized(_ facts: ACPIssuanceCeremonyFacts) throws -> ACPIssuanceAuthorization {
         try ACPIssuanceAuthorizationGate.authorize(
-            facts: facts, cryptographyConfirmed: true, candidateIdentityBound: true,
-            approvalMatchesCeremony: true, approvalUnexpired: true, approvalSingleUse: true,
-            cancelled: false, replayed: false, publicKeyValid: true, trustDomainValid: true,
-            stillValid: { true })
+            facts: facts, confirmedKey: confirmedKey(facts.transcriptHash),
+            approvalMatchesCeremony: true, approvalSingleUse: true,
+            cancelled: false, replayed: false,
+            stillValid: { true }).authorization
+    }
+
+    private func confirmedKey(_ transcriptHash: Data) -> ACPConfirmedSPAKE2PlusKey {
+        ACPConfirmedSPAKE2PlusKey(
+            secret: ACPSecretBytes(Data(repeating: 0xa5, count: 32))!,
+            transcriptHash: transcriptHash)
     }
 }
 

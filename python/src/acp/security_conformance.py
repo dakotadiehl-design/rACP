@@ -45,7 +45,8 @@ def _validate_foreign_artifact(fixture: dict[str, Any], artifact: dict[str, Any]
     kind = fixture["artifact_type"]
     if kind == "canonical_spki":
         spki = bytes.fromhex(artifact["spki_der_hex"])
-        if len(spki) != 91 or not spki.startswith(bytes.fromhex("3059301306072a8648ce3d020106082a8648ce3d03010703420004")):
+        prefix = bytes.fromhex("3059301306072a8648ce3d020106082a8648ce3d03010703420004")
+        if len(spki) != 91 or not spki.startswith(prefix):
             raise ValueError("noncanonical P-256 SPKI")
         if "sha256:" + hashlib.sha256(spki).hexdigest() != artifact["identity_key_id"]:
             raise ValueError("identity key ID mismatch")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 
 import pytest
@@ -159,25 +160,28 @@ def test_extension_handling_is_fail_closed(value: bytes) -> None:
 def test_revocation_epoch_never_moves_backward(epoch: int, next_epoch: int) -> None:
     state = RevocationState(DOMAIN, 10)
 
-    def snapshot(value: int) -> bytes:
-        return encode(
-            {
-                "format": "acp-revocation-snapshot-v1",
-                "trust_domain_id": str(DOMAIN),
-                "epoch": value,
-                "issued_at": CborTag(0, "2026-08-26T00:00:00Z"),
-                "next_update": CborTag(0, "2026-08-27T00:00:00Z"),
-                "issuer_key_id": ISSUER,
-                "entries": [],
-            }
-        )
+    def snapshot(value: int, previous_hash: str | None = None) -> bytes:
+        body = {
+            "format": "acp-revocation-snapshot-v1",
+            "trust_domain_id": str(DOMAIN),
+            "epoch": value,
+            "issued_at": CborTag(0, "2026-08-26T00:00:00Z"),
+            "next_update": CborTag(0, "2026-08-27T00:00:00Z"),
+            "issuer_key_id": ISSUER,
+            "entries": [],
+        }
+        if previous_hash is not None:
+            body["previous_snapshot_hash"] = previous_hash
+        return encode(body)
 
-    state.ingest(snapshot(epoch), b"sig", lambda *_: True)
+    initial = snapshot(epoch)
+    state.ingest(initial, b"sig", lambda *_: True)
+    previous_hash = "sha256:" + hashlib.sha256(initial).hexdigest()
     if next_epoch <= epoch:
         with pytest.raises(ValueError):
-            state.ingest(snapshot(next_epoch), b"sig", lambda *_: True)
+            state.ingest(snapshot(next_epoch, previous_hash), b"sig", lambda *_: True)
     else:
-        state.ingest(snapshot(next_epoch), b"sig", lambda *_: True)
+        state.ingest(snapshot(next_epoch, previous_hash), b"sig", lambda *_: True)
         assert state.epoch == next_epoch
 
 
