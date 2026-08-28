@@ -49,6 +49,9 @@ Add the repository as a Swift Package dependency and depend on the
 `ReasonableACP` product. The portable core exposes `JSONValue`, `RACPMessage`,
 `RACPLineDecoder`, `RACPSession`, and `RACPConnection`. Apple platforms also expose
 `NetworkByteStream` and `RACPNetworkServer` for bounded plain-TCP connections.
+`RACPNetworkServer(port:binding:)` accepts `.loopback` with port `0` for isolated
+integration tests; its `port` property reports the OS-assigned port after startup.
+The default remains `.allInterfaces`.
 
 Client applications can observe `connection.stateUpdates()`, await
 `connection.waitUntilReady()`, and issue correlated requests with

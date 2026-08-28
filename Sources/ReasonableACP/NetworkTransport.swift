@@ -112,6 +112,13 @@
     public func close() async { connection.cancel() }
   }
 
+  public enum RACPNetworkServerBinding: Sendable, Equatable {
+    /// Preserve the production default by accepting connections on all interfaces.
+    case allInterfaces
+    /// Bind only to the IPv4 loopback interface, primarily for local integration tests.
+    case loopback
+  }
+
   public final class RACPNetworkServer: @unchecked Sendable {
     private let listener: NWListener
     private let sessionFactory: @Sendable () -> RACPSession
@@ -122,6 +129,7 @@
 
     public init(
       port: UInt16,
+      binding: RACPNetworkServerBinding = .allInterfaces,
       maximumConnections: Int = 64,
       connectionHandler: @escaping @Sendable (RACPConnection) -> Void = { _ in },
       sessionFactory: @escaping @Sendable () -> RACPSession
@@ -129,7 +137,14 @@
       guard maximumConnections > 0, let port = NWEndpoint.Port(rawValue: port) else {
         throw RACPConnectionError.connectionLost
       }
-      listener = try NWListener(using: racpTCPParameters(), on: port)
+      let parameters = racpTCPParameters()
+      switch binding {
+      case .allInterfaces:
+        listener = try NWListener(using: parameters, on: port)
+      case .loopback:
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
+        listener = try NWListener(using: parameters)
+      }
       self.maximumConnections = maximumConnections
       self.connectionHandler = connectionHandler
       self.sessionFactory = sessionFactory

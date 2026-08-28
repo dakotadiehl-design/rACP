@@ -90,6 +90,25 @@
     listener.cancel()
   }
 
+  @Test func networkServerSupportsLoopbackEphemeralBinding() async throws {
+    let hello = try RACPHello(peerType: "device", peerID: "loopback")
+    let server = try RACPNetworkServer(port: 0, binding: .loopback) {
+      RACPSession(local: hello)
+    }
+    try await server.start()
+    defer { server.cancel() }
+    let port = try #require(server.port)
+    #expect(port != 0)
+
+    let connection = RACPConnection(
+      stream: try await NetworkByteStream.connect(host: "127.0.0.1", port: port),
+      session: RACPSession(local: try RACPHello(peerType: "remote", peerID: "test")))
+    let run = Task { await connection.run() }
+    #expect(try await connection.waitUntilReady() == hello)
+    await connection.close(reason: "test_complete")
+    await run.value
+  }
+
   @Test func productionTCPConversationAndCorrelation() async throws {
     let applied = CommandRecorder()
     let serverHello = try RACPHello(peerType: "device", peerID: "server", capabilities: ["cue.go"])
