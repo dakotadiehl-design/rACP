@@ -50,7 +50,7 @@
 
     public static func connect(endpoint: RACPNetworkEndpoint) async throws -> NetworkByteStream {
       let networkEndpoint: NWEndpoint
-      if let retained = endpoint.platformEndpoint as? NWEndpoint {
+      if let retained = endpoint.platformEndpoint {
         networkEndpoint = retained
       } else {
         switch endpoint.kind {

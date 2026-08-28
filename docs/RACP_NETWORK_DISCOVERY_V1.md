@@ -7,14 +7,15 @@ an rACP implementation remains conforming without discovery support.
 ## DNS-SD records
 
 An advertiser publishes `_racp._tcp` in the `local.` domain. Its service instance name
-is a human-readable label and is not persistent identity. DNS-SD supplies the SRV port
+is a human-readable label and is not persistent identity. It is 1–63 UTF-8 bytes and
+must not contain ASCII control characters. DNS-SD supplies the SRV port
 and target hostname and the corresponding A and/or AAAA records.
 
 The TXT record contains these required v1 keys:
 
 | Key | Value |
 | --- | --- |
-| `v` | ASCII unsigned decimal profile version; v1 is `1` |
+| `v` | ASCII unsigned decimal profile version without leading zeros; v1 is `1` |
 | `id` | The peer ID that the advertiser will send in rACP `HELLO` |
 | `type` | The peer type that the advertiser will send in rACP `HELLO` |
 

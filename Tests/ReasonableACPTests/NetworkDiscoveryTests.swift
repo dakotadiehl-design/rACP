@@ -15,17 +15,44 @@ import Testing
   #expect(throws: RACPNetworkDiscoveryError.invalidConfiguration) {
     try RACPNetworkAdvertisement(instanceName: "Prism", peerID: "not valid", peerType: "prism")
   }
+  #expect(throws: RACPNetworkDiscoveryError.invalidConfiguration) {
+    try RACPNetworkAdvertisement(instanceName: "Prism\nHidden", peerID: "prism", peerType: "prism")
+  }
   #expect(throws: RACPNetworkDiscoveryError.invalidTXTRecord) {
     try RACPDiscoveryTXT.validate([
       ("v", "1"), ("id", "one"), ("id", "two"), ("type", "prism"),
     ])
   }
+  var duplicateWireRecord = Data()
+  for item in ["v=1", "id=one", "id=two", "type=prism"] {
+    duplicateWireRecord.append(UInt8(item.utf8.count))
+    duplicateWireRecord.append(contentsOf: item.utf8)
+  }
+  #expect(throws: RACPNetworkDiscoveryError.invalidTXTRecord) {
+    try RACPDiscoveryTXT.validate(duplicateWireRecord)
+  }
   #expect(throws: RACPNetworkDiscoveryError.unsupportedProfileVersion(2)) {
     try RACPDiscoveryTXT.validate(["v": "2", "id": "prism", "type": "prism"])
   }
   #expect(throws: RACPNetworkDiscoveryError.invalidTXTRecord) {
+    try RACPDiscoveryTXT.validate(["v": "01", "id": "prism", "type": "prism"])
+  }
+  #expect(throws: RACPNetworkDiscoveryError.invalidTXTRecord) {
     try RACPDiscoveryTXT.validate(["v": "1", "id": "prism"])
   }
+}
+
+@Test func discoveryIDsCannotCollideThroughComponentSeparators() {
+  let first = RACPDiscoveryID.service(
+    instanceName: "a|1:b", type: "_racp._tcp", domain: "local.", interfaceNames: ["en0"])
+  let second = RACPDiscoveryID.service(
+    instanceName: "a", type: "1:b|_racp._tcp", domain: "local.", interfaceNames: ["en0"])
+  #expect(first != second)
+  #expect(
+    RACPDiscoveryID.service(
+      instanceName: "a", type: "_racp._tcp", domain: "local.", interfaceNames: ["a,b"])
+      != RACPDiscoveryID.service(
+        instanceName: "a", type: "_racp._tcp", domain: "local.", interfaceNames: ["a", "b"]))
 }
 
 @Test func discoveryHelloValidationReportsMatchesAndMismatches() throws {

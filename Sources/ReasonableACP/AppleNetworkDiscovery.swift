@@ -2,12 +2,26 @@
   import Foundation
   import Network
 
+  private final class RACPDiscoveryCallbackSequence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: UInt64 = 0
+
+    func next() -> UInt64 {
+      lock.withLock {
+        value &+= 1
+        return value
+      }
+    }
+  }
+
   public actor RACPNetworkDiscovery {
     private enum Lifecycle { case idle, running, stopped, failed }
 
     private let browser: NWBrowser
     private let queue: DispatchQueue
+    private let callbackSequence = RACPDiscoveryCallbackSequence()
     private var lifecycle: Lifecycle = .idle
+    private var lastAppliedCallback: UInt64 = 0
     private var services: [RACPDiscoveryID: RACPDiscoveredService] = [:]
     private var observers:
       [UUID: AsyncThrowingStream<RACPNetworkDiscoveryEvent, any Error>.Continuation] = [:]
@@ -30,7 +44,8 @@
       }
       browser.browseResultsChangedHandler = { [weak self] results, _ in
         guard let self else { return }
-        Task { await self.replaceResults(results) }
+        let sequence = self.callbackSequence.next()
+        Task { await self.replaceResults(results, sequence: sequence) }
       }
       browser.start(queue: queue)
     }
@@ -45,7 +60,10 @@
           return
         }
         observers[id] = continuation
-        continuation.onTermination = { _ in Task { await self.removeObserver(id) } }
+        continuation.onTermination = { [weak self] _ in
+          guard let self else { return }
+          Task { await self.removeObserver(id) }
+        }
       }
       return RACPDiscoveryObservation(
         initialServices: services.values.sorted(by: Self.sortServices), events: stream)
@@ -77,15 +95,15 @@
       }
     }
 
-    private func replaceResults(_ results: Set<NWBrowser.Result>) {
-      guard lifecycle == .running else { return }
+    private func replaceResults(_ results: Set<NWBrowser.Result>, sequence: UInt64) {
+      guard lifecycle == .running, sequence > lastAppliedCallback else { return }
+      lastAppliedCallback = sequence
       var replacement: [RACPDiscoveryID: RACPDiscoveredService] = [:]
       for result in results {
         guard let service = try? Self.makeService(result) else { continue }
         replacement[service.id] = service
       }
-      for (id, old) in services where replacement[id] == nil {
-        _ = old
+      for id in services.keys where replacement[id] == nil {
         emit(.removed(id))
       }
       for (id, service) in replacement {
@@ -107,7 +125,7 @@
     }
 
     private func finishObservers(throwing error: (any Error)? = nil) {
-      let current = observers.values
+      let current = Array(observers.values)
       observers.removeAll()
       for observer in current {
         if let error { observer.finish(throwing: error) } else { observer.finish() }
@@ -120,26 +138,13 @@
       guard case .service(let name, let type, let domain, let scopedInterface) = result.endpoint,
         case .bonjour(let txtRecord) = result.metadata
       else { throw RACPNetworkDiscoveryError.invalidTXTRecord }
-      guard txtRecord.data.count <= RACPNetworkDiscoveryProfile.maximumTXTBytes else {
-        throw RACPNetworkDiscoveryError.invalidTXTRecord
-      }
-      let entries: [(String, String?)] = txtRecord.map { entry in
-        let value: String? =
-          switch entry.value {
-          case .string(let value): value
-          case .empty: ""
-          case .none: nil
-          case .data(let data): String(data: data, encoding: .utf8)
-          @unknown default: nil
-          }
-        return (entry.key, value)
-      }
-      let validated = try RACPDiscoveryTXT.validate(entries)
+      let validated = try RACPDiscoveryTXT.validate(txtRecord.data)
       let interfaces = result.interfaces.map(Self.makeInterface).sorted {
         ($0.name, $0.kind.rawValue) < ($1.name, $1.kind.rawValue)
       }
-      let scope = scopedInterface?.name ?? interfaces.map(\.name).joined(separator: ",")
-      let id = RACPDiscoveryID(rawValue: [name, type, domain, scope].joined(separator: "\u{1f}"))
+      let id = RACPDiscoveryID.service(
+        instanceName: name, type: type, domain: domain,
+        interfaceNames: scopedInterface.map { [$0.name] } ?? interfaces.map(\.name))
       let endpoint = RACPNetworkEndpoint(
         kind: .service(
           name: name, type: type, domain: domain, interfaceName: scopedInterface?.name),

@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(Network)
+  import Network
+#endif
+
 public enum RACPNetworkDiscoveryProfile {
   public static let serviceType = "_racp._tcp"
   public static let domain = "local."
@@ -14,6 +18,7 @@ public struct RACPNetworkAdvertisement: Sendable, Equatable {
 
   public init(instanceName: String, peerID: String, peerType: String) throws {
     guard !instanceName.isEmpty, instanceName.utf8.count <= 63,
+      !instanceName.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7f }),
       Self.validPeerToken(peerID), Self.validPeerToken(peerType)
     else { throw RACPNetworkDiscoveryError.invalidConfiguration }
     self.instanceName = instanceName
@@ -51,6 +56,16 @@ public struct RACPDiscoveryID: Sendable, Hashable, CustomStringConvertible {
   public let rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
   public var description: String { rawValue }
+
+  static func service(
+    instanceName: String, type: String, domain: String, interfaceNames: [String]
+  ) -> Self {
+    let components =
+      [instanceName, type.lowercased(), domain.lowercased()]
+      + interfaceNames.sorted()
+    return Self(
+      rawValue: components.map { "\($0.utf8.count):\($0)" }.joined(separator: "|"))
+  }
 }
 
 public struct RACPNetworkInterface: Sendable, Hashable {
@@ -67,7 +82,7 @@ public struct RACPNetworkInterface: Sendable, Hashable {
   }
 }
 
-public struct RACPNetworkEndpoint: @unchecked Sendable, Hashable {
+public struct RACPNetworkEndpoint: Sendable, Hashable {
   public enum Kind: Sendable, Hashable {
     case hostPort(host: String, port: UInt16)
     case service(name: String, type: String, domain: String, interfaceName: String?)
@@ -76,7 +91,7 @@ public struct RACPNetworkEndpoint: @unchecked Sendable, Hashable {
   public let kind: Kind
 
   #if canImport(Network)
-    let platformEndpoint: Any?
+    let platformEndpoint: NWEndpoint?
   #endif
 
   public init(host: String, port: UInt16) {
@@ -98,6 +113,42 @@ public struct RACPNetworkEndpoint: @unchecked Sendable, Hashable {
 }
 
 enum RACPDiscoveryTXT {
+  static func validate(_ data: Data) throws -> (version: UInt, id: String, type: String) {
+    guard data.count <= RACPNetworkDiscoveryProfile.maximumTXTBytes else {
+      throw RACPNetworkDiscoveryError.invalidTXTRecord
+    }
+    var entries: [(String, String?)] = []
+    var offset = data.startIndex
+    while offset < data.endIndex {
+      let length = Int(data[offset])
+      offset = data.index(after: offset)
+      guard length > 0, let end = data.index(offset, offsetBy: length, limitedBy: data.endIndex)
+      else { throw RACPNetworkDiscoveryError.invalidTXTRecord }
+      let entry = data[offset..<end]
+      offset = end
+      let separator = entry.firstIndex(of: UInt8(ascii: "="))
+      let keyBytes = separator.map { entry[..<$0] } ?? entry[...]
+      guard !keyBytes.isEmpty, let key = String(data: keyBytes, encoding: .utf8) else {
+        throw RACPNetworkDiscoveryError.invalidTXTRecord
+      }
+      let value: String?
+      if let separator {
+        let valueStart = entry.index(after: separator)
+        guard let decoded = String(data: entry[valueStart...], encoding: .utf8) else {
+          // Unknown keys may carry binary data. Required keys are checked below.
+          value = nil
+          entries.append((key, value))
+          continue
+        }
+        value = decoded
+      } else {
+        value = nil
+      }
+      entries.append((key, value))
+    }
+    return try validate(entries)
+  }
+
   static func validate(_ values: [String: String]) throws -> (
     version: UInt, id: String, type: String
   ) {
@@ -120,6 +171,7 @@ enum RACPDiscoveryTXT {
     }
     guard encodedBytes <= RACPNetworkDiscoveryProfile.maximumTXTBytes,
       let versionValue = values["v"], !versionValue.isEmpty,
+      versionValue == "0" || versionValue.first != "0",
       versionValue.utf8.allSatisfy({ (48...57).contains($0) }),
       let version = UInt(versionValue),
       let id = values["id"], RACPNetworkAdvertisement.validPeerToken(id),
