@@ -48,6 +48,27 @@
       return stream
     }
 
+    public static func connect(endpoint: RACPNetworkEndpoint) async throws -> NetworkByteStream {
+      let networkEndpoint: NWEndpoint
+      if let retained = endpoint.platformEndpoint as? NWEndpoint {
+        networkEndpoint = retained
+      } else {
+        switch endpoint.kind {
+        case .hostPort(let host, let port):
+          guard let networkPort = NWEndpoint.Port(rawValue: port) else {
+            throw RACPNetworkDiscoveryError.invalidConfiguration
+          }
+          networkEndpoint = .hostPort(host: NWEndpoint.Host(host), port: networkPort)
+        case .service(let name, let type, let domain, _):
+          networkEndpoint = .service(name: name, type: type, domain: domain, interface: nil)
+        }
+      }
+      let connection = NWConnection(to: networkEndpoint, using: racpTCPParameters())
+      let stream = NetworkByteStream(connection: connection)
+      try await stream.start()
+      return stream
+    }
+
     public func start() async throws {
       try await withCheckedThrowingContinuation {
         (continuation: CheckedContinuation<Void, any Error>) in
@@ -131,6 +152,7 @@
       port: UInt16,
       binding: RACPNetworkServerBinding = .allInterfaces,
       maximumConnections: Int = 64,
+      advertisement: RACPNetworkAdvertisement? = nil,
       connectionHandler: @escaping @Sendable (RACPConnection) -> Void = { _ in },
       sessionFactory: @escaping @Sendable () -> RACPSession
     ) throws {
@@ -144,6 +166,15 @@
       case .loopback:
         parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
         listener = try NWListener(using: parameters)
+      }
+      if let advertisement {
+        let txtRecord = NWTXTRecord(advertisement.txtValues)
+        guard txtRecord.data.count <= RACPNetworkDiscoveryProfile.maximumTXTBytes else {
+          throw RACPNetworkDiscoveryError.invalidConfiguration
+        }
+        listener.service = NWListener.Service(
+          name: advertisement.instanceName, type: RACPNetworkDiscoveryProfile.serviceType,
+          domain: RACPNetworkDiscoveryProfile.domain, txtRecord: txtRecord)
       }
       self.maximumConnections = maximumConnections
       self.connectionHandler = connectionHandler

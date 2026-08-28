@@ -1,0 +1,30 @@
+# Copy this file outside source control and adapt it to a disposable Prism instance.
+[target]
+host = "127.0.0.1"
+port = 9000
+expected_peer_type = "device"
+# expected_peer_id = "prism-main"
+required_capabilities = ["cue.go"]
+
+[local]
+peer_type = "diagnostic"
+peer_id = "prism-harness"
+
+[options]
+timeout = 5.0
+output_dir = "prism-harness-results"
+malformed_tests = true
+
+[metadata]
+environment = "disposable-local"
+
+# Omit `value` to test CMD without a value. TOML has no null literal, so use
+# `value_json = "null"` when a command must carry explicit JSON null.
+[[commands]]
+name = "cue.go"
+expected = "ack"
+state_changing = true
+
+# [[subscriptions]]
+# name = "cue.current"
+# expect_initial = true

@@ -12,6 +12,7 @@ with appropriate VLANs, ACLs, firewalls, physical isolation, or a VPN.
 ## Start here
 
 - [rACP v1 specification](docs/RACP_SPEC_V1.md)
+- [rACP Network Discovery Profile v1](docs/RACP_NETWORK_DISCOVERY_V1.md)
 - [Manual TCP test](docs/RACP_TCP_MANUAL_TEST.md)
 - [Cross-language conformance plan](docs/RACP_CROSS_LANGUAGE.md)
 
@@ -86,3 +87,46 @@ drive the ordinary rACP disconnection lifecycle.
 The implementation is transport-independent above its byte-stream adapter. A future
 TLS/TCP transport can wrap the same rACP messages without changing application
 semantics.
+
+## Local-network discovery
+
+Apple platforms expose optional DNS-SD browsing through `RACPNetworkDiscovery` and
+advertising through `RACPNetworkServer` configuration. Static host/port connections
+remain supported when multicast DNS is unavailable or filtered.
+
+```swift
+let advertisement = try RACPNetworkAdvertisement(
+  instanceName: "Prism Stage Left", peerID: "prism-a1b2c3", peerType: "prism")
+let server = try RACPNetworkServer(port: 0, advertisement: advertisement) {
+  RACPSession(local: localHello)
+}
+try await server.start()
+
+let discovery = RACPNetworkDiscovery()
+let observation = await discovery.observe()
+try await discovery.start()
+for try await event in observation.events {
+  if case .added(let service) = event {
+    let stream = try await NetworkByteStream.connect(endpoint: service.endpoint)
+    // Run an RACPConnection and validate service hints against its HELLO peer.
+  }
+}
+```
+
+`observe()` atomically returns the current snapshot and subsequent changes. After
+`.resyncRequired`, obtain a fresh snapshot with `discoveredServices()`. Discovery
+instances are single-use; `stop()` is idempotent.
+
+App Store applications that browse or advertise must declare local-network usage:
+
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>Discover and connect to rACP devices on your local network.</string>
+<key>NSBonjourServices</key>
+<array>
+  <string>_racp._tcp</string>
+</array>
+```
+
+Avahi and lwIP can implement the same profile. TXT data is untrusted; the connected
+rACP `HELLO` remains authoritative.

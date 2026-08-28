@@ -54,3 +54,13 @@ The golden files contain only normative v1 forms and no security credentials, en
 negotiation, profiles, or generated schemas. Python and Swift now preserve the same
 transport-independent semantic shape. Rust remains deferred until Bridge has a concrete
 integration need.
+
+## Optional network discovery profile
+
+Ports that implement local discovery publish and browse `_racp._tcp.local` according
+to `RACP_NETWORK_DISCOVERY_V1.md`. Apple uses Network.framework, Linux systems can use
+Avahi, and lwIP devices can call `mdns_resp_add_service` with service `_racp`, TCP, the
+listener port, and TXT items `v=1`, `id=<peer-id>`, and `type=<peer-type>`.
+
+Discovery models must not expose backend-native endpoint types as their portable
+semantic contract. Static endpoints remain supported by every transport.
